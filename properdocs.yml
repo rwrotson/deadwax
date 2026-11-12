@@ -13,8 +13,11 @@ watch:
 nav:
   - Home: index.md
   - Getting Started: getting_started.md
+  - Sources: sources.md
+  - Output: output.md
   - Architecture: architecture.md
   - Configuration: configuration.md
+  - Schema: schema.md
   - Notes: notes.md
   - API Reference: reference/
 
@@ -56,6 +59,7 @@ plugins:
       scripts:
         - docs/gen_ref_pages.py
         - docs/gen_config_page.py
+        - docs/gen_schema_page.py
   - literate-nav:
       nav_file: SUMMARY.md
   - mkdocstrings:

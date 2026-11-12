@@ -494,11 +494,27 @@ def _wanted(heading: str, language: str) -> bool:
     return any(a in heading for a in allowed) and not any(d in heading for d in denied)
 
 
+def _quoted(node: Node, root: Node) -> bool:
+    parent = node.parent
+    while parent is not None and parent != root:
+        if parent.tag == "blockquote":
+            return True
+        parent = parent.parent
+    return False
+
+
+def _paragraph(node: Node) -> str | None:
+    # Text nodes are joined as written: a separator would put spaces before punctuation after links.
+    return " ".join(node.text(separator="").split()) or None
+
+
 def _prose(nodes: Sequence[Node]) -> str | None:
     paragraphs = []
     for node in nodes:
         found = [node] if node.tag in {"p", "blockquote"} else node.css("p, blockquote")
-        paragraphs += [text for p in found if (text := text_of(p)) is not None]
+        paragraphs += [
+            text for p in found if not _quoted(p, node) and (text := _paragraph(p)) is not None
+        ]
     return "\n\n".join(paragraphs) or None
 
 

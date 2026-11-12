@@ -34,6 +34,8 @@ deadwax sources                                          # what each source cont
 
 A text query must state `--album` or `--track`; a URL implies its kind. Options: `--sources` and `--exclude` (comma-separated names), `--format pretty|json|markdown`, `--no-cache`, `--timeout SECONDS` per source, `--config PATH` (TOML), `--verbose`. Settings come from flags, `DEADWAX_*` variables, `.env`, and a TOML file, in that order of precedence; see [Configuration](configuration.md).
 
+[Sources](sources.md) describes what each source contributes and needs; [Output](output.md) describes the dossier and its errors.
+
 | Exit code | Meaning |
 |-----------|---------|
 | 0 | A source identified the record |

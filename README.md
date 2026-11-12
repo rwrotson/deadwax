@@ -9,7 +9,7 @@ Collect what open sources know about one track or album:
 
 Every fact carries the source and URL where it was found. Nothing is invented: missing data leaves a field empty. The result is equally usable in a terminal and as JSON for other programs.
 
-> **Status:** under development. The specification, stages, and progress log are in [`DEADWAX_PLAN.md`](https://github.com/rwrotson/deadwax/blob/main/DEADWAX_PLAN.md). The library's `lookup()` and the command work with the sources listed below.
+> **Status:** v1, with the eight sources listed below. The specification, stages, and progress log are in [`DEADWAX_PLAN.md`](https://github.com/rwrotson/deadwax/blob/main/DEADWAX_PLAN.md).
 
 ## Usage
 
@@ -45,18 +45,40 @@ print(dossier.model_dump_json(indent=2))
 
 ## Sources
 
-| Source | Status | Contributes |
-|--------|--------|-------------|
-| MusicBrainz | implemented | identity, ISRCs, labels, credits, tags and genres, members, covers, remixes, samples, appearances on releases and compilations, streaming links, Discogs and Wikidata IDs; resolves MusicBrainz and Spotify URLs |
-| iTunes Search | implemented | Apple Music links and previews, release date, genre; resolves Apple Music URLs |
-| Deezer | implemented | Deezer links and previews, ISRC, barcode, label; resolves Deezer URLs. The API may refuse some networks; this is reported as `blocked` |
-| Odesli (song.link) | implemented | links on every platform Odesli matches, read from the song.link page of a streaming link (the query URL, or a Spotify, Apple Music, Deezer, Tidal or YouTube link found earlier), with the title, ISRC, or UPC of that record; resolves streaming URLs. Odesli has no public API since 2026-07-31; the page is fetched with browser headers and the escalation ladder. Without such a link from the query or MusicBrainz it reports `not_found` |
-| Discogs | implemented; search needs `discogs.token` | genres and styles, credits with roles and tracks, database notes, labels with catalog numbers, barcodes, other versions of the master, compilations (with token), the label's other releases, members, groups and aliases; user reviews from the release page through the escalation ladder (a refused page is reported as `blocked` and costs only the reviews); resolves Discogs URLs. Without a token it reads records by the Discogs IDs MusicBrainz gives, at 25 requests a minute. Discogs refused deadwax's own User-Agent on 2026-11-12, so it is sent httpx's (`discogs.user_agent` overrides it) |
-| Bandcamp | implemented | tags, About and Credits texts, simple credits, fan comments, recommendations as similar releases, label from the mobile API, the label's other releases; resolves album and track pages on `bandcamp.com` subdomains. A track found on another artist's album (a compilation) contributes only its identity, links and own notes |
-| Last.fm | implemented, needs `lastfm.api_key` | tags with weights (track or album, and artist-wide ones marked `artist`), wiki texts, similar tracks (for a track) or similar artists (for an album) |
-| Wikipedia/Wikidata | implemented | genres, producers, composers, lyricists, labels, release date, the album a song is on, review scores (Wikidata and the ratings templates of the articles), and the lead and music-related sections of the English article and the article in the record's original language; the item comes from the Wikidata ID MusicBrainz gives, else from a Wikidata search by title, type, and performer. Section headings are recognised in English, Russian, Japanese, German, and French; other languages contribute the lead |
+Every source is described in detail in [the sources guide](https://rwrotson.github.io/deadwax/sources/); the output is described in [the output guide](https://rwrotson.github.io/deadwax/output/).
 
-Other sources are planned as separate adapters; the full list with tiers will be documented here. Names written in a non-Latin script are compared as written: a store that lists "Кино" as "Kino" is reported as `no_match`.
+### Tier 1: identity and links
+
+| Source | Status | Contributes | Caveats |
+|--------|--------|-------------|---------|
+| MusicBrainz | implemented | identity, ISRCs, labels, credits, tags and genres, members, covers, remixes, samples, appearances on releases and compilations, streaming links, Discogs and Wikidata IDs; resolves MusicBrainz and Spotify URLs | the only identity-pass source; the public server is often busy (retried) |
+| iTunes Search | implemented | Apple Music links and previews, release date, genre; resolves Apple Music URLs | about 20 requests a minute |
+| Deezer | implemented | Deezer links and previews, ISRC, barcode, label, genres; resolves Deezer URLs | Akamai refuses some networks (`blocked`) |
+| Odesli (song.link) | implemented | links on every platform Odesli matches, with the title and ISRC or UPC; resolves streaming URLs | no public API since 2026-07-31: reads the song.link page of a streaming link from the query or MusicBrainz, else `not_found` |
+
+### Tier 2: enrichment
+
+| Source | Status | Contributes | Caveats |
+|--------|--------|-------------|---------|
+| Discogs | implemented; search needs `discogs.token` | genres and styles, credits with roles and tracks, notes, labels with catalog numbers, barcodes, other versions of the master, compilations, the label's other releases, members, groups, aliases, user reviews; resolves Discogs URLs | without a token reads only the IDs MusicBrainz gives (25 requests a minute); sends httpx's User-Agent because Discogs refuses deadwax's; review pages may be `blocked` |
+| Bandcamp | implemented | tags, About and Credits texts, credits, fan comments, recommendations as similar releases, label, the label's other releases; resolves `bandcamp.com` album and track pages | scraped pages; a track found on another artist's album contributes only its identity, links and own notes |
+| Last.fm | implemented, needs `lastfm.api_key` | weighted tags (artist-wide ones marked `artist`), wiki texts, similar tracks or artists | `skipped` without the key |
+| Wikipedia/Wikidata | implemented | genres, producers, composers, lyricists, labels, date, the album a song is on, review scores, lead and music sections of the English and original-language articles | section headings recognised in en, ru, ja, de, fr; other languages give the lead |
+
+Names written in a non-Latin script are compared as written: a store that lists "Кино" as "Kino" is reported as `no_match`.
+
+### Planned
+
+| Group | Sources | Caveats |
+|-------|---------|---------|
+| Shops | Boomkat, Juno, Norman, Forced Exposure, Hard Wax, Phonica, Soundohm, Bleep, Rough Trade | shop copy as `shop` texts |
+| Reviews and press | AllMusic, Resident Advisor (GraphQL), press reviews through one adapter with per-site rules | |
+| Catalogues and communities | Apple Music, Rate Your Music, Genius, Album of the Year, ListenBrainz, SecondHandSongs | Rate Your Music only through a browser |
+| Radio and mixes | NTS, Mixcloud, 1001Tracklists, KEXP, WFMU, BBC Sounds | |
+| Streaming and download stores | Spotify, SoundCloud, YouTube, Beatport, Juno Download, Traxsource | Spotify for search and links only; YouTube not as a fact source |
+| Samples | WhoSampled | needs a separate decision on its terms of service |
+
+Never used: Every Noise at Once, direct Metacritic scraping (Metacritic scores come from Wikipedia), Spotify audio features.
 
 ## Configuration
 
@@ -96,6 +118,8 @@ src/
     │   ├── musicbrainz/     # MusicBrainz models, parsers, adapter
     │   ├── discogs/         # Discogs models, parsers, adapter
     │   ├── bandcamp/        # Bandcamp models, page parsers, adapter
+    │   ├── lastfm/          # Last.fm models, parsers, adapter
+    │   ├── wikipedia/       # Wikidata and Wikipedia models, parsers, adapter
     │   └── _http/           # rate limits, retries, cache, escalation transports
     └── core/                # models, matching, orchestrator, errors (Pydantic only)
 tests/                       # mirrors the package; network is disabled

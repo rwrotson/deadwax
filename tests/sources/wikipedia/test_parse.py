@@ -258,6 +258,7 @@ HTML = """
 <div class="mw-heading mw-heading3"><h3 id="Sub">Sub</h3></div>
 <p>Sub text.</p>
 <blockquote><p>A quote.</p></blockquote>
+<div class="quote"><blockquote><p>Wrapped <a href="/wiki/Q">quote</a>, once.</p></blockquote></div>
 <div class="mw-heading mw-heading2"><h2 id="Music_video">Music video</h2></div>
 <p>Video text.</p>
 <div class="mw-heading mw-heading2"><h2 id="Reception">Reception</h2></div>
@@ -272,8 +273,8 @@ def test_sections() -> None:
     texts = p.sections(HTML, "Song", "en", Scope.RECORDING, URL)
 
     assert [(t.title, t.body) for t in texts] == [
-        ("Song", "Lead text .\n\nSecond lead paragraph."),
-        ("Background", "Background text.\n\nSub text.\n\nA quote."),
+        ("Song", "Lead text.\n\nSecond lead paragraph."),
+        ("Background", "Background text.\n\nSub text.\n\nA quote.\n\nWrapped quote, once."),
         ("Legacy", "Old markup."),
     ]
     assert texts[1].sources[0].url == f"{URL}#Background"

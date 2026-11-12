@@ -4,7 +4,7 @@
 
 This is the implementation specification and multi-session handoff for deadwax. It is meant to be sufficient for an engineer or coding agent starting without the planning conversation. The original request (Russian, 2026-11-12) asked for a library and CLI that collects, for one track or album, everything open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links.
 
-- **Status:** Stages 0–6 complete; Stage 7 next (see the status table).
+- **Status:** Stages 0–7 complete; v1 qualified (see the status table).
 - **Branch:** `main`. Stage 0 was committed by the user as `df3befa`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -171,7 +171,7 @@ Rate limits/TTL defaults per adapter in `sources/config.py`; all overridable.
 | 4 | Complete | CLI: lookup and `sources`, formats, settings with TOML config, cache directory; first manual run. |
 | 5 | Complete | Bandcamp and Discogs (reviews through the escalation ladder). |
 | 6 | Complete | Last.fm and Wikipedia/Wikidata; Odesli reads the song.link page. |
-| 7 | Not started | README source tiers, docs, full checks, manual runs on five records, final report. |
+| 7 | Complete | README source tiers, docs, full checks, manual runs on five records, final report. |
 
 ### Stage 0: establish the workstream
 
@@ -234,16 +234,16 @@ Rate limits/TTL defaults per adapter in `sources/config.py`; all overridable.
 
 ### Stage 7: qualification and documentation
 
-- [ ] README source tables by tier with "planned" marks and caveats; docs pages for sources and output schema.
-- [ ] Full checks, package build and wheel smoke, audit.
-- [ ] Manual runs on the five records with `--format pretty`; final report separating mock-tested from live-verified behaviour.
+- [x] README source tables by tier with "planned" marks and caveats; docs pages for sources and output schema.
+- [x] Full checks, package build and wheel smoke, audit.
+- [x] Manual runs on the five records with `--format pretty`; final report separating mock-tested from live-verified behaviour.
 
 **Acceptance:** all checks pass or blocked ones have precise reasons; outputs reviewed against source pages. **Suggested message:** `docs: document sources and qualify deadwax v1`.
 
-### Five manual-check records (proposed; confirmed at Stage 7)
+### Five manual-check records (confirmed at Stage 7)
 
 1. Mainstream: `--track "Radiohead - Paranoid Android"`.
-2. Bandcamp-only underground: chosen at Stage 7 by checking that Odesli/Deezer/iTunes find nothing besides Bandcamp; queried by Bandcamp URL and by text.
+2. Bandcamp-only underground: `--album "ESTADO DE BIENESTAR - Capítulo IV : La Fiesta Seria y Nuevas Formas de Tecnaco"` (Oráculo Records, 2026), also by `https://oraculorecords.bandcamp.com/album/cap-tulo-iv-la-fiesta-seria-y-nuevas-formas-de-tecnaco`; MusicBrainz, iTunes, Discogs, and Wikipedia know nothing of it and Odesli has no seed (Deezer is refused from the development network).
 3. Electronic on a small label: `--album "Huerco S. - For Those of You Who Have Never (And Also Those Who Have)"` (Proibito).
 4. Non-English: `--track "Кино - Группа крови"` (and a Japanese fallback such as `--album "細野晴臣 - Hosono House"` if Cyrillic coverage is thin).
 5. Known remix: `--track "Everything but the Girl - Missing (Todd Terry Remix)"` — must not merge with the 1994 original; the original appears as `remix_of`.
@@ -315,9 +315,38 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-13 | Wikipedia reads the English article and the original-language one: the lead and h2 sections whose headings match per-language allow-lists (en, ru, ja, de, fr; other languages give the lead); a sitelink that redirects (a song's link to its album) is skipped. Song items contribute no MusicBrainz release group or Discogs master (they name the single); "part of" (P361) counts only when it is an album. | Section names differ per wiki; Q4150791's en sitelink redirects to the album article; Kino's album P361 is a list item. | 6 |
 | 2026-11-13 | Last.fm errors inside 200 bodies: 6 → not found, 29 → rate limited, others → failed. Artist-wide tags have `scope=artist`, but merge deduplicates tags by name, so an artist tag equal to a track tag joins the track tag. | Last.fm reports errors in the body; merge behaviour unchanged. | 6 |
 | 2026-11-13 | Odesli is seeded only by streaming links of the query or the identity pass; records whose identity-pass links name no streaming service (Huerco S., the Todd Terry remix, the OK Computer Discogs URL) report `not_found`. | Odesli runs in the enrichment pass, which sees only identity-pass links. | 6 |
+| 2026-11-13 | Wikipedia prose joins text nodes without a separator, and paragraphs inside a quoted block are read once, through the block. | Live Stage 7 run: links produced spaces before punctuation (`" Paranoid Android " is`), and a wrapped pull quote appeared twice. | 6, 7 |
+| 2026-11-13 | The output schema page is generated from `Dossier.model_json_schema()` (`docs/gen_schema_page.py`); `docs/sources.md` and `docs/output.md` describe sources and the dossier. | Generated pages are never edited by hand; the README holds the tier tables. | 7 |
 | 2026-11-12 | Tracks from the user's library are not fixtures but opt-in live integration tests (`tests/integration`, collected only with `--live`, `poe test-live`) that check invariants and print a report. | ~25–30 MB of fixtures otherwise; live data changes; user choice. | 5, 7 |
 
-**Current task:** Stage 6 complete. **Next action:** user review and commit; then Stage 7 on request.
+**Current task:** Stage 7 complete; v1 qualified. **Next action:** user review and commit; later work is chosen by the user (planned sources in README).
+
+### 2026-11-13 — Stage 7 qualification
+
+Documentation: README "Sources" split into tier tables (tier 1 identity and links, tier 2 enrichment) with status and caveat columns, a "Planned" table grouped by kind (shops, reviews and press, catalogues, radio and mixes, streaming and stores, WhoSampled pending a ToS decision) and the never-used list; status note and project structure updated. New pages: `docs/sources.md` (lookup flow, tiers, one section per source with access, credentials, how it finds the record, contributions and limits; escalation ladder), `docs/output.md` (provenance, identity, version gate, facts and scopes, relation kinds, error kinds, exit codes), and `schema.md` generated by `docs/gen_schema_page.py` from `Dossier.model_json_schema()`; nav and Getting Started link them. Observation while writing: only MusicBrainz runs in the identity pass, and `Identity` has no `ambiguities` field; the docs describe the code.
+
+Fix found by the live runs: Wikipedia prose had spaces before punctuation after links and repeated pull quotes wrapped in a `div` (see decisions); `_prose` now joins text nodes as written and skips paragraphs inside a quoted block; `test_sections` (which had asserted `"Lead text ."`) covers both. Re-verified live from the cache on Paranoid Android.
+
+Checks: `uv sync --all-groups --locked`; `uv run poe check` passed (Ruff format and lint, 18 contracts kept, mypy strict on 122 files, 544 tests, 99.23% branch coverage); `uv run --group docs properdocs build --strict` passed with the schema page; `git diff --check` passed; `uv build` produced sdist and wheel; wheel smoke in fresh venvs: base install imports `deadwax` and `deadwax.lookup` without rich or typer, bare `deadwax` exits 1 naming `deadwax[cli]`, with `[cli]` `deadwax --version` prints `deadwax 0.1.0` and `deadwax sources` lists eight sources; `uv run poe audit`: no known vulnerabilities. Not run: pre-commit hooks (they rewrite files), CI (Ubuntu/macOS matrix, lowest-direct job, trivy).
+
+Manual runs on 2026-11-13 (this machine, development proxy, Discogs token and Last.fm key from `.env`, `curl_cffi` installed, Playwright Chromium not installed): `deadwax sources` all ready. Times are wall clock including `uv run`.
+
+| Record | `--no-cache` | cached | Result |
+| --- | --- | --- | --- |
+| 1 `--track "Radiohead - Paranoid Android"` | exit 0, 15.0 s | exit 0, 9.1 s | identity from seven sources, 1997-05-21 with the Bandcamp 2021 reissue date as a discrepancy, ISRC GBAYE9701376, Discogs master 21491, Wikidata Q1751357; MB credits, weighted tags, Last.fm and Wikipedia texts (lead, writing and recording, composition, release, reception), Odesli links |
+| 2 ESTADO DE BIENESTAR, URL and `--album` text | exit 0, 3.4 s (text) | exit 0, 6.9 s (URL) | Bandcamp and Last.fm only; tags, About and Credits texts, 7 Bandcamp recommendations, 10 Last.fm similar artists; every other source `not_found`, Deezer `blocked`; no label (the mobile API has none; the seller "Oráculo Records" is not taken for a label, Stage 5 decision) |
+| 3 Huerco S. album | exit 0, 12.3 s | exit 0, 7.7 s | Proibito PRB018 (MB, Discogs) and West Mineral Ltd. (Bandcamp), 2016-06-06 from five sources; `-f json` validated with `Dossier.model_validate_json` (15 tags, 17 texts, 39 relations, 9 links); Odesli `not_found` (no streaming seed) |
+| 4 `--track "Кино - Группа крови"` | exit 0, 13.1 s | exit 0, 7.6 s | Cyrillic names kept, five ISRCs, Wikidata Q4150791; iTunes and Odesli `no_match` ("Kino"); Bandcamp 2023 date as a discrepancy. The Japanese fallback was not needed |
+| 5 `--track "Everything but the Girl - Missing (Todd Terry Remix)"` | exit 0, 16.5 s | exit 0, 9.8 s | version remix (Todd Terry remix), remixer credit, `remix of` relation; Wikipedia's item (the original song) only in the version discrepancy; artist (iTunes "& Todd Terry") and date (MB 1998 vs 1994) disagreements shown |
+| `--timeout 0.01` | exit 3, 0.6 s | — | "Nothing matched", seven `timeout` errors and Odesli `not_found` |
+
+Observations: Deezer answered the Akamai block every time; Discogs review pages were refused by httpx and curl_cffi and then failed for the missing Chromium (`failed`, API facts kept). Cached runs take 7–10 s only because of that review page: errors are not cached, so each run climbs the ladder again (`--exclude discogs` cached: about 1 s). Not changed in this stage.
+
+`uv run poe test-live` (22 library tracks, Discogs token from `.env`): 9 passed, 13 failed, all on the first invariant (no `failed` errors) because of the Discogs reviews error above; the summary lines show `discogs:failed` for exactly those 13. Their later invariants were therefore not checked. Last.fm was `skipped` in every live test: the tests read only the Discogs token from the environment. Three tracks were not found by any source (Ilya Vlasenko "untitled", Jeff Buckley "Sky Blue Skin", the Basinski remix).
+
+Live-verified across stages: MusicBrainz search and lookups, iTunes, Odesli song.link pages, Discogs API with and without token (search with token), Bandcamp pages, search endpoint and mobile API, Last.fm, Wikidata and en/ru Wikipedia, the cache, timeouts, the version gate on a remix, URL resolution (Spotify, Apple Music, Bandcamp, Discogs URLs). Mock-tested only: Deezer success paths (blocked from this network), Discogs review parsing and the browser step of the ladder (Chromium not installed), Bandcamp HTML search and the blocked-page mobile fallback, Last.fm error codes other than 6, Wikidata P444 scores, ja/de/fr section lists, retry on `Retry-After` dates, rate-limited errors.
+
+Open items for the user: install Chromium (`uv run playwright install chromium`) or treat a missing escalation browser as `skipped` so the live invariant holds; pass the Last.fm key to the live tests; consider caching refused review pages for a short time. No commit was created.
 
 ### 2026-11-13 — Stage 6 qualification
 
