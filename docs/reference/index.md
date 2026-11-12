@@ -21,13 +21,19 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.sources.musicbrainz.models` | Model MusicBrainz web service responses |
 | `deadwax.sources.itunes` | Find Apple Music links and previews with the iTunes Search API |
 | `deadwax.sources.deezer` | Find Deezer links, ISRCs and barcodes with the Deezer API |
-| `deadwax.sources.odesli` | Expand a streaming link to all platforms with Odesli (API key) |
+| `deadwax.sources.odesli` | Read links on all platforms from the song.link page of a streaming link |
 | `deadwax.sources.discogs.adapter` | Read masters, releases, versions, artists, labels, and reviews from Discogs |
 | `deadwax.sources.discogs.parse` | Turn Discogs responses into identity and facts |
 | `deadwax.sources.discogs.models` | Model Discogs API responses |
 | `deadwax.sources.bandcamp.adapter` | Find and read Bandcamp album and track pages |
 | `deadwax.sources.bandcamp.parse` | Read Bandcamp page data, JSON-LD, search results, and label pages |
 | `deadwax.sources.bandcamp.models` | Model Bandcamp page data and API responses |
+| `deadwax.sources.lastfm.adapter` | Read tracks, albums, tags, and similar items from Last.fm (API key) |
+| `deadwax.sources.lastfm.parse` | Turn Last.fm responses into tags, texts, and relations |
+| `deadwax.sources.lastfm.models` | Model Last.fm API responses |
+| `deadwax.sources.wikipedia.adapter` | Read the Wikidata item and its Wikipedia articles |
+| `deadwax.sources.wikipedia.parse` | Turn Wikidata statements, article sections, and ratings templates into facts |
+| `deadwax.sources.wikipedia.models` | Model Wikidata and MediaWiki API responses |
 | `deadwax.logs.settings` | Define logging settings |
 | `deadwax.logs.setup` | Configure console and file logging for applications |
 | `deadwax.cli.settings` | Load command settings from the environment |

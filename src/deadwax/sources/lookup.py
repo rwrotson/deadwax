@@ -10,8 +10,10 @@ from deadwax.sources.config import SourcesConfig
 from deadwax.sources.deezer import DeezerAdapter
 from deadwax.sources.discogs import DiscogsAdapter
 from deadwax.sources.itunes import ItunesAdapter
+from deadwax.sources.lastfm import LastfmAdapter
 from deadwax.sources.musicbrainz import MusicBrainzAdapter
 from deadwax.sources.odesli import OdesliAdapter
+from deadwax.sources.wikipedia import WikipediaAdapter
 
 # Order matters: the first ready adapter that resolves a URL query reads it first.
 ADAPTERS: tuple[type[HttpAdapter], ...] = (
@@ -21,6 +23,8 @@ ADAPTERS: tuple[type[HttpAdapter], ...] = (
     DeezerAdapter,
     DiscogsAdapter,
     BandcampAdapter,
+    LastfmAdapter,
+    WikipediaAdapter,
 )
 
 

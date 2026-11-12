@@ -4,7 +4,7 @@
 
 This is the implementation specification and multi-session handoff for deadwax. It is meant to be sufficient for an engineer or coding agent starting without the planning conversation. The original request (Russian, 2026-11-12) asked for a library and CLI that collects, for one track or album, everything open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links.
 
-- **Status:** Stages 0–5 complete; Stage 6 next (see the status table).
+- **Status:** Stages 0–6 complete; Stage 7 next (see the status table).
 - **Branch:** `main`. Stage 0 was committed by the user as `df3befa`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -170,7 +170,7 @@ Rate limits/TTL defaults per adapter in `sources/config.py`; all overridable.
 | 3 | Complete | MusicBrainz, iTunes, Deezer, Odesli (key only), URL resolution, recorded fixtures, `lookup()`. |
 | 4 | Complete | CLI: lookup and `sources`, formats, settings with TOML config, cache directory; first manual run. |
 | 5 | Complete | Bandcamp and Discogs (reviews through the escalation ladder). |
-| 6 | Not started | Last.fm and Wikipedia/Wikidata. |
+| 6 | Complete | Last.fm and Wikipedia/Wikidata; Odesli reads the song.link page. |
 | 7 | Not started | README source tiers, docs, full checks, manual runs on five records, final report. |
 
 ### Stage 0: establish the workstream
@@ -226,8 +226,9 @@ Rate limits/TTL defaults per adapter in `sources/config.py`; all overridable.
 
 ### Stage 6: Last.fm and Wikipedia
 
-- [ ] Last.fm track and album info, tags with weights, similar tracks; missing key → skipped.
-- [ ] Wikidata claims and review scores; Wikipedia sections and the album ratings template, in English and the original language.
+- [x] Last.fm track and album info, tags with weights, similar tracks; missing key → skipped.
+- [x] Wikidata claims and review scores; Wikipedia sections and the album ratings template, in English and the original language.
+- [x] Odesli from the song.link page instead of the retired API (added during the stage at the user's request).
 
 **Acceptance:** fixture tests including a non-English article. **Suggested message:** `feat(sources): add Last.fm and Wikipedia adapters`.
 
@@ -307,9 +308,30 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-12 | Bandcamp's HTML search runs only when the search endpoint fails, not when it finds nothing; the HTML search page is behind a Fastly "Client Challenge" (marker `/_fs-ch-` added to challenge detection). | A search without results reported `blocked` instead of `not_found`. | 5 |
 | 2026-11-12 | A Bandcamp track whose album has another artist (a compilation or third-party upload) contributes only identity, links, its own credits and notes, and a `compilation` relation; the album's tags, recommendations, fan texts, date, label, and seller are dropped. | The Todd Terry remix was found on an unofficial compilation whose SEO tags and 2007 date entered the dossier and a date discrepancy. | 5 |
 | 2026-11-12 | Fixtures are recorded in a hybrid mode: existing MusicBrainz, iTunes and Deezer fixtures are replayed and only Bandcamp and Discogs are recorded live (`--live` chooses); requests with a body are keyed with a body hash; recording and source tests run with `escalation=none`. | Keeps Stage 3 fixtures stable; Bandcamp search is a POST to one URL; curl_cffi opens sockets pytest-socket cannot block. | 5 |
+| 2026-11-13 | Odesli reads the song.link web page (`https://song.link/<streaming URL>`, browser profile and the escalation ladder) instead of the API: the page's `__NEXT_DATA__` holds the entity (title, artist, ISRC or UPC) and a link per platform; platforms without a URL are unmatched. `OdesliSettings` and `odesli.api_key` are removed (breaking); Odesli is ready without a key, at 0.5 requests a second. Supersedes the 2026-11-12 "Odesli runs only with `odesli.api_key`". | Odesli has no public API any more (checked by the user); user choice. Verified live on 2026-11-13: Paranoid Android 10 platforms with ISRC, OK Computer 9 with UPC, an unknown Spotify ID redirects to `/not-found` (no page data → not found). | 6 |
+| 2026-11-13 | The fixture recorder passes the Discogs token and the Last.fm key only to sources recorded live. | A replayed source with a credential makes requests its fixtures lack. | 6 |
+| 2026-11-13 | Scores without review text (ratings templates, Wikidata P444) are `Text(kind=review, body="")` with publication and rating; such texts are deduplicated by publication, rating, and title and rendered as one line. | No separate model; a score is a review reduced to its rating. | 6 |
+| 2026-11-13 | Wikidata names come in the item's original language (P407 → P424), then `mul`, then English; genres and publications in English first. A performer is named by the label or alias that matches the expected artist. | Кино stays Cyrillic; Radiohead has only a `mul` label; Huerco S. is an alias of the item "Pendant". | 6 |
+| 2026-11-13 | Wikipedia reads the English article and the original-language one: the lead and h2 sections whose headings match per-language allow-lists (en, ru, ja, de, fr; other languages give the lead); a sitelink that redirects (a song's link to its album) is skipped. Song items contribute no MusicBrainz release group or Discogs master (they name the single); "part of" (P361) counts only when it is an album. | Section names differ per wiki; Q4150791's en sitelink redirects to the album article; Kino's album P361 is a list item. | 6 |
+| 2026-11-13 | Last.fm errors inside 200 bodies: 6 → not found, 29 → rate limited, others → failed. Artist-wide tags have `scope=artist`, but merge deduplicates tags by name, so an artist tag equal to a track tag joins the track tag. | Last.fm reports errors in the body; merge behaviour unchanged. | 6 |
+| 2026-11-13 | Odesli is seeded only by streaming links of the query or the identity pass; records whose identity-pass links name no streaming service (Huerco S., the Todd Terry remix, the OK Computer Discogs URL) report `not_found`. | Odesli runs in the enrichment pass, which sees only identity-pass links. | 6 |
 | 2026-11-12 | Tracks from the user's library are not fixtures but opt-in live integration tests (`tests/integration`, collected only with `--live`, `poe test-live`) that check invariants and print a report. | ~25–30 MB of fixtures otherwise; live data changes; user choice. | 5, 7 |
 
-**Current task:** Stage 5 complete. **Next action:** user review and commit; then Stage 6 on request.
+**Current task:** Stage 6 complete. **Next action:** user review and commit; then Stage 7 on request.
+
+### 2026-11-13 — Stage 6 qualification
+
+Fixtures recorded on 2026-11-13 (`scripts/record_fixtures.py --live lastfm,wikipedia,odesli`, the Last.fm key from `.env`; other sources replayed): all nine scenarios for Wikipedia and Last.fm, four for Odesli (the others have no streaming seed); 3.3 MB. The first user run produced Odesli fixtures of 308 redirects only and no Last.fm fixtures: the raw seed URL (`song.link/https://…`) is normalized by a 308, the recorder crashed on the redirected request (`RequestNotRead`: a redirected request arrives with an unread stream), an Apple seed lost its `?i=` track parameter, and the key line in `.env` was still commented. Fixed: the seed is URL-encoded (one 302 to `/s/<id>` or `/i/<id>`), the recorder reads the request before keying it, fixtures store `location` for redirects and both replays send it. The remaining five scenarios were recorded by the agent with the key from `.env` (exit 0, no traceback; the key does not appear in fixtures).
+
+Live-verified through the recorded runs: Paranoid Android gets Wikidata label, lyricist, producer, `appears_on` OK Computer, the en lead and four sections, Last.fm weighted tags and 20 similar tracks, and Odesli links (Pandora, Tidal, Yandex, Anghami…); Кино gets the ru article (lead, «Смысл», «История песни»), lyricist «Виктор Цой», similar Russian rock tracks, while Odesli reports `no_match` (Spotify spells the band "Kino"); Huerco S. gets seven scores from the ratings template (Metacritic 85/100, Pitchfork 8.1/10…) and the identity through the alias; the Todd Terry remix keeps Wikidata's original song out (`other_version`) and gets Last.fm tags and similar tracks of the remix itself; the unknown query gets `not_found` from Last.fm and Wikipedia. Mock-tested only: Last.fm error codes 29 and others, Wikidata P444 scores (none of the check items has one), ja/de/fr section lists, CirrusSearch with a non-Latin title through the adapter (verified by hand: OK Computer and «Группа крови» found).
+
+Checks: `uv run poe check` passed (Ruff format and lint, 18 contracts kept, mypy strict on 121 files, 544 tests, 99.22% branch coverage); `uv run --group docs properdocs build --strict` passed. Not run: pre-commit hooks, `poe audit`, `poe test-live`, CI. No commit was created.
+
+### 2026-11-13 — Stage 6 interim (awaiting fixtures)
+
+Live Wikimedia probes (honest User-Agent, plain httpx): Wikidata items Q1751357 (Paranoid Android, a single), Q202996 (OK Computer), Q4150791 and Q2725250 (Кино's song and album), Q104869719 (Huerco S.), Q3859219 (Missing); en articles use `{{Album ratings}}` (up to three per article; `revNscore` and `revNScore` both occur), ru album articles `{{Рейтинги альбома}}`; level-2 headings are `div.mw-heading2 > h2`. Radiohead's item has only a `mul` label; Huerco S.'s performer item is labelled "Pendant" with the alias "Huerco S."; a song's P436/P1954 name its single, not the album; the en sitelink of «Группа крови (песня)» redirects to the album article. The Wikipedia adapter ran live on all five check records before fixtures existed.
+
+Implemented: `sources/lastfm` and `sources/wikipedia` packages, wired into `lookup`, R4 and two R8 contracts (18 kept); score-only texts deduplicated by publication, rating, and title and rendered as one line; recorder hosts and `DEADWAX_LASTFM__API_KEY`; docs. Unit tests on hand-written responses pass; the 10 replay tests in `tests/sources/test_lookup.py` fail until the new fixtures are recorded.
 
 ### 2026-11-12 — Stage 5 qualification
 

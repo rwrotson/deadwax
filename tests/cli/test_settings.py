@@ -83,7 +83,7 @@ def test_config_file_from_the_environment_and_the_default(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, isolated_user_dirs: Path
 ) -> None:
     named = tmp_path / "named.toml"
-    named.write_text("[odesli]\napi_key = 'k'\n")
+    named.write_text("[lastfm]\napi_key = 'k'\n")
     isolated_user_dirs.parent.mkdir()
     isolated_user_dirs.write_text("[itunes]\nenabled = false\n")
 
@@ -93,7 +93,7 @@ def test_config_file_from_the_environment_and_the_default(
 
     assert not default.itunes.enabled
     assert from_environment.itunes.enabled
-    assert from_environment.odesli.api_key is not None
+    assert from_environment.lastfm.api_key is not None
 
 
 def test_named_config_file_must_exist(tmp_path: Path) -> None:

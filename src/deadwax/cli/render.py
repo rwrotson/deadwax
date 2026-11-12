@@ -31,7 +31,7 @@ class OutputFormat(StrEnum):
 
 
 def env_variable(setting: str) -> str:
-    """Name the environment variable of a setting path such as 'odesli.api_key'."""
+    """Name the environment variable of a setting path such as 'lastfm.api_key'."""
     return "DEADWAX_" + setting.upper().replace(".", "__")
 
 
@@ -142,8 +142,10 @@ def _texts(dossier: Dossier) -> list[Text | Table]:
         header.append(" · " + " · ".join(d for d in details if d) if any(details) else "")
         header.append(" — ")
         header.append_text(_sources(text.sources))
-        body = text.body if len(text.body) <= _TEXT_LIMIT else text.body[:_TEXT_LIMIT] + "…"
-        parts += [header, Text(body)]
+        parts.append(header)
+        if text.body.strip():
+            body = text.body if len(text.body) <= _TEXT_LIMIT else text.body[:_TEXT_LIMIT] + "…"
+            parts.append(Text(body))
     return parts
 
 

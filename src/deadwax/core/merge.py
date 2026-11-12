@@ -353,6 +353,14 @@ class _Facts:
     links: list[Link]
 
 
+def _text_key(text: Text) -> tuple[object, ...]:
+    """Texts are the same by body; scores without a body by publication, rating, and title."""
+    if text.body.strip():
+        return (text.kind, normalize_text(text.body))
+    publication = normalize_text(text.publication or "")
+    return (text.kind, "", publication, text.rating, normalize_text(text.title or ""))
+
+
 def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Partial]) -> _Facts:
     scope_rank = _scope_rank(kind)
     tags = _dedupe(
@@ -366,9 +374,7 @@ def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Parti
             normalize_text(c.detail or ""),
         ),
     )
-    texts = _dedupe(
-        (text for p in accepted for text in p.texts), lambda t: (t.kind, normalize_text(t.body))
-    )
+    texts = _dedupe((text for p in accepted for text in p.texts), _text_key)
     found_relations = (relation for p in accepted for relation in p.relations)
     version_relations = (
         _other_version_relation(p, p.candidate) for p in other_versions if p.candidate is not None

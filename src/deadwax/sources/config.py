@@ -79,14 +79,6 @@ class DiscogsSettings(SourceSettings):
     )
 
 
-class OdesliSettings(SourceSettings):
-    """Settings of the Odesli (song.link) source."""
-
-    api_key: SecretStr | None = Field(
-        default=None, description="API key; the keyless API was retired on 2026-07-31"
-    )
-
-
 class LastfmSettings(SourceSettings):
     """Settings of the Last.fm source."""
 
@@ -99,7 +91,7 @@ DEFAULT_RATES: dict[str, float] = {
     "musicbrainz": 1.0,
     "itunes": 0.3,
     "deezer": 2.0,
-    "odesli": 1.0,
+    "odesli": 0.5,
     "discogs": 1.0,
     "bandcamp": 0.5,
     "lastfm": 4.0,
@@ -116,7 +108,7 @@ class SourcesConfig(_Model):
     musicbrainz: SourceSettings = SourceSettings()
     itunes: SourceSettings = SourceSettings()
     deezer: SourceSettings = SourceSettings()
-    odesli: OdesliSettings = OdesliSettings()
+    odesli: SourceSettings = SourceSettings()
     discogs: DiscogsSettings = DiscogsSettings()
     bandcamp: SourceSettings = SourceSettings()
     lastfm: LastfmSettings = LastfmSettings()

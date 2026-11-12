@@ -17,6 +17,7 @@ from deadwax.core import (
     Partial,
     Provenance,
     Query,
+    Rating,
     RecordCandidate,
     Relation,
     RelationKind,
@@ -352,3 +353,34 @@ def test_empty_merge(kind: EntityKind) -> None:
 
     assert not dossier.found
     assert dossier.identity.kind is kind
+
+
+def test_scores_without_body_are_kept_apart_by_publication_and_rating() -> None:
+    def score(publication: str, value: float, source: str = "wikipedia") -> Text:
+        return Text(
+            kind=TextKind.REVIEW,
+            body="",
+            publication=publication,
+            rating=Rating(value=value, scale=5),
+            scope=Scope.RECORDING,
+            sources=provenance(source),
+        )
+
+    texts = [score("AllMusic", 4.5), score("Q", 5), score("AllMusic", 4)]
+    other = [score("allmusic", 4.5, "lastfm")]
+
+    dossier = merge(
+        TRACK,
+        [
+            partial("wikipedia", candidate(), texts=texts),
+            partial("lastfm", candidate(), texts=other),
+        ],
+        generated_at=NOW,
+    )
+
+    assert [(t.publication, t.rating.value if t.rating else None) for t in dossier.texts] == [
+        ("AllMusic", 4.5),
+        ("Q", 5),
+        ("AllMusic", 4),
+    ]
+    assert [p.source for p in dossier.texts[0].sources] == ["wikipedia", "lastfm"]

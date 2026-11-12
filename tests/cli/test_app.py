@@ -165,7 +165,7 @@ def test_config_file_and_environment_reach_the_sources(
     fake: FakeLookup, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     config = tmp_path / "deadwax.toml"
-    config.write_text("adapter_timeout = 12\n[odesli]\napi_key = 'from-file'\n")
+    config.write_text("adapter_timeout = 12\n[lastfm]\napi_key = 'from-file'\n")
     monkeypatch.setenv("DEADWAX_ITUNES__ENABLED", "false")
 
     result = runner.invoke(app, ["--track", "a - b", "--config", str(config)])
@@ -173,7 +173,7 @@ def test_config_file_and_environment_reach_the_sources(
     assert result.exit_code == 0, result.output
     [(_, sources, _, _)] = fake.calls
     assert sources.adapter_timeout == 12
-    assert sources.odesli.api_key is not None
+    assert sources.lastfm.api_key is not None
     assert not sources.itunes.enabled
 
 
@@ -184,17 +184,19 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
     as_json = runner.invoke(app, ["sources", "--format", "json"])
 
     assert table.exit_code == as_json.exit_code == 0
-    assert "DEADWAX_ODESLI__API_KEY" in table.stdout
     statuses = {row["source"]: row["status"]["state"] for row in json.loads(as_json.stdout)}
     assert statuses == {
         "musicbrainz": "ready",
-        "odesli": "missing_credential",
+        "odesli": "ready",
         "itunes": "disabled",
         "deezer": "ready",
         "discogs": "ready",
         "bandcamp": "ready",
+        "lastfm": "missing_credential",
+        "wikipedia": "ready",
     }
     assert "DEADWAX_DISCOGS__TOKEN" in table.stdout
+    assert "DEADWAX_LASTFM__API_KEY" in table.stdout
 
 
 def test_settings_configure_logging(

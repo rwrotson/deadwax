@@ -14,6 +14,9 @@ SECRET_PARAMS = frozenset({"key", "api_key", "token"})
 
 # Fast limits so replayed lookups do not wait between requests.
 FAST = {"rate": 1000}
+SOURCES = (
+    "musicbrainz", "itunes", "deezer", "odesli", "discogs", "bandcamp", "lastfm", "wikipedia"
+)  # fmt: skip
 
 
 def fixture_key(request: httpx.Request) -> str:
@@ -47,9 +50,12 @@ def transport(scenario: str, seen: list[str] | None = None) -> httpx.MockTranspo
         recorded = interactions.get(key)
         if recorded is None:
             raise AssertionError(f"no recorded response for {key}")
+        headers = {"content-type": str(recorded["content_type"])}
+        if "location" in recorded:
+            headers["location"] = str(recorded["location"])
         return httpx.Response(
             int(str(recorded["status"])),
-            headers={"content-type": str(recorded["content_type"])},
+            headers=headers,
             content=str(recorded["body"]).encode(),
         )
 
@@ -62,10 +68,8 @@ def fast_config(**changes: object) -> SourcesConfig:
     Escalation stays off because curl_cffi opens its own sockets, which pytest-socket
     cannot block, and Playwright would launch a browser.
     """
-    fields: dict[str, object] = {
-        name: dict(FAST)
-        for name in ("musicbrainz", "itunes", "deezer", "odesli", "discogs", "bandcamp")
-    }
+    fields: dict[str, object] = {name: dict(FAST) for name in SOURCES}
+    fields["lastfm"] = {**FAST, "api_key": "test-key"}
     fields["http"] = {"escalation": "none"}
     return SourcesConfig.model_validate(fields | changes)
 

@@ -70,6 +70,17 @@ def untrue_dossier() -> str:
         ),
         Text(kind=TextKind.LABEL, body="Label copy.", scope=Scope.RELEASE, sources=SOURCE),
         Text(
+            kind=TextKind.REVIEW,
+            body="",
+            title="Retrospective reviews",
+            publication="AllMusic",
+            rating=Rating(value=4.5, scale=5),
+            language="en",
+            scope=Scope.RELEASE,
+            sources=SOURCE,
+        ),
+        Text(kind=TextKind.REVIEW, body="", scope=Scope.RELEASE, sources=[Provenance(source="x")]),
+        Text(
             kind=TextKind.WIKI,
             body="No score.",
             rating=Rating(),
@@ -147,6 +158,11 @@ def test_markdown_sections_and_sources() -> None:
     assert "*shop, release — A-*" in text
     assert "*user, release — 5*" in text
     assert "*wiki, release*" in text
+    assert (
+        "- AllMusic: 4.5/5 (Retrospective reviews, release, en) — "
+        "[bandcamp](https://burial.bandcamp.com/album/untrue)\n" in text
+    )
+    assert "- Review (release) — x\n" in text
     assert "*label, release*" in text
     assert "- label: [Hyperdub](https://hyperdub.net) (founded by Kode9)" in text
     assert "- similar: Burial — Rival Dealer — [bandcamp]" in text

@@ -283,10 +283,9 @@ layers = [
 name = "R4: sources modules"
 type = "layers"
 containers = ["deadwax.sources"]
-# Last.fm and Wikipedia join when they are added.
 layers = [
     "lookup",
-    "musicbrainz | itunes | deezer | odesli | discogs | bandcamp",
+    "musicbrainz | itunes | deezer | odesli | discogs | bandcamp | lastfm | wikipedia",
     "_base | _html",
     "_http",
     "config",
@@ -308,6 +307,18 @@ layers = ["adapter", "parse", "models"]
 name = "R8: Discogs adapter modules"
 type = "layers"
 containers = ["deadwax.sources.discogs"]
+layers = ["adapter", "parse", "models"]
+
+[[tool.importlinter.contracts]]
+name = "R8: Last.fm adapter modules"
+type = "layers"
+containers = ["deadwax.sources.lastfm"]
+layers = ["adapter", "parse", "models"]
+
+[[tool.importlinter.contracts]]
+name = "R8: Wikipedia adapter modules"
+type = "layers"
+containers = ["deadwax.sources.wikipedia"]
 layers = ["adapter", "parse", "models"]
 
 [[tool.importlinter.contracts]]

@@ -1,0 +1,10 @@
+{
+ "recorded_at": "2026-11-12T23:37:55+00:00",
+ "interactions": {
+  "GET https://ws.audioscrobbler.com/2.0/?artist=Zzqx+Nonexistent+Artist&autocorrect=1&format=json&method=track.getInfo&track=No+Such+Song+At+All": {
+   "status": 200,
+   "content_type": "application/json",
+   "body": "{\"error\":6,\"message\":\"Track not found\",\"links\":[]}"
+  }
+ }
+}

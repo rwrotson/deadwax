@@ -19,7 +19,6 @@ from deadwax import (
     DiscogsSettings,
     HttpSettings,
     LastfmSettings,
-    OdesliSettings,
     SourcesConfig,
     SourceSettings,
 )
@@ -55,7 +54,7 @@ class Settings(BaseSettings):
     musicbrainz: SourceSettings = Field(default_factory=SourceSettings)
     itunes: SourceSettings = Field(default_factory=SourceSettings)
     deezer: SourceSettings = Field(default_factory=SourceSettings)
-    odesli: OdesliSettings = Field(default_factory=OdesliSettings)
+    odesli: SourceSettings = Field(default_factory=SourceSettings)
     discogs: DiscogsSettings = Field(default_factory=DiscogsSettings)
     bandcamp: SourceSettings = Field(default_factory=SourceSettings)
     lastfm: LastfmSettings = Field(default_factory=LastfmSettings)

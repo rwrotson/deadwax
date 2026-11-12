@@ -77,11 +77,11 @@ INFOS = [
         status=SourceStatus(source="musicbrainz", state=SourceState.READY),
     ),
     SourceInfo(
-        source="odesli",
+        source="lastfm",
         pass_=Pass.ENRICH,
-        capabilities=[Capability.LINKS],
-        requires=[Requirement(setting="odesli.api_key", purpose="every lookup")],
-        status=SourceStatus(source="odesli", state=SourceState.MISSING_CREDENTIAL, detail="x"),
+        capabilities=[Capability.TAGS],
+        requires=[Requirement(setting="lastfm.api_key", purpose="every lookup")],
+        status=SourceStatus(source="lastfm", state=SourceState.MISSING_CREDENTIAL, detail="x"),
     ),
     SourceInfo(
         source="bandcamp",
@@ -112,12 +112,12 @@ def test_sources(output: OutputFormat) -> None:
     if output is OutputFormat.JSON:
         assert [row["source"] for row in json.loads(text)] == [
             "musicbrainz",
-            "odesli",
+            "lastfm",
             "bandcamp",
             "itunes",
         ]
     else:
-        assert "missing DEADWAX_ODESLI__API_KEY" in text
+        assert "missing DEADWAX_LASTFM__API_KEY" in text
         assert "missing extra: deadwax[browser]" in text
         assert "disabled" in text
         assert "identity, links" in text

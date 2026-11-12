@@ -77,6 +77,8 @@ def _credit(credit: Credit) -> list[str]:
 
 
 def _text(text: Text) -> list[str]:
+    if not text.body.strip():
+        return _score(text)
     byline = ", ".join(part for part in (text.publication, text.author, text.date) if part)
     rating = _rating(text)
     rating = f" — {rating}" if rating else ""
@@ -84,6 +86,15 @@ def _text(text: Text) -> list[str]:
     meta = f"*{text.kind}, {text.scope}{', ' + byline if byline else ''}{rating}*"
     quoted = [f"> {line}" if line else ">" for line in text.body.splitlines()]
     return [heading, "", meta, "", *quoted, "", f"Source: {_sources(text.sources)}", ""]
+
+
+def _score(text: Text) -> list[str]:
+    """A score without a review body, as one list line."""
+    name = text.publication or text.author or text.kind.capitalize()
+    rating = _rating(text)
+    details = ", ".join(d for d in (text.title, str(text.scope), text.language) if d)
+    line = f"- {name}{': ' + rating if rating else ''} ({details}) — {_sources(text.sources)}"
+    return [line, ""]
 
 
 def _rating(text: Text) -> str:

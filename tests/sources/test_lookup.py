@@ -13,7 +13,9 @@ from deadwax import (
     LinkTarget,
     Pass,
     Query,
+    Rating,
     RelationKind,
+    Scope,
     SourcesConfig,
     SourceState,
     TextKind,
@@ -66,6 +68,9 @@ async def test_mainstream_track(replay: Replay, config: SourcesConfig) -> None:
         "itunes",
         "discogs",
         "bandcamp",
+        "odesli",
+        "lastfm",
+        "wikipedia",
     }
     assert identity.version.kind is VersionKind.ORIGINAL
     assert identity.date is not None
@@ -86,13 +91,19 @@ async def test_mainstream_track(replay: Replay, config: SourcesConfig) -> None:
         link.service for link in dossier.links
     }
     assert "alternative rock" in tags_from(dossier, "discogs")
-    assert errors(dossier) == {
-        "odesli": ErrorKind.SKIPPED,
-        "deezer": ErrorKind.BLOCKED,
-        "discogs": ErrorKind.BLOCKED,
-    }
+    assert errors(dossier) == {"deezer": ErrorKind.BLOCKED, "discogs": ErrorKind.BLOCKED}
     reviews = next(e for e in dossier.errors if e.source == "discogs")
     assert reviews.reason.startswith("reviews:")
+    assert {"pandora", "yandex"} <= {
+        link.service for link in dossier.links if link.sources[0].source == "odesli"
+    }
+    weighted = [t for t in dossier.tags if t.sources[0].source == "lastfm" and t.weight]
+    assert Scope.RECORDING in {t.scope for t in weighted}
+    similar = [r for r in dossier.relations if r.kind is RelationKind.SIMILAR]
+    assert any(r.sources[0].source == "lastfm" for r in similar)
+    wiki = [t for t in dossier.texts if t.sources[0].source == "wikipedia"]
+    assert {"Paranoid Android", "Composition"} <= {t.title for t in wiki}
+    assert ("lyricist", "Thom Yorke") in {(c.role, c.name) for c in dossier.credits}
 
 
 @pytest.mark.asyncio
@@ -122,6 +133,16 @@ async def test_album_on_a_small_label(replay: Replay, config: SourcesConfig) -> 
     fans = [text for text in dossier.texts if text.kind is TextKind.USER]
     assert fans
     assert all(text.author for text in fans)
+    scores = {t.publication: t.rating for t in dossier.texts if t.kind is TextKind.REVIEW}
+    assert scores["Metacritic"] == Rating(value=85, scale=100)
+    assert scores["Pitchfork"] == Rating(value=8.1, scale=10)
+    # Wikidata names the performer Pendant, with Huerco S. as an alias.
+    assert dossier.identity.artist is not None
+    assert "wikipedia" in {s.source for s in dossier.identity.artist.sources}
+    assert {r.target.name for r in dossier.relations if r.kind is RelationKind.SIMILAR} >= {
+        "Actress",
+        "Gas",
+    }
     assert RelationKind.SIMILAR in relation_kinds(dossier)
     assert RelationKind.LABEL_RELEASE in relation_kinds(dossier)
 
@@ -139,6 +160,14 @@ async def test_cyrillic_track_is_not_transliterated(replay: Replay, config: Sour
     ] == [("Maschina Records", ["bandcamp"])]
     assert ("lyricist", "Виктор Цой") in {(c.role, c.name) for c in dossier.credits}
     assert errors(dossier)["itunes"] is ErrorKind.NO_MATCH
+    assert errors(dossier)["odesli"] is ErrorKind.NO_MATCH
+    russian = [t for t in dossier.texts if t.kind is TextKind.WIKI and t.language == "ru"]
+    assert {"Группа крови (песня)", "Смысл", "История песни"} <= {t.title for t in russian}
+    assert all(t.sources[0].url and "ru.wikipedia.org" in t.sources[0].url for t in russian)
+    # The English sitelink redirects to the album article, which is not about the song.
+    assert not [t for t in dossier.texts if t.language == "en"]
+    similar = [r.target.artist for r in dossier.relations if r.kind is RelationKind.SIMILAR]
+    assert "Агата Кристи" in similar
 
 
 @pytest.mark.asyncio
@@ -163,6 +192,12 @@ async def test_remix_is_not_merged_with_the_original(replay: Replay, config: Sou
     compilations = [r for r in dossier.relations if r.kind is RelationKind.COMPILATION]
     assert "bandcamp" in {s.source for r in compilations for s in r.sources}
     assert errors(dossier)["discogs"] is ErrorKind.SKIPPED
+    # Wikidata's item is the original song: it stays out and is listed as another version.
+    other = [r for r in dossier.relations if r.kind is RelationKind.OTHER_VERSION]
+    assert "wikipedia" in {s.source for r in other for s in r.sources}
+    assert not [t for t in dossier.texts if t.sources[0].source == "wikipedia"]
+    assert dossier.identity.title is not None
+    assert "lastfm" in {s.source for s in dossier.identity.title.sources}
 
 
 @pytest.mark.parametrize(
@@ -184,6 +219,10 @@ async def test_streaming_urls_resolve_to_the_same_recording(
     assert dossier.identity.kind is EntityKind.TRACK
     assert ids(dossier)[IdKind.MUSICBRAINZ_RECORDING] == ORIGINAL_RECORDING
     assert ids(dossier)[IdKind.APPLE_MUSIC] == "1097861770"
+    odesli = [link for link in dossier.links if link.sources[0].source == "odesli"]
+    assert odesli
+    assert odesli[0].sources[0].url is not None
+    assert "song.link" in odesli[0].sources[0].url
 
 
 @pytest.mark.asyncio
@@ -209,7 +248,7 @@ async def test_selection_and_cache(replay: Replay, config: SourcesConfig, tmp_pa
     second = await lookup(
         query,
         cached,
-        exclude=["musicbrainz", "deezer", "odesli", "discogs", "bandcamp"],
+        exclude=["musicbrainz", "deezer", "odesli", "discogs", "bandcamp", "lastfm", "wikipedia"],
         transport=replay("no_match"),
     )
 
@@ -252,11 +291,16 @@ async def test_discogs_url_resolves_first(replay: Replay, config: SourcesConfig)
 def test_describe_sources() -> None:
     sources = {info.source: info for info in describe_sources()}
 
-    assert list(sources) == ["musicbrainz", "odesli", "itunes", "deezer", "discogs", "bandcamp"]
+    assert list(sources) == [
+        "musicbrainz", "odesli", "itunes", "deezer", "discogs", "bandcamp", "lastfm", "wikipedia"
+    ]  # fmt: skip
     assert sources["musicbrainz"].pass_ is Pass.IDENTITY
-    assert sources["odesli"].status.state is SourceState.MISSING_CREDENTIAL
-    assert [r.setting for r in sources["odesli"].requires] == ["odesli.api_key"]
+    assert sources["odesli"].status.ready
+    assert sources["odesli"].requires == []
     assert sources["itunes"].status.ready
     assert sources["discogs"].status.ready
     assert [r.setting for r in sources["discogs"].requires] == ["discogs.token"]
     assert sources["bandcamp"].status.ready
+    assert sources["lastfm"].status.state is SourceState.MISSING_CREDENTIAL
+    assert [r.setting for r in sources["lastfm"].requires] == ["lastfm.api_key"]
+    assert sources["wikipedia"].status.ready

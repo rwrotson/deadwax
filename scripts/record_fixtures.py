@@ -17,6 +17,7 @@ from deadwax import (
     EntityKind,
     Escalation,
     HttpSettings,
+    LastfmSettings,
     Query,
     SourcesConfig,
     parse_query,
@@ -29,10 +30,13 @@ HOSTS = {
     "musicbrainz.org": "musicbrainz",
     "itunes.apple.com": "itunes",
     "api.deezer.com": "deezer",
-    "api.song.link": "odesli",
+    "song.link": "odesli",
+    "album.link": "odesli",
     "api.discogs.com": "discogs",
     "www.discogs.com": "discogs",
     "bandcamp.com": "bandcamp",
+    "ws.audioscrobbler.com": "lastfm",
+    "www.wikidata.org": "wikipedia",
 }
 
 # Sources recorded live by default; the others replay their existing fixtures when present.
@@ -60,9 +64,11 @@ SCENARIOS: dict[str, Query] = {
 
 
 def source_of(host: str) -> str:
-    """Name the source a host belongs to; Bandcamp pages live on subdomains."""
+    """Name the source a host belongs to; Bandcamp pages and Wikipedias live on subdomains."""
     if host.endswith(".bandcamp.com"):
         return "bandcamp"
+    if host.endswith(".wikipedia.org"):
+        return "wikipedia"
     return HOSTS.get(host, host)
 
 
@@ -85,6 +91,14 @@ def load(scenario: str, source: str) -> dict[str, dict[str, object]] | None:
     return interactions
 
 
+def replayed_headers(recorded: dict[str, object]) -> dict[str, str]:
+    """Headers of a recorded response: its content type and, for a redirect, its target."""
+    headers = {"content-type": str(recorded["content_type"])}
+    if "location" in recorded:
+        headers["location"] = str(recorded["location"])
+    return headers
+
+
 class RecordingTransport(httpx.AsyncBaseTransport):
     """Replay existing fixtures of some sources; forward the rest and keep their responses."""
 
@@ -105,12 +119,14 @@ class RecordingTransport(httpx.AsyncBaseTransport):
             raise LookupError(f"{source}: no recorded response for {key}; record it live")
         return httpx.Response(
             int(str(recorded["status"])),
-            headers={"content-type": str(recorded["content_type"])},
+            headers=replayed_headers(recorded),
             content=str(recorded["body"]).encode(),
         )
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         """Serve a replayed response, or send the request uncompressed and store the response."""
+        # Requests that follow a redirect arrive with an unread body stream.
+        await request.aread()
         source = source_of(request.url.host)
         key = fixture_key(request)
         replayed = self._replayed(source, key)
@@ -120,11 +136,14 @@ class RecordingTransport(httpx.AsyncBaseTransport):
         request.headers["accept-encoding"] = "identity"
         response = await self.inner.handle_async_request(request)
         body = await response.aread()
-        self.recorded.setdefault(source, {})[key] = {
+        entry: dict[str, object] = {
             "status": response.status_code,
             "content_type": response.headers.get("content-type", ""),
             "body": body.decode("utf-8", "replace"),
         }
+        if "location" in response.headers:
+            entry["location"] = response.headers["location"]
+        self.recorded.setdefault(source, {})[key] = entry
         sys.stdout.write(f"  {response.status_code} {key}\n")
         return httpx.Response(response.status_code, headers=response.headers, content=body)
 
@@ -133,18 +152,23 @@ class RecordingTransport(httpx.AsyncBaseTransport):
         await self.inner.aclose()
 
 
-def config() -> SourcesConfig:
-    """Default settings with the Discogs token from DEADWAX_DISCOGS__TOKEN, if set.
+def config(live: frozenset[str]) -> SourcesConfig:
+    """Default settings with the Discogs token and the Last.fm key from the environment.
+
+    They are read from DEADWAX_DISCOGS__TOKEN and DEADWAX_LASTFM__API_KEY, and only for a
+    source recorded live: a replayed source must make the requests its fixtures hold.
 
     Escalation is off because only plain httpx responses pass through the recording
     transport, and the timeout is long because Discogs allows 25 requests a minute without
     a token.
     """
-    token = os.environ.get("DEADWAX_DISCOGS__TOKEN")
+    token = os.environ.get("DEADWAX_DISCOGS__TOKEN") if "discogs" in live else None
+    lastfm_key = os.environ.get("DEADWAX_LASTFM__API_KEY") if "lastfm" in live else None
     return SourcesConfig(
         http=HttpSettings(escalation=Escalation.NONE),
         adapter_timeout=180,
         discogs=DiscogsSettings(token=SecretStr(token) if token else None),
+        lastfm=LastfmSettings(api_key=SecretStr(lastfm_key) if lastfm_key else None),
     )
 
 
@@ -152,7 +176,7 @@ async def record(name: str, query: Query, live: frozenset[str]) -> Dossier:
     """Run one lookup and write the fixtures of the sources recorded live."""
     transport = RecordingTransport(name, live)
     try:
-        dossier = await lookup(query, config(), transport=transport)
+        dossier = await lookup(query, config(live), transport=transport)
     finally:
         await transport.aclose()
     recorded_at = datetime.now(UTC).isoformat(timespec="seconds")

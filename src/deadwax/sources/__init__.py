@@ -8,7 +8,6 @@ from .config import (
     Escalation,
     HttpSettings,
     LastfmSettings,
-    OdesliSettings,
     SourcesConfig,
     SourceSettings,
 )
@@ -22,7 +21,6 @@ __all__ = [
     "Escalation",
     "HttpSettings",
     "LastfmSettings",
-    "OdesliSettings",
     "SourceSettings",
     "SourcesConfig",
     "build_adapters",

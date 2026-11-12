@@ -1,6 +1,7 @@
 import re
+from urllib.parse import quote
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from deadwax.core import (
     Capability,
@@ -15,13 +16,16 @@ from deadwax.core import (
     Provenance,
     Query,
     RecordCandidate,
-    Requirement,
+    SourceError,
 )
 from deadwax.sources._base import HttpAdapter, service_for_url
+from deadwax.sources._html import parse_html
+from deadwax.sources._http import Profile
 
-API = "https://api.song.link/v1-alpha.1/links"
+SITE = "https://song.link/"
 
-# Services whose URLs Odesli accepts as a starting point, in order of preference.
+# Services whose URLs Odesli accepts as a starting point, best matches first: a Spotify seed
+# finds the most platforms.
 _SEED_SERVICES = ("spotify", "apple_music", "deezer", "tidal", "youtube_music", "youtube")
 
 # Platform names that differ from the service names used elsewhere in deadwax.
@@ -32,32 +36,42 @@ _PLATFORMS = {
 }
 
 
-class _Api(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="ignore")
+class _Page(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
 
 
-class Entity(_Api):
-    """Song or album as one platform knows it."""
+class Entity(_Page):
+    """Song or album the page is about, as the seed platform knows it."""
 
     type: str
     title: str | None = None
     artist_name: str | None = Field(default=None, alias="artistName")
+    isrc: str | None = None
+    upc: str | None = None
 
 
-class PlatformLink(_Api):
-    """Link of one platform."""
+class PlatformLink(_Page):
+    """Link of one platform; platforms Odesli did not match have no URL."""
 
-    url: str
-    entity_unique_id: str | None = Field(default=None, alias="entityUniqueId")
+    platform: str
+    url: str | None = None
+    show: bool = True
 
 
-class Links(_Api):
-    """Response of the links endpoint."""
+class Section(_Page):
+    """Block of the page, such as the 'listen' and 'buy' link lists."""
+
+    section_id: str = Field(default="", alias="sectionId")
+    links: list[PlatformLink] = []
+
+
+class PageData(_Page):
+    """Data the song.link page renders."""
 
     entity_unique_id: str = Field(alias="entityUniqueId")
     page_url: str | None = Field(default=None, alias="pageUrl")
-    entities_by_unique_id: dict[str, Entity] = Field(default={}, alias="entitiesByUniqueId")
-    links_by_platform: dict[str, PlatformLink] = Field(default={}, alias="linksByPlatform")
+    entity: Entity | None = Field(default=None, alias="entityData")
+    sections: list[Section] = []
 
 
 def service_name(platform: str) -> str:
@@ -65,44 +79,74 @@ def service_name(platform: str) -> str:
     return _PLATFORMS.get(platform) or re.sub(r"(?<!^)([A-Z])", r"_\1", platform).lower()
 
 
-def partial(links: Links) -> Partial:
-    """Describe the record and list its link on every platform Odesli knows."""
-    entity = links.entities_by_unique_id.get(links.entity_unique_id)
+def page_data(content: bytes, url: str) -> PageData:
+    """Read the page data from the Next.js script of a song.link page.
+
+    An unknown URL redirects to a page without data, which means not found.
+    """
+    script = parse_html(content).css_first("script#__NEXT_DATA__")
+    if script is None:
+        raise SourceError("the song.link page has no page data", url=url)
+    try:
+        data = _NextData.model_validate_json(script.text())
+    except ValidationError as error:
+        raise SourceError(f"unexpected song.link page data: {error.error_count()} errors") from None
+    if data.props.page_props.page_data is None:
+        raise NotFoundError("song.link does not know this record", url=url)
+    return data.props.page_props.page_data
+
+
+class _PageProps(_Page):
+    page_data: PageData | None = Field(default=None, alias="pageData")
+
+
+class _Props(_Page):
+    page_props: _PageProps = Field(default=_PageProps(), alias="pageProps")
+
+
+class _NextData(_Page):
+    props: _Props = _Props()
+
+
+def partial(data: PageData) -> Partial:
+    """Describe the record and list its link on every platform Odesli matched."""
+    entity = data.entity
     kind = EntityKind.ALBUM if entity is not None and entity.type == "album" else EntityKind.TRACK
     target = LinkTarget.ALBUM if kind is EntityKind.ALBUM else LinkTarget.TRACK
-    sources = [Provenance(source=OdesliAdapter.name, url=links.page_url)]
+    sources = [Provenance(source=OdesliAdapter.name, url=data.page_url)]
     candidate = None
     if entity is not None and entity.title and entity.artist_name:
         candidate = RecordCandidate(
-            kind=kind, artist=entity.artist_name, title=entity.title, url=links.page_url
+            kind=kind,
+            artist=entity.artist_name,
+            title=entity.title,
+            isrcs=[entity.isrc] if entity.isrc else [],
+            upcs=[entity.upc] if entity.upc else [],
+            url=data.page_url,
         )
+    found = {
+        link.url: link
+        for section in data.sections
+        for link in section.links
+        if link.url and link.show and re.match(r"^https?://", link.url)
+    }
     return Partial(
         source=OdesliAdapter.name,
         candidate=candidate,
         links=[
-            Link(service=service_name(platform), url=link.url, target=target, sources=sources)
-            for platform, link in sorted(links.links_by_platform.items())
+            Link(service=service_name(link.platform), url=url, target=target, sources=sources)
+            for url, link in found.items()
         ],
     )
 
 
 class OdesliAdapter(HttpAdapter):
-    """Links on every streaming platform from Odesli (song.link); needs an API key."""
+    """Links on every streaming platform from the song.link page of a streaming link."""
 
     name = "odesli"
     pass_ = Pass.ENRICH
     capabilities = frozenset({Capability.LINKS})
-    requires = (Requirement(setting="odesli.api_key", purpose="every lookup"),)
-    secret_params = frozenset({"key"})
-
-    @property
-    def _key(self) -> str | None:
-        api_key = self.config.odesli.api_key
-        return api_key.get_secret_value() if api_key is not None else None
-
-    def missing_credential(self) -> str | None:
-        """The keyless API was retired, so every lookup needs a key."""
-        return None if self._key else "needs odesli.api_key; the keyless API was retired"
+    profile = Profile.BROWSER
 
     def resolves(self, query: Query) -> bool:
         """Streaming service URLs."""
@@ -111,14 +155,14 @@ class OdesliAdapter(HttpAdapter):
         )
 
     async def lookup(self, query: Query, context: LookupContext) -> Partial:
-        """Expand a streaming URL from the query or an earlier pass into links on all platforms."""
+        """Open the song.link page of a streaming URL from the query or an earlier pass."""
         seed = _seed(query, context)
         if seed is None:
             raise NotFoundError("no streaming URL to start from")
-        response = await self.client.get(
-            API, params={"url": seed, "userCountry": "US", "key": self._key or ""}
-        )
-        return partial(Links.model_validate_json(response.content))
+        # Encoded, the seed keeps its own query (Apple's track `?i=`) and song.link answers
+        # with one redirect to the record's page instead of normalizing the path first.
+        response = await self.client.get(f"{SITE}{quote(seed, safe='')}")
+        return partial(page_data(response.content, response.url))
 
 
 def _seed(query: Query, context: LookupContext) -> str | None:

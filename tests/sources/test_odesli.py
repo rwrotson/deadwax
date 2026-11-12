@@ -1,6 +1,8 @@
+import json
+from urllib.parse import quote
+
 import httpx
 import pytest
-from pydantic import SecretStr
 
 from deadwax.core import (
     EntityKind,
@@ -9,42 +11,66 @@ from deadwax.core import (
     LookupContext,
     NotFoundError,
     Provenance,
+    SourceError,
     SourceState,
     parse_query,
 )
-from deadwax.sources import OdesliSettings, SourcesConfig
+from deadwax.sources import SourcesConfig
 from deadwax.sources._http import HttpResources
-from deadwax.sources.odesli import OdesliAdapter, service_name
+from deadwax.sources.odesli import OdesliAdapter, page_data, partial, service_name
 
-# Hand-written response in the shape Odesli documents; the keyless API was retired, so none
-# could be recorded.
-LINKS = {
-    "entityUniqueId": "SPOTIFY_SONG::6LgJvl0Xdtc73RJ1mmpotq",
+SPOTIFY = "https://open.spotify.com/track/6LgJvl0Xdtc73RJ1mmpotq"
+AMAZON = "https://music.amazon.com/albums/B01"
+TIDAL = "https://listen.tidal.com/track/58990512"
+
+# Page data in the shape song.link rendered on 2026-11-13; unmatched platforms have no URL.
+PAGE_DATA = {
+    "entityUniqueId": "spotify|song|6LgJvl0Xdtc73RJ1mmpotq",
     "pageUrl": "https://song.link/s/6LgJvl0Xdtc73RJ1mmpotq",
-    "entitiesByUniqueId": {
-        "SPOTIFY_SONG::6LgJvl0Xdtc73RJ1mmpotq": {
-            "id": "6LgJvl0Xdtc73RJ1mmpotq",
-            "type": "song",
-            "title": "Paranoid Android",
-            "artistName": "Radiohead",
-        }
+    "entityData": {
+        "type": "song",
+        "title": "Paranoid Android",
+        "artistName": "Radiohead",
+        "isrc": "GBAYE9701376",
     },
-    "linksByPlatform": {
-        "spotify": {"url": "https://open.spotify.com/track/6LgJvl0Xdtc73RJ1mmpotq"},
-        "appleMusic": {"url": "https://geo.music.apple.com/us/album/_/1097861387?i=1097861770"},
-        "youtubeMusic": {"url": "https://music.youtube.com/watch?v=fHiGbolFFGw"},
-        "amazonMusic": {"url": "https://music.amazon.com/albums/B07ZR4PJVK"},
-    },
-}
+    "sections": [
+        {"sectionId": "section|auto|albumArt", "title": "Paranoid Android"},
+        {
+            "sectionId": "section|auto|links|listen",
+            "links": [
+                {"platform": "spotify", "url": SPOTIFY, "show": True},
+                {"platform": "appleMusic", "show": True},
+                {"platform": "amazonMusic", "url": AMAZON, "show": True},
+                {"platform": "tidal", "url": TIDAL, "show": False},
+                {"platform": "yandex", "url": "spotify:track:x", "show": True},
+            ],
+        },
+        {
+            "sectionId": "section|auto|links|buy",
+            "links": [
+                {"platform": "itunes", "show": True},
+                {"platform": "amazonStore", "url": "https://amazon.com/dp/B01", "show": True},
+                {"platform": "spotify", "url": SPOTIFY, "show": True},
+            ],
+        },
+    ],
+}  # fmt: skip
 
 
-def adapter(key: str | None, requests: list[httpx.Request]) -> OdesliAdapter:
+def page(data: object) -> bytes:
+    payload = json.dumps({"props": {"pageProps": data}, "page": "/[...pages]"})
+    script = f'<script id="__NEXT_DATA__" type="application/json">{payload}</script>'
+    return f"<html>{script}</html>".encode()
+
+
+def adapter(requests: list[httpx.Request], body: bytes | None = None) -> OdesliAdapter:
     def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request)
-        return httpx.Response(200, json=LINKS)
+        return httpx.Response(200, content=body or page({"pageData": PAGE_DATA}))
 
-    settings = OdesliSettings(api_key=SecretStr(key) if key else None)
-    config = SourcesConfig(odesli=settings)
+    config = SourcesConfig.model_validate(
+        {"odesli": {"rate": 1000}, "http": {"escalation": "none"}}
+    )
     return OdesliAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 
 
@@ -53,67 +79,82 @@ async def test_links_on_every_platform_from_a_curated_link() -> None:
     requests: list[httpx.Request] = []
     query = parse_query("Radiohead - Paranoid Android", EntityKind.TRACK)
     spotify = Link(
-        service="spotify",
-        url="https://open.spotify.com/track/6LgJvl0Xdtc73RJ1mmpotq",
-        target=LinkTarget.TRACK,
-        sources=[Provenance(source="musicbrainz")],
+        service="spotify", url=SPOTIFY, target=LinkTarget.TRACK, sources=[Provenance(source="mb")]
     )
-    odesli = adapter("s3cret", requests)
 
-    partial = await odesli.lookup(query, LookupContext(query=query, links=[spotify]))
-    await odesli.aclose()
+    found = await adapter(requests).lookup(query, LookupContext(query=query, links=[spotify]))
 
-    assert odesli.status().ready
-    assert requests[0].url.params["key"] == "s3cret"
-    assert requests[0].url.params["url"] == spotify.url
-    assert partial.candidate is not None
-    assert (partial.candidate.artist, partial.candidate.title) == ("Radiohead", "Paranoid Android")
-    assert {link.service for link in partial.links} == {
-        "spotify",
-        "apple_music",
-        "youtube_music",
-        "amazon_music",
-    }
-    assert all(link.sources[0].url == LINKS["pageUrl"] for link in partial.links)
+    assert str(requests[0].url) == f"https://song.link/{quote(SPOTIFY, safe='')}"
+    assert "Mozilla" in requests[0].headers["user-agent"]
+    assert found.candidate is not None
+    assert (found.candidate.title, found.candidate.isrcs) == ("Paranoid Android", ["GBAYE9701376"])
+    assert [(link.service, link.target) for link in found.links] == [
+        ("spotify", LinkTarget.TRACK),
+        ("amazon_music", LinkTarget.TRACK),
+        ("amazon_store", LinkTarget.TRACK),
+    ]
+    assert found.links[0].sources[0].url == "https://song.link/s/6LgJvl0Xdtc73RJ1mmpotq"
 
 
 @pytest.mark.asyncio
-async def test_query_url_is_the_seed_and_is_resolved() -> None:
+async def test_query_url_is_the_seed_and_albums_have_album_links() -> None:
     requests: list[httpx.Request] = []
-    query = parse_query("https://open.spotify.com/track/6LgJvl0Xdtc73RJ1mmpotq")
-    odesli = adapter("s3cret", requests)
+    entity = {"type": "album", "title": "OK Computer", "artistName": "Radiohead",
+              "upc": "634904078164"}  # fmt: skip
+    album = PAGE_DATA | {"entityData": entity}
+    query = parse_query("https://open.spotify.com/album/6dVIqQ8qmQ5GBnJ9shOYGE")
 
-    await odesli.lookup(query, LookupContext(query=query))
+    found = await adapter(requests, page({"pageData": album})).lookup(
+        query, LookupContext(query=query)
+    )
 
-    assert odesli.resolves(query)
-    assert requests[0].url.params["url"] == query.url
+    assert str(requests[0].url).endswith("open.spotify.com%2Falbum%2F6dVIqQ8qmQ5GBnJ9shOYGE")
+    assert found.candidate is not None
+    assert (found.candidate.kind, found.candidate.upcs) == (EntityKind.ALBUM, ["634904078164"])
+    assert {link.target for link in found.links} == {LinkTarget.ALBUM}
 
 
 @pytest.mark.asyncio
-async def test_without_a_seed_nothing_is_requested() -> None:
-    requests: list[httpx.Request] = []
+async def test_without_a_streaming_url_there_is_nothing_to_expand() -> None:
     query = parse_query("Radiohead - Paranoid Android", EntityKind.TRACK)
 
-    with pytest.raises(NotFoundError, match="no streaming URL"):
-        await adapter("s3cret", requests).lookup(query, LookupContext(query=query))
-
-    assert requests == []
+    with pytest.raises(NotFoundError):
+        await adapter([]).lookup(query, LookupContext(query=query))
 
 
-def test_missing_key_and_disabled_states() -> None:
-    disabled = SourcesConfig(odesli=OdesliSettings(enabled=False, api_key=SecretStr("k")))
+def test_unknown_record_redirects_to_a_page_without_data() -> None:
+    with pytest.raises(NotFoundError):
+        page_data(page({}), "https://song.link/not-found")
 
-    status = adapter(None, []).status()
 
-    assert status.state is SourceState.MISSING_CREDENTIAL
-    assert status.detail is not None
-    assert "odesli.api_key" in status.detail
-    assert OdesliAdapter(disabled, HttpResources()).status().state is SourceState.DISABLED
+@pytest.mark.parametrize(
+    "body", [b"<html>Just text</html>", page({"pageData": {"sections": "wrong"}})]
+)
+def test_unexpected_pages(body: bytes) -> None:
+    with pytest.raises(SourceError):
+        page_data(body, "https://song.link/x")
+
+
+def test_page_without_entity_has_links_only() -> None:
+    data = page_data(page({"pageData": PAGE_DATA | {"entityData": None}}), "u")
+
+    found = partial(data)
+
+    assert found.candidate is None
+    assert found.links[0].target is LinkTarget.TRACK
+
+
+def test_ready_without_a_key() -> None:
+    assert adapter([]).status().state is SourceState.READY
+    query = parse_query(SPOTIFY)
+    assert adapter([]).resolves(query)
+    assert not adapter([]).resolves(parse_query("Radiohead - Creep", EntityKind.TRACK))
 
 
 @pytest.mark.parametrize(
     ("platform", "service"),
-    [("spotify", "spotify"), ("appleMusic", "apple_music"), ("amazonStore", "amazon_store")],
-)
-def test_platform_names(platform: str, service: str) -> None:
+    [("appleMusic", "apple_music"), ("amazonMusic", "amazon_music"), ("itunes", "itunes_store"),
+     ("youtubeMusic", "youtube_music"), ("spotify", "spotify")],
+)  # fmt: skip
+def test_service_names(platform: str, service: str) -> None:
     assert service_name(platform) == service
