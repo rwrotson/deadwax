@@ -54,9 +54,9 @@ deadwax.sources.config
 
 Adapters are independent: they never import each other, and data found by one adapter reaches another only through `LookupContext`. A helper needed by two adapters moves down into `_html` or `_http`.
 
-### R5. Inside `core` (contract, added with the modules)
+### R5. Inside `core` (contract)
 
-From top to bottom:
+From top to bottom; `orchestrator` and `adapter` join the contract when they are added:
 
 ```
 orchestrator

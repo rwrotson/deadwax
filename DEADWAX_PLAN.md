@@ -4,8 +4,8 @@
 
 This is the implementation specification and multi-session handoff for deadwax. It is meant to be sufficient for an engineer or coding agent starting without the planning conversation. The original request (Russian, 2026-11-12) asked for a library and CLI that collects, for one track or album, everything open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links.
 
-- **Status:** Stage 0 complete; Stage 1 next (see the status table).
-- **Branch:** `main` (clean at the start, single initial commit `3fb3e34`). Agents never create commits on the user's behalf.
+- **Status:** Stages 0–1 complete; Stage 2 next (see the status table).
+- **Branch:** `main`. Stage 0 was committed by the user as `df3befa`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
 
@@ -163,7 +163,7 @@ Rate limits/TTL defaults per adapter in `sources/config.py`; all overridable.
 | Stage | Status | Deliverable |
 | --- | --- | --- |
 | 0 | Complete | Template renamed to deadwax, dependencies, import rules R1–R9 and contracts, docs adapted, this journal. |
-| 1 | Not started | Core: errors, models, query parsing, normalization, version detection, matching, merge, markdown. |
+| 1 | Complete | Core: errors, models, query parsing, normalization, version detection, matching, merge, markdown. |
 | 2 | Not started | Adapter protocol, two-pass orchestrator; HTTP stack: profiles, rate limiter, retry, cache, challenge detection, escalation ladder. |
 | 3 | Not started | MusicBrainz and Odesli (Deezer/iTunes seed), URL resolution, recorded fixtures. |
 | 4 | Not started | CLI: lookup and `sources`, formats, settings with TOML config, cache directory; first manual run. |
@@ -183,11 +183,11 @@ Rate limits/TTL defaults per adapter in `sources/config.py`; all overridable.
 
 ### Stage 1: core model and matching
 
-- [ ] `errors` (extend if needed), `query` (Query, EntityKind, `parse_query` with dash variants and quoting; URL kind detection for Bandcamp, MusicBrainz, Discogs; kind mismatch → `InvalidQueryError`).
-- [ ] `models`: Provenance, Scope, Identity with sourced values, Tag, Credit, Text, Rating, Relation, Entity, Link, Discrepancy, AdapterError, Partial, Dossier; JSON round-trip.
-- [ ] `normalize` (NFKC, casefold, Latin diacritics, feat./ft., punctuation and dashes; Cyrillic and Japanese preserved), `versions` (remix, live, demo, remaster, cover, edit, instrumental, acoustic, alternate; detail such as remixer).
-- [ ] `matching` (artist and base title score, version gate), `merge` (dedupe, provenance aggregation, discrepancies, other versions to relations), `markdown`.
-- [ ] R5 layers contract for core modules; public exports; reference index rows.
+- [x] `errors` (extend if needed), `query` (Query, EntityKind, `parse_query` with dash variants and quoting; URL kind detection for Bandcamp, MusicBrainz, Discogs; kind mismatch → `InvalidQueryError`).
+- [x] `models`: Provenance, Scope, Identity with sourced values, Tag, Credit, Text, Rating, Relation, Entity, Link, Discrepancy, AdapterError, Partial, Dossier; JSON round-trip.
+- [x] `normalize` (NFKC, casefold, Latin diacritics, feat./ft., punctuation and dashes; Cyrillic and Japanese preserved), `versions` (remix, live, demo, remaster, cover, edit, instrumental, acoustic, alternate; detail such as remixer).
+- [x] `matching` (artist and base title score, version gate), `merge` (dedupe, provenance aggregation, discrepancies, other versions to relations), `markdown`.
+- [x] R5 layers contract for core modules; public exports; reference index rows.
 
 **Acceptance:** tests cover Unicode variants, feat., bracketed versions, original vs remix vs live vs remaster, discrepancy recording, no merge on title alone; `poe check` green. **Suggested message:** `feat(core): add dossier model, query parsing and version-aware matching`.
 
@@ -270,9 +270,19 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-12 | Escalation ladder httpx → curl_cffi → Playwright for HTML pages; honest UA for APIs. | Explicit user choice; API policies. | 2, 5 |
 | 2026-11-12 | Odesli seeded by Deezer, then iTunes Search. | Explicit user choice. | 3 |
 | 2026-11-12 | Import rules R1–R9 fixed before code; per-module contracts added with modules. | User request; import-linter rejects missing layer modules. | All |
+| 2026-11-12 | Fact URLs are plain strings, not `HttpUrl`. | `HttpUrl` rewrites URLs (trailing slash), which breaks deduplication and shows sources differently from the page. | 1 |
+| 2026-11-12 | `Query.kind` may be `None` for a URL whose kind the URL does not reveal; the resolver adapter sets it. Text queries still require it. | Odesli and custom Bandcamp domains reveal the type only after a request. | 1, 3 |
+| 2026-11-12 | Relation kinds are directional (`cover_of`/`covered_by`, `remix_of`/`remixed_by`, `samples`/`sampled_by`); `VersionKind` adds `reissue` (deluxe/expanded/anniversary editions). | Direction is needed to tell an original from its cover or remix. | 1 |
+| 2026-11-12 | A candidate with a different version is kept out of the dossier: its facts are dropped, it becomes an `other_version` relation, and the disagreement is a `version` discrepancy. An unrelated candidate becomes a `no_match` error. For a URL query, the first candidate (the URL's own page) is the reference, so the orchestrator must run the URL resolver first. | Request: versions must not mix, and disagreements must be shown. | 1, 2 |
 | 2026-11-12 | `InvalidInputError` replaced by `InvalidQueryError`; `ConfigurationError` added in Stage 0. | Needed by the import-rule text (R7) and the CLI from the start. | 0, 1 |
 
-**Current task:** Stage 0 complete. **Next action:** user review and commit; then Stage 1 on request.
+**Current task:** Stage 1 complete. **Next action:** user review and commit; then Stage 2 on request.
+
+### 2026-11-12 — Stage 1 qualification
+
+Added the core modules: `query` (`Query`, `EntityKind`, `IdKind`, `parse_query`, `recognize_url` for Bandcamp, MusicBrainz, Discogs, Spotify, Deezer, and Apple Music URLs; dash variants and quotes; kind required for text and checked against the URL), `models` (provenance, scopes, identity with sourced values, tags, credits, texts with ratings, relations, links, adapter errors, `RecordCandidate`, `Partial`, `Dossier`), `normalize` (NFKC, casefold, dash and quote folding, diacritics removed from Latin letters only, `feat.` splitting, artist keys without a leading "The", ISRC/catalog and barcode keys), `versions` (bracketed and dash-suffix markers; exact forms such as "Original Mix" and "Radio Edit" first, then keywords by priority remix > live > demo > cover > instrumental > acoustic > edit > alternate > reissue > remaster), `matching` (difflib character and sorted-word similarity, thresholds 0.85, collaboration credits 0.9, remix and live details compared, album and track never match, title alone never matches), `merge` (reference record, verdicts, consensus with discrepancies for artist, title, version, date and IDs, deduplicated facts with combined provenance, scope-ordered output), and `markdown`. `deadwax.core` exports all of them for `sources`; `deadwax` exports the models, `parse_query`, `parse_title`, and `to_markdown`. The R5 layers contract covers the seven modules (`orchestrator` and `adapter` join in Stage 2).
+
+Checks: `uv run poe check` passed (Ruff, 9 contracts kept, mypy strict on 39 files, 175 tests, 99% branch coverage; all core modules at 100%); `uv run --group docs properdocs build --strict` passed. No network was used, no live source was queried, and no commit was created.
 
 ### 2026-11-12 — Stage 0 qualification
 

@@ -271,6 +271,12 @@ type = "layers"
 layers = ["deadwax.main", "deadwax.cli", "deadwax.logs | deadwax.sources", "deadwax.core"]
 
 [[tool.importlinter.contracts]]
+name = "R5: core modules"
+type = "layers"
+containers = ["deadwax.core"]
+layers = ["merge | markdown", "matching", "versions", "normalize", "models", "query", "errors"]
+
+[[tool.importlinter.contracts]]
 name = "R3: applications use the library only through the deadwax public API"
 type = "forbidden"
 source_modules = ["deadwax.main", "deadwax.cli", "deadwax.logs"]
