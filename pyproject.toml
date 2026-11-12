@@ -274,7 +274,27 @@ layers = ["deadwax.main", "deadwax.cli", "deadwax.logs | deadwax.sources", "dead
 name = "R5: core modules"
 type = "layers"
 containers = ["deadwax.core"]
-layers = ["merge | markdown", "matching", "versions", "normalize", "models", "query", "errors"]
+layers = [
+    "orchestrator",
+    "adapter | merge | markdown",
+    "matching", "versions", "normalize", "models", "query", "errors"]
+
+[[tool.importlinter.contracts]]
+name = "R4: sources modules"
+type = "layers"
+containers = ["deadwax.sources"]
+# Adapters, _html and lookup join above _http when they are added.
+layers = ["_http", "config"]
+
+[[tool.importlinter.contracts]]
+name = "R8: HTTP stack modules"
+type = "layers"
+containers = ["deadwax.sources._http"]
+layers = [
+    "client",
+    "impersonate | browser | plain | cache",
+    "challenge | profiles | ratelimit | retry | messages",
+]
 
 [[tool.importlinter.contracts]]
 name = "R3: applications use the library only through the deadwax public API"
@@ -336,6 +356,20 @@ source_modules = ["deadwax.main", "deadwax.cli"]
 forbidden_modules = ["httpx", "selectolax", "curl_cffi", "playwright"]
 # The CLI reaches them through the deadwax package.
 allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "R6: curl_cffi is used only by the impersonation transport"
+type = "forbidden"
+source_modules = ["deadwax"]
+forbidden_modules = ["curl_cffi"]
+ignore_imports = ["deadwax.sources._http.impersonate -> curl_cffi"]
+
+[[tool.importlinter.contracts]]
+name = "R6: Playwright is used only by the browser transport"
+type = "forbidden"
+source_modules = ["deadwax"]
+forbidden_modules = ["playwright"]
+ignore_imports = ["deadwax.sources._http.browser -> playwright"]
 
 [[tool.importlinter.contracts]]
 name = "R6: transitive dependencies are not imported directly"

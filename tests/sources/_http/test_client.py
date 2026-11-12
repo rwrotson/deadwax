@@ -1,0 +1,336 @@
+import random
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
+
+import httpx
+import pytest
+
+from deadwax.core import BlockedError, NotFoundError, RateLimitedError, SourceError
+from deadwax.sources import Escalation, HttpSettings, SourcesConfig
+from deadwax.sources._http import (
+    ClientSpec,
+    Fetcher,
+    HostLimiters,
+    HttpClient,
+    HttpResources,
+    Profile,
+    Request,
+    Response,
+    ResponseCache,
+    TransportError,
+    escalation_steps,
+    redact,
+)
+from deadwax.sources._http import client as client_module
+
+NOW = datetime(2026, 11, 12, tzinfo=UTC)
+URL = "https://api.example.org/record"
+CHALLENGE = b"<html><title>Just a moment...</title></html>"
+
+
+@dataclass
+class FakeTime:
+    now: float = 1000.0
+    sleeps: list[float] = field(default_factory=list)
+
+    def clock(self) -> float:
+        return self.now
+
+    async def sleep(self, seconds: float) -> None:
+        self.sleeps.append(seconds)
+        self.now += seconds
+
+
+@dataclass
+class Server:
+    """MockTransport handler answering with queued responses; the last one repeats."""
+
+    answers: list[httpx.Response | Exception]
+    requests: list[httpx.Request] = field(default_factory=list)
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        answer = self.answers.pop(0) if len(self.answers) > 1 else self.answers[0]
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+
+@dataclass
+class FakeFetcher:
+    name: str
+    answers: list[Response | SourceError]
+    requests: list[Request] = field(default_factory=list)
+    closed: bool = False
+
+    async def fetch(self, request: Request) -> Response:
+        self.requests.append(request)
+        answer = self.answers.pop(0) if len(self.answers) > 1 else self.answers[0]
+        if isinstance(answer, SourceError):
+            raise answer
+        return answer
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+def page(status: int = 200, content: bytes = b"<html>ok</html>") -> Response:
+    return Response(url=URL, status=status, content=content)
+
+
+@dataclass
+class Setup:
+    server: Server
+    time: FakeTime = field(default_factory=FakeTime)
+    cache: ResponseCache | None = None
+    fetchers: dict[Escalation, FakeFetcher] = field(default_factory=dict)
+    retries: int = 2
+
+    def client(
+        self,
+        profile: Profile = Profile.API,
+        secret_params: frozenset[str] = frozenset(),
+        escalation: Escalation | None = None,
+    ) -> HttpClient:
+        def factory(step: Escalation) -> Callable[[HttpSettings], Fetcher]:
+            return lambda settings: self.fetchers[step]
+
+        resources = HttpResources(
+            limiters=HostLimiters(clock=self.time.clock, sleep=self.time.sleep),
+            cache=self.cache,
+            transport=httpx.MockTransport(self.server),
+            escalations={step: factory(step) for step in Escalation},
+            installed=lambda package: True,
+            sleep=self.time.sleep,
+            now=lambda: NOW,
+            rng=random.Random(0),  # noqa: S311 -- seeded test jitter
+        )
+        config = SourcesConfig(
+            http=HttpSettings(retries=self.retries, escalation=escalation, contact="https://c")
+        )
+        spec = ClientSpec("lastfm", profile, {"x-source": "test"}, secret_params)
+        return HttpClient(spec, config, resources)
+
+
+@pytest.mark.asyncio
+async def test_api_requests_are_honest_and_cached(tmp_path: Path) -> None:
+    setup = Setup(Server([httpx.Response(200, json={"ok": True})]))
+    setup.cache = ResponseCache(tmp_path / "cache.sqlite")
+
+    async with setup.client() as client:
+        first = await client.get(URL, params={"q": "missing"})
+        second = await client.get(URL, params={"q": "missing"})
+    setup.cache.close()
+
+    [request] = setup.server.requests
+    assert request.headers["user-agent"].startswith("deadwax/")
+    assert request.headers["user-agent"].endswith("(+https://c)")
+    assert request.headers["x-source"] == "test"
+    assert first.json() == second.json() == {"ok": True}
+
+
+@pytest.mark.asyncio
+async def test_not_found_is_raised_and_cached(tmp_path: Path) -> None:
+    setup = Setup(Server([httpx.Response(404)]))
+    setup.cache = ResponseCache(tmp_path / "cache.sqlite")
+
+    async with setup.client() as client:
+        for _ in range(2):
+            with pytest.raises(NotFoundError) as raised:
+                await client.get(URL)
+    setup.cache.close()
+
+    assert raised.value.url == URL
+    assert len(setup.server.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_retry_after_is_honoured(tmp_path: Path) -> None:
+    server = Server(
+        [httpx.Response(429, headers={"Retry-After": "7"}), httpx.Response(200, text="ok")]
+    )
+    setup = Setup(server)
+    setup.cache = ResponseCache(tmp_path / "cache.sqlite")
+
+    async with setup.client() as client:
+        response = await client.get(URL)
+    setup.cache.close()
+
+    assert response.text == "ok"
+    assert 7.0 in setup.time.sleeps
+    assert len(server.requests) == 2
+
+
+@pytest.mark.asyncio
+async def test_persistent_rate_limit_is_reported() -> None:
+    setup = Setup(Server([httpx.Response(429)]))
+
+    async with setup.client() as client:
+        with pytest.raises(RateLimitedError, match="too many requests"):
+            await client.get(URL)
+
+    assert len(setup.server.requests) == 3
+
+
+@pytest.mark.asyncio
+async def test_too_long_retry_after_gives_up_at_once() -> None:
+    setup = Setup(Server([httpx.Response(503, headers={"Retry-After": "3600"})]))
+
+    async with setup.client() as client:
+        with pytest.raises(RateLimitedError, match="asked to wait 3600 s"):
+            await client.get(URL)
+
+    assert len(setup.server.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_server_errors_are_retried_with_backoff() -> None:
+    setup = Setup(Server([httpx.Response(502), httpx.Response(200, text="ok")]))
+
+    async with setup.client() as client:
+        response = await client.get(URL)
+
+    assert response.text == "ok"
+    assert any(0 <= wait <= 0.5 for wait in setup.time.sleeps)
+
+
+@pytest.mark.asyncio
+async def test_other_errors_are_not_retried() -> None:
+    setup = Setup(Server([httpx.Response(400)]))
+
+    async with setup.client() as client:
+        with pytest.raises(SourceError, match="HTTP 400"):
+            await client.get(URL)
+
+    assert len(setup.server.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_network_errors_are_retried_then_raised_without_secrets() -> None:
+    refused = httpx.ConnectError("refused")
+    setup = Setup(Server([refused, httpx.Response(200, text="ok")]))
+    failing = Setup(Server([refused]))
+
+    async with setup.client() as client:
+        recovered = await client.get(URL)
+    async with failing.client(secret_params=frozenset({"api_key"})) as client:
+        with pytest.raises(TransportError) as raised:
+            await client.get(URL, params={"api_key": "s3cret", "q": "x"})
+
+    assert recovered.text == "ok"
+    assert len(failing.server.requests) == 3
+    assert raised.value.url == f"{URL}?q=x"
+
+
+@pytest.mark.asyncio
+async def test_secret_parameters_are_sent_but_not_exposed() -> None:
+    setup = Setup(Server([httpx.Response(200), httpx.Response(500)]))
+
+    async with setup.client(secret_params=frozenset({"api_key"})) as client:
+        response = await client.get(URL, params={"q": "x", "api_key": "s3cret"})
+        with pytest.raises(SourceError) as raised:
+            await client.request("POST", URL, params={"api_key": "s3cret"}, body=b"{}")
+
+    assert setup.server.requests[0].url.params["api_key"] == "s3cret"
+    assert response.url == f"{URL}?q=x"
+    assert raised.value.url == URL
+
+
+@pytest.mark.asyncio
+async def test_browser_profile_escalates_and_stays_escalated() -> None:
+    setup = Setup(Server([httpx.Response(403, content=CHALLENGE)]))
+    impersonate = FakeFetcher("impersonate", [page()])
+    setup.fetchers = {Escalation.IMPERSONATE: impersonate}
+
+    client = setup.client(Profile.BROWSER, escalation=Escalation.IMPERSONATE)
+    async with client:
+        first = await client.get(URL)
+        second = await client.get(URL)
+
+    assert first.text == second.text == "<html>ok</html>"
+    assert len(setup.server.requests) == 1
+    assert len(impersonate.requests) == 2
+    assert setup.server.requests[0].headers["user-agent"].startswith("Mozilla/5.0")
+    assert impersonate.closed
+
+
+@pytest.mark.asyncio
+async def test_blocked_when_every_transport_meets_a_challenge() -> None:
+    setup = Setup(Server([httpx.Response(503, content=CHALLENGE)]))
+    setup.fetchers = {
+        Escalation.IMPERSONATE: FakeFetcher("impersonate", [page(403, CHALLENGE)]),
+        Escalation.BROWSER: FakeFetcher("browser", [page(200, CHALLENGE)]),
+    }
+
+    async with setup.client(Profile.BROWSER) as client:
+        with pytest.raises(BlockedError, match=r"tried httpx, impersonate, browser") as raised:
+            await client.get(URL)
+
+    assert raised.value.url == URL
+    assert len(setup.server.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_escalated_transport_errors_carry_the_url() -> None:
+    setup = Setup(Server([httpx.Response(403, content=CHALLENGE)]), retries=0)
+    setup.fetchers = {Escalation.IMPERSONATE: FakeFetcher("impersonate", [SourceError("boom")])}
+
+    async with setup.client(Profile.BROWSER, escalation=Escalation.IMPERSONATE) as client:
+        with pytest.raises(SourceError, match="boom") as raised:
+            await client.get(URL)
+
+    assert raised.value.url == URL
+
+
+@pytest.mark.asyncio
+async def test_api_profile_never_escalates() -> None:
+    setup = Setup(Server([httpx.Response(403, headers={"cf-mitigated": "challenge"})]))
+
+    async with setup.client() as client:
+        with pytest.raises(BlockedError, match=r"Cloudflare challenge \(tried httpx\)"):
+            await client.get(URL)
+
+
+@pytest.mark.parametrize(
+    ("setting", "installed", "expected"),
+    [
+        (None, set(), []),
+        (None, {"curl_cffi"}, [Escalation.IMPERSONATE]),
+        (None, {"playwright"}, [Escalation.BROWSER]),
+        (None, {"curl_cffi", "playwright"}, [Escalation.IMPERSONATE, Escalation.BROWSER]),
+        (Escalation.NONE, {"curl_cffi", "playwright"}, []),
+        (Escalation.IMPERSONATE, set(), [Escalation.IMPERSONATE]),
+        (Escalation.IMPERSONATE, {"playwright"}, [Escalation.IMPERSONATE]),
+        (Escalation.BROWSER, set(), [Escalation.BROWSER]),
+        (Escalation.BROWSER, {"curl_cffi"}, [Escalation.IMPERSONATE, Escalation.BROWSER]),
+    ],
+)
+def test_escalation_steps(
+    setting: Escalation | None, installed: set[str], expected: list[Escalation]
+) -> None:
+    assert escalation_steps(setting, installed.__contains__) == expected
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("https://x/a?q=1", "https://x/a?q=1"),
+        ("https://x/a?q=1&token=t", "https://x/a?q=1"),
+        ("https://x/a?token=t", "https://x/a"),
+    ],
+)
+def test_redact(url: str, expected: str) -> None:
+    assert redact(url, {"token"}) == expected
+    assert redact(url, set()) == url
+
+
+def test_default_resources() -> None:
+    resources = HttpResources()
+
+    assert resources.cache is None
+    assert set(resources.escalations) == {Escalation.IMPERSONATE, Escalation.BROWSER}
+    assert resources.now().tzinfo is UTC
+    assert client_module._installed("json")
+    assert not client_module._installed("deadwax_missing_package")

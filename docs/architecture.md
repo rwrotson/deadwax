@@ -52,11 +52,19 @@ deadwax.sources._http
 deadwax.sources.config
 ```
 
-Adapters are independent: they never import each other, and data found by one adapter reaches another only through `LookupContext`. A helper needed by two adapters moves down into `_html` or `_http`.
+Adapters are independent: they never import each other, and data found by one adapter reaches another only through `LookupContext`. A helper needed by two adapters moves down into `_html` or `_http`. The contract lists the layers that exist; adapters, `_html`, and `lookup` join it when they are added.
+
+Inside `deadwax.sources._http` (contract "R8: HTTP stack modules"), from top to bottom:
+
+```
+client
+impersonate | browser | plain | cache
+challenge | profiles | ratelimit | retry | messages
+```
 
 ### R5. Inside `core` (contract)
 
-From top to bottom; `orchestrator` and `adapter` join the contract when they are added:
+From top to bottom:
 
 ```
 orchestrator
@@ -136,5 +144,9 @@ The `deadwax` command calls it with `LogSettings` loaded from `DEADWAX_LOG__*`.
 | `DeadwaxError` | `Exception` | Base for every expected library failure |
 | `InvalidQueryError` | `DeadwaxError`, `ValueError` | The query cannot be parsed or is inconsistent |
 | `ConfigurationError` | `DeadwaxError` | A setting, credential, or optional dependency required for an operation is missing |
+| `SourceError` | `DeadwaxError` | A source could not answer a request; carries the request URL without secrets |
+| `BlockedError` | `SourceError` | Every allowed transport met an anti-bot challenge |
+| `RateLimitedError` | `SourceError` | The source kept answering 429 or asked to wait too long |
+| `NotFoundError` | `SourceError` | The source has no page for the request (HTTP 404) |
 
 Callers can catch `DeadwaxError` for all library failures or the built-in base for a specific one. Add a subclass for each new kind of expected failure. Unexpected exceptions are not wrapped. A failing adapter does not raise out of a lookup; its failure is recorded in the dossier.

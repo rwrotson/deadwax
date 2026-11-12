@@ -4,7 +4,7 @@
 
 This is the implementation specification and multi-session handoff for deadwax. It is meant to be sufficient for an engineer or coding agent starting without the planning conversation. The original request (Russian, 2026-11-12) asked for a library and CLI that collects, for one track or album, everything open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links.
 
-- **Status:** Stages 0–1 complete; Stage 2 next (see the status table).
+- **Status:** Stages 0–2 complete; Stage 3 next (see the status table).
 - **Branch:** `main`. Stage 0 was committed by the user as `df3befa`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -164,7 +164,7 @@ Rate limits/TTL defaults per adapter in `sources/config.py`; all overridable.
 | --- | --- | --- |
 | 0 | Complete | Template renamed to deadwax, dependencies, import rules R1–R9 and contracts, docs adapted, this journal. |
 | 1 | Complete | Core: errors, models, query parsing, normalization, version detection, matching, merge, markdown. |
-| 2 | Not started | Adapter protocol, two-pass orchestrator; HTTP stack: profiles, rate limiter, retry, cache, challenge detection, escalation ladder. |
+| 2 | Complete | Adapter protocol, two-pass orchestrator; HTTP stack: profiles, rate limiter, retry, cache, challenge detection, escalation ladder. |
 | 3 | Not started | MusicBrainz and Odesli (Deezer/iTunes seed), URL resolution, recorded fixtures. |
 | 4 | Not started | CLI: lookup and `sources`, formats, settings with TOML config, cache directory; first manual run. |
 | 5 | Not started | Bandcamp and Discogs (reviews through the escalation ladder). |
@@ -193,9 +193,9 @@ Rate limits/TTL defaults per adapter in `sources/config.py`; all overridable.
 
 ### Stage 2: orchestration and HTTP stack
 
-- [ ] `adapter` protocol (name, capabilities, requires, pass, lookup, status) and `LookupContext`; `orchestrator` with two passes, per-adapter timeout, error capture, include/exclude.
-- [ ] `sources.config`, `_http` client with API and browser header profiles, per-host rate limiter, retry with jittered backoff and Retry-After, sqlite cache with TTL and secret stripping, challenge detection, curl_cffi and Playwright transports behind lazy imports.
-- [ ] R4 and module-level R6 contracts for the new modules.
+- [x] `adapter` protocol (name, capabilities, requires, pass, lookup, status) and `LookupContext`; `orchestrator` with two passes, per-adapter timeout, error capture, include/exclude.
+- [x] `sources.config`, `_http` client with API and browser header profiles, per-host rate limiter, retry with jittered backoff and Retry-After, sqlite cache with TTL and secret stripping, challenge detection, curl_cffi and Playwright transports behind lazy imports.
+- [x] R4 and module-level R6 contracts for the new modules.
 
 **Acceptance:** fake-adapter tests for pass ordering, context propagation, timeout, exception, blocked, missing key; HTTP tests with MockTransport and fake clock; escalation tested with fake transports only. **Suggested message:** `feat(sources): add adapter orchestration and resilient HTTP stack`.
 
@@ -275,8 +275,23 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-12 | Relation kinds are directional (`cover_of`/`covered_by`, `remix_of`/`remixed_by`, `samples`/`sampled_by`); `VersionKind` adds `reissue` (deluxe/expanded/anniversary editions). | Direction is needed to tell an original from its cover or remix. | 1 |
 | 2026-11-12 | A candidate with a different version is kept out of the dossier: its facts are dropped, it becomes an `other_version` relation, and the disagreement is a `version` discrepancy. An unrelated candidate becomes a `no_match` error. For a URL query, the first candidate (the URL's own page) is the reference, so the orchestrator must run the URL resolver first. | Request: versions must not mix, and disagreements must be shown. | 1, 2 |
 | 2026-11-12 | `InvalidInputError` replaced by `InvalidQueryError`; `ConfigurationError` added in Stage 0. | Needed by the import-rule text (R7) and the CLI from the start. | 0, 1 |
+| 2026-11-12 | `SourceError` with `BlockedError`, `RateLimitedError`, `NotFoundError` lives in `core.errors`; the orchestrator maps them to `ErrorKind`. | Adapters and the HTTP stack raise them; `errors` is the lowest core layer, so the mapping sits in the orchestrator. | 2 |
+| 2026-11-12 | Adapters are constructed with their settings and report `status()` without arguments; `requires` lists setting paths (`discogs.token`) that the CLI maps to `DEADWAX_` names. | Keeps core free of configuration types. | 2, 4 |
+| 2026-11-12 | Pass 2 context is the identity and links of a merge of pass-1 results; a URL query's resolver runs alone first and gives its kind to a kindless query. | Rejected other-version candidates must not leak IDs into enrichment. | 2 |
+| 2026-11-12 | Excluded and disabled adapters produce no error; adapters missing a key or extra produce `skipped`; unknown names in include/exclude raise `ConfigurationError`. | Errors report what the user did not choose. | 2, 4 |
+| 2026-11-12 | Default API contact is the repository URL, not a personal address; overridable by `http.contact`. | API policies need a contact; no personal data by default. | 2 |
+| 2026-11-12 | Plain httpx transport lives in `_http.plain`; a layers contract ("R8: HTTP stack modules") orders `_http` modules. | R8 requires a layers contract for every multi-module package. | 2 |
+| 2026-11-12 | Captcha widget markers count as a challenge only on 403/429/503; Cloudflare interstitial markers count on any status. | Ordinary pages embed reCAPTCHA in login forms. | 2, 5 |
 
-**Current task:** Stage 1 complete. **Next action:** user review and commit; then Stage 2 on request.
+**Current task:** Stage 2 complete. **Next action:** user review and commit; then Stage 3 on request.
+
+### 2026-11-12 — Stage 2 qualification
+
+Core: `errors` gained `SourceError` (with `url`) and `BlockedError`, `RateLimitedError`, `NotFoundError`. `adapter` defines `Pass`, `Capability`, `Requirement`, `SourceState`, `SourceStatus`, `LookupContext` (query, identity, links; `id()` and `urls()` helpers), and the `Adapter` protocol (`name`, `pass_`, `capabilities`, `requires`, `status()`, `resolves()`, `lookup()`). `orchestrator.run(query, adapters, LookupOptions, now=)` selects adapters (include/exclude, status), runs a URL resolver alone first, then the identity pass and the enrichment pass concurrently with `TaskGroup`, each adapter under `asyncio.timeout`; failures become `AdapterError`s (timeout, blocked, rate_limited, not_found, failed with a logged traceback) and cancellation propagates. The R5 contract now includes `orchestrator` and `adapter`.
+
+Sources: `config` has `HttpSettings`, `CacheSettings`, `SourceSettings`, `DiscogsSettings.token`/`LastfmSettings.api_key` (`SecretStr`), `Escalation`, `SourcesConfig` with per-source rate and TTL defaults. `_http`: `messages` (`Request`, `Response`, `Fetcher`, `TransportError`, `ResponseTooLargeError`), `profiles` (honest `deadwax/<version> (+contact)` API headers; Chrome and Firefox header sets), `ratelimit` (per-host token bucket with jitter, injectable clock/sleep/rng), `retry` (full-jitter backoff, Retry-After seconds and dates, cap → `RateLimitedError`), `challenge` (Cloudflare, DataDome, PerimeterX, captcha markers), `cache` (sqlite3 via `asyncio.to_thread`, key without secret params, 2xx with source TTL, 404 with `not_found_ttl`, broken cache counts as empty), `plain` (httpx with HTTP/2, cookies, streamed size cap), `impersonate` (curl_cffi `AsyncSession(impersonate="chrome")`), `browser` (Playwright Chromium, status of the last main-frame navigation, waits up to 5 s for network idle), and `client` (`HttpClient(ClientSpec, SourcesConfig, HttpResources)`: cache → limiter → retries → challenge check → escalation for browser-profile clients, sticky per client; secret params removed from response and error URLs). Contracts added: R4 (`_http`, `config`), R8 HTTP stack layers, R6 curl_cffi only in `_http.impersonate`, R6 Playwright only in `_http.browser`. A temporary probe (`_http/_probe.py` importing curl_cffi and playwright, `config` importing `_http`) broke all four as intended and was removed.
+
+Checks: `uv run poe check` passed (Ruff format and lint, 13 contracts kept, mypy strict on 66 files, 290 tests, 99.94% branch coverage); `uv run --group docs properdocs build --strict` passed. Everything is mock-tested only: HTTP through `httpx.MockTransport`, curl_cffi and Playwright through fake modules in `sys.modules`; no live request was made and no real browser was launched. No commit was created.
 
 ### 2026-11-12 — Stage 1 qualification
 

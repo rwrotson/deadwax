@@ -1,6 +1,23 @@
 """Library internals shared by deadwax layers; the supported public API is `deadwax`."""
 
-from .errors import ConfigurationError, DeadwaxError, InvalidQueryError
+from .adapter import (
+    Adapter,
+    Capability,
+    LookupContext,
+    Pass,
+    Requirement,
+    SourceState,
+    SourceStatus,
+)
+from .errors import (
+    BlockedError,
+    ConfigurationError,
+    DeadwaxError,
+    InvalidQueryError,
+    NotFoundError,
+    RateLimitedError,
+    SourceError,
+)
 from .markdown import to_markdown
 from .matching import Match, RecordKey, Verdict, artist_similarity, compare, title_similarity
 from .merge import QUERY_SOURCE, build_identity, merge
@@ -43,14 +60,18 @@ from .normalize import (
     normalize_text,
     split_featuring,
 )
+from .orchestrator import LookupOptions, run
 from .query import EntityKind, IdKind, Query, parse_query, recognize_url
 from .versions import ParsedTitle, classify_marker, parse_title
 
 __all__ = [
     "QUERY_SOURCE",
+    "Adapter",
     "AdapterError",
     "Attributed",
+    "BlockedError",
     "CandidateLabel",
+    "Capability",
     "ConfigurationError",
     "Credit",
     "DeadwaxError",
@@ -68,17 +89,26 @@ __all__ = [
     "LabelRef",
     "Link",
     "LinkTarget",
+    "LookupContext",
+    "LookupOptions",
     "Match",
+    "NotFoundError",
     "ParsedTitle",
     "Partial",
+    "Pass",
     "Provenance",
     "Query",
+    "RateLimitedError",
     "Rating",
     "RecordCandidate",
     "RecordKey",
     "Relation",
     "RelationKind",
+    "Requirement",
     "Scope",
+    "SourceError",
+    "SourceState",
+    "SourceStatus",
     "Sourced",
     "Tag",
     "TagKind",
@@ -100,6 +130,7 @@ __all__ = [
     "parse_query",
     "parse_title",
     "recognize_url",
+    "run",
     "split_featuring",
     "title_similarity",
     "to_markdown",
