@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from my_lib.logs import LogSettings
+from deadwax.logs import LogSettings
 
 
 @pytest.mark.parametrize(

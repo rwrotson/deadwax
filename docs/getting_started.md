@@ -9,7 +9,7 @@
 
 ```bash
 git clone <repo-url>
-cd python-lib-template
+cd deadwax
 uv sync --all-groups --locked
 uv run pre-commit install
 ```
@@ -24,32 +24,27 @@ Ruff and mypy run from the locked project environment (`uv run --no-sync`), so h
 
 ## Using the Library
 
-```python
-from my_lib import InvalidInputError, greet
+The lookup API and the `deadwax` command are being implemented in stages; see `DEADWAX_PLAN.md` for the current status. Library errors derive from `DeadwaxError`:
 
-greet("Ada")  # "Hello, Ada!"
+```python
+from deadwax import DeadwaxError, InvalidQueryError
 ```
 
-A base install (`pip install my-lib`) depends only on Pydantic. Optional extras add application features:
+A base install (`pip install deadwax`) depends on Pydantic, httpx, and selectolax. Optional extras add application features:
 
 | Extra | Adds |
 |-------|------|
-| `my-lib[logs]` | `my_lib.logs`: `LogSettings` and `setup_logging()` (structlog) |
-| `my-lib[cli]` | The `my-lib` command (Typer, Pydantic Settings) and the `logs` extra |
+| `deadwax[logs]` | `deadwax.logs`: `LogSettings` and `setup_logging()` (structlog) |
+| `deadwax[cli]` | The `deadwax` command (Typer, Pydantic Settings, rich, platformdirs) and the `logs` extra |
+| `deadwax[stealth]` | curl_cffi transport for pages behind bot protection |
+| `deadwax[browser]` | Playwright transport; run `playwright install chromium` once |
 
 Configure logging in the application, or use the bundled helper:
 
 ```python
-from my_lib.logs import LogSettings, setup_logging
+from deadwax.logs import LogSettings, setup_logging
 
 setup_logging(LogSettings(level="DEBUG"))
-```
-
-The command runs the same API:
-
-```bash
-uv run my-lib greet Ada
-uv run my-lib --verbose greet Ada  # debug logs on stderr
 ```
 
 ## Development Commands
@@ -95,53 +90,24 @@ Bump type is inferred from commits: `fix:` → patch · `feat:` → minor · `fe
 
 ## Adding Functionality
 
-See the [architecture guide](architecture.md) for the layers and error handling.
+Follow the layers and import rules in the [architecture guide](architecture.md):
 
-1. Create the code in `src/my_lib/core/slug.py`:
-
-```python
-from my_lib.core.errors import InvalidInputError
-
-
-def slugify(text: str) -> str:
-    """Convert text to a lowercase, hyphen-separated slug."""
-    words = text.lower().split()
-    if not words:
-        raise InvalidInputError("text must not be empty")
-    return "-".join(words)
-```
-
-2. Export it from `src/my_lib/core/__init__.py`:
-
-```python
-from .errors import InvalidInputError, MyLibError
-from .example import greet
-from .slug import slugify
-
-__all__ = ["InvalidInputError", "MyLibError", "greet", "slugify"]
-```
-
-   and from `src/my_lib/__init__.py`:
-
-```python
-from .core import InvalidInputError, MyLibError, greet, slugify
-
-__all__ = ["InvalidInputError", "MyLibError", "greet", "slugify"]
-```
-
-3. Test it in `tests/core/test_slug.py` and add a row to `docs/reference/index.md`.
+1. Put the code in the layer that owns it (`core/` for models and matching, `sources/` for adapters and HTTP) and raise a `DeadwaxError` subclass for expected failures.
+2. Add a new module to the layer contract of its package in `pyproject.toml` (rules R4 and R5).
+3. Export supported names from the package `__init__.py` and from `deadwax/__init__.py`, with `__all__`.
+4. Test it in the mirrored directory under `tests/`, with recorded responses instead of network access, and list the module in `docs/reference/index.md`.
 
 ## Configuration
 
-The `my-lib` command reads `MY_LIB_*` environment variables and a `.env` file in the working directory through `my_lib.cli.settings.load_settings()`; the library itself never reads them. Sections are nested with `__`:
+The `deadwax` command reads `DEADWAX_*` environment variables and a `.env` file in the working directory through `deadwax.cli.settings.load_settings()`; the library itself never reads them. Sections are nested with `__`:
 
 | Prefix | Controls |
 |--------|----------|
-| `MY_LIB_LOG__*` | Log levels, console renderer, optional log directory, file rotation |
+| `DEADWAX_LOG__*` | Log levels, console renderer, optional log directory, file rotation |
 
 ```env
-MY_LIB_LOG__LEVEL=DEBUG
-MY_LIB_LOG__FORMAT=json
+DEADWAX_LOG__LEVEL=DEBUG
+DEADWAX_LOG__FORMAT=json
 ```
 
 All variables are listed on the [configuration page](configuration.md).

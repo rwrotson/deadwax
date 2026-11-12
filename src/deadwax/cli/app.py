@@ -4,23 +4,23 @@ from typing import Annotated
 import typer
 from pydantic import ValidationError
 
-from my_lib import MyLibError, greet
-from my_lib.cli.settings import load_settings
-from my_lib.logs import setup_logging
+from deadwax.cli.settings import load_settings
+from deadwax.logs import setup_logging
 
 app = typer.Typer(
-    help="Command-line interface for my-lib.", no_args_is_help=True, add_completion=False
+    help="Collect what open sources know about a track or album.", add_completion=False
 )
 
 
 def _show_version(value: bool) -> None:
     if value:
-        typer.echo(f"my-lib {version('my-lib')}")
+        typer.echo(f"deadwax {version('deadwax')}")
         raise typer.Exit
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def root(
+    ctx: typer.Context,
     verbose: Annotated[bool, typer.Option("--verbose", "-V", help="Log debug messages.")] = False,
     _version: Annotated[
         bool,
@@ -29,7 +29,7 @@ def root(
         ),
     ] = False,
 ) -> None:
-    """Load MY_LIB_* settings and configure logging for one invocation."""
+    """Load DEADWAX_* settings and configure logging for one invocation."""
     try:
         settings = load_settings()
     except ValidationError as error:
@@ -39,13 +39,5 @@ def root(
     log_settings = settings.log.model_copy(update={"level": "DEBUG"}) if verbose else settings.log
     setup_logging(log_settings)
 
-
-@app.command("greet")
-def greet_command(name: str) -> None:
-    """Print a greeting for NAME."""
-    try:
-        message = greet(name)
-    except MyLibError as error:
-        typer.echo(f"Error: {error}", err=True)
-        raise typer.Exit(1) from error
-    typer.echo(message)
+    if ctx.invoked_subcommand is None:
+        typer.echo(ctx.get_help())

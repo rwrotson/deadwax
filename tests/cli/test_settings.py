@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from my_lib.cli.settings import Settings, env_fields, load_settings
+from deadwax.cli.settings import Settings, env_fields, load_settings
 
 ENV_EXAMPLE = Path(__file__).parents[2] / ".env.example"
 
@@ -18,8 +18,8 @@ def test_settings_use_code_defaults() -> None:
 
 
 def test_nested_environment_variables(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setenv("MY_LIB_LOG__LEVEL", "WARNING")
-    monkeypatch.setenv("MY_LIB_LOG__DIR", str(tmp_path))
+    monkeypatch.setenv("DEADWAX_LOG__LEVEL", "WARNING")
+    monkeypatch.setenv("DEADWAX_LOG__DIR", str(tmp_path))
 
     settings = load_settings()
 
@@ -28,8 +28,8 @@ def test_nested_environment_variables(monkeypatch: pytest.MonkeyPatch, tmp_path:
 
 
 def test_process_environment_overrides_dotenv(monkeypatch: pytest.MonkeyPatch) -> None:
-    Path(".env").write_text("MY_LIB_LOG__LEVEL=ERROR\nMY_LIB_LOG__FORMAT=json\n")
-    monkeypatch.setenv("MY_LIB_LOG__LEVEL", "DEBUG")
+    Path(".env").write_text("DEADWAX_LOG__LEVEL=ERROR\nDEADWAX_LOG__FORMAT=json\n")
+    monkeypatch.setenv("DEADWAX_LOG__LEVEL", "DEBUG")
 
     settings = load_settings()
 
@@ -38,12 +38,12 @@ def test_process_environment_overrides_dotenv(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_empty_values_fall_back_to_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("MY_LIB_LOG__DIR", "")
+    monkeypatch.setenv("DEADWAX_LOG__DIR", "")
     assert load_settings().log.dir is None
 
 
 def test_invalid_level_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("MY_LIB_LOG__LEVEL", "LOUD")
+    monkeypatch.setenv("DEADWAX_LOG__LEVEL", "LOUD")
     with pytest.raises(ValidationError):
         load_settings()
 
@@ -53,7 +53,7 @@ def test_env_example_parses_to_defaults() -> None:
 
 
 def test_env_example_documents_every_setting() -> None:
-    documented = set(re.findall(r"^#? ?(MY_LIB_[A-Z_]+)=", ENV_EXAMPLE.read_text(), re.MULTILINE))
+    documented = set(re.findall(r"^#? ?(DEADWAX_[A-Z_]+)=", ENV_EXAMPLE.read_text(), re.MULTILINE))
     settings = {name for name, _ in env_fields()}
 
     assert settings - documented == set(), "add new settings to .env.example"

@@ -4,14 +4,14 @@ from pydantic import BaseModel, Field
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from my_lib.logs import LogSettings
+from deadwax.logs import LogSettings
 
 
 class Settings(BaseSettings):
-    """Load command settings from MY_LIB_* variables and .env."""
+    """Load command settings from DEADWAX_* variables and .env."""
 
     model_config = SettingsConfigDict(
-        env_prefix="MY_LIB_",
+        env_prefix="DEADWAX_",
         env_file=".env",
         env_nested_delimiter="__",
         env_ignore_empty=True,
@@ -30,7 +30,7 @@ def nested_model(field: FieldInfo) -> type[BaseModel] | None:
 
 
 def env_fields(
-    model: type[BaseModel] = Settings, prefix: str = "MY_LIB_"
+    model: type[BaseModel] = Settings, prefix: str = "DEADWAX_"
 ) -> Iterator[tuple[str, FieldInfo]]:
     """Yield every leaf setting with its environment variable name."""
     for name, field in model.model_fields.items():

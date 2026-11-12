@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from my_lib.logs import LogSettings, setup_logging
-from my_lib.logs.setup import _AppConsoleHandler, _AppFileHandler
+from deadwax.logs import LogSettings, setup_logging
+from deadwax.logs.setup import _AppConsoleHandler, _AppFileHandler
 
 _EXPECTED_HANDLER_COUNT = 2
 
@@ -25,13 +25,13 @@ def test_setup_logging_without_dir_logs_only_to_console(
 def test_setup_logging_ignores_environment_when_called_without_arguments(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, clean_root_logger: logging.Logger
 ) -> None:
-    monkeypatch.setenv("MY_LIB_LOG__DIR", str(tmp_path))
-    monkeypatch.setenv("MY_LIB_LOG__LEVEL", "ERROR")
+    monkeypatch.setenv("DEADWAX_LOG__DIR", str(tmp_path))
+    monkeypatch.setenv("DEADWAX_LOG__LEVEL", "ERROR")
 
     setup_logging()
 
     assert clean_root_logger.level == logging.INFO
-    assert not (tmp_path / "my-lib.log").exists()
+    assert not (tmp_path / "deadwax.log").exists()
 
 
 def test_setup_logging_creates_log_dir(tmp_path: Path, clean_root_logger: logging.Logger) -> None:
@@ -123,7 +123,7 @@ def test_setup_logging_failed_reconfiguration_keeps_previous_handlers(
     assert _app_handlers(clean_root_logger) == previous_handlers
     assert clean_root_logger.level == logging.WARNING
     clean_root_logger.error("still active")
-    event = json.loads((tmp_path / "working" / "my-lib.log").read_text())
+    event = json.loads((tmp_path / "working" / "deadwax.log").read_text())
     assert event["event"] == "still active"
 
 
@@ -173,7 +173,7 @@ def test_setup_logging_writes_exceptions_as_json_text(
     except RuntimeError:
         clean_root_logger.exception("failed")
 
-    event = json.loads((tmp_path / "my-lib.log").read_text())
+    event = json.loads((tmp_path / "deadwax.log").read_text())
     assert "RuntimeError: boom" in event["exception"]
 
 
@@ -193,8 +193,8 @@ def test_library_records_reach_configured_handlers(
 ) -> None:
     _ = clean_root_logger
     setup_logging(LogSettings(format="json", level="DEBUG"))
-    logging.getLogger("my_lib.core.example").debug("from library")
+    logging.getLogger("deadwax.core.example").debug("from library")
 
     event = json.loads(capsys.readouterr().err)
     assert event["event"] == "from library"
-    assert event["logger"] == "my_lib.core.example"
+    assert event["logger"] == "deadwax.core.example"

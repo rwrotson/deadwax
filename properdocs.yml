@@ -1,12 +1,12 @@
-site_name: python-lib-template
-site_url: https://rwrotson.github.io/python-lib-template/
-site_description: A template for building typed Python libraries with optional structured logging setup
-repo_url: https://github.com/rwrotson/python-lib-template
-repo_name: rwrotson/python-lib-template
+site_name: deadwax
+site_url: https://rwrotson.github.io/deadwax/
+site_description: Collect what open sources know about a track or album
+repo_url: https://github.com/rwrotson/deadwax
+repo_name: rwrotson/deadwax
 edit_uri: edit/main/docs/
 
 watch:
-  - src/my_lib/
+  - src/deadwax/
   - .env.example
   - README.md
 

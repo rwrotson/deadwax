@@ -5,7 +5,7 @@ except ModuleNotFoundError as error:
     if error.name != "structlog":
         raise
     raise ModuleNotFoundError(
-        "my_lib.logs requires the 'logs' extra; install 'my-lib[logs]'", name=error.name
+        "deadwax.logs requires the 'logs' extra; install 'deadwax[logs]'", name=error.name
     ) from error
 
 __all__ = ["LogSettings", "setup_logging"]

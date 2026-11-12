@@ -1,43 +1,125 @@
 # Architecture
 
-The core does the library's work and knows nothing about settings, logging setup, or the command line. Each outer layer adds one application concern on top of the layers below it, and its third-party packages come from an optional extra, so a library consumer installs only Pydantic.
+The core models a query and its dossier, matches and merges facts, and runs adapters; it knows nothing about HTTP, settings loading, logging setup, or the command line. `sources` implements adapters and the HTTP stack on top of the core. Each outer layer adds one application concern, and its third-party packages come from an optional extra.
 
 ## Layers
 
-Layers are listed from top to bottom. A layer may import any layer below it and never one above it.
+Layers are listed from top to bottom. A layer may import any layer below it and never one above it. `logs` and `sources` are independent siblings.
 
 | Layer | Location | Responsibility | Third-party packages | Install |
 | --- | --- | --- | --- | --- |
-| Entry point | `my_lib/main.py` | `my-lib` console script; reports a missing `cli` extra | — | base |
-| CLI | `my_lib/cli/` | Composition root: loads `MY_LIB_*` settings, sets up logging, calls the library, maps errors to exit codes | Pydantic Settings, Typer | `my-lib[cli]` |
-| Logging setup | `my_lib/logs/` | `LogSettings` and the opt-in `setup_logging()` for applications | structlog | `my-lib[logs]` |
-| Core | `my_lib/core/` | Library functionality and the `MyLibError` hierarchy | Pydantic | base |
+| Entry point | `deadwax/main.py` | `deadwax` console script; reports a missing `cli` extra | — | base |
+| CLI | `deadwax/cli/` | Composition root: loads `DEADWAX_*` settings, sets up logging, calls the library, renders output, maps errors to exit codes | Pydantic Settings, Typer, rich, platformdirs | `deadwax[cli]` |
+| Logging setup | `deadwax/logs/` | `LogSettings` and the opt-in `setup_logging()` for applications | structlog | `deadwax[logs]` |
+| Sources | `deadwax/sources/` | Adapters, HTTP stack (rate limits, retries, cache, escalation), `lookup()` | httpx, selectolax; curl_cffi, Playwright | base; `deadwax[stealth]`, `deadwax[browser]` |
+| Core | `deadwax/core/` | Models, query parsing, normalization, matching, merge, adapter protocol, orchestrator, `DeadwaxError` hierarchy | Pydantic | base |
 
-`my_lib/__init__.py` re-exports the core's supported names with `__all__` and attaches a `NullHandler` to the `my_lib` logger. `my_lib.logs` raises a `ModuleNotFoundError` that names the `logs` extra when structlog is missing.
+`deadwax/__init__.py` re-exports the supported names with `__all__` and attaches a `NullHandler` to the `deadwax` logger. `deadwax.logs` raises a `ModuleNotFoundError` that names the `logs` extra when structlog is missing.
 
-### Rules
+## Import rules
 
-- `main`, `cli`, and `logs` import library names only from `my_lib`, never from `my_lib.core` modules.
-- A module or package whose name starts with `_` is imported only by modules in the same package and its subpackages.
-- The library never reads the environment or `.env`. Only the CLI does, in `my_lib.cli.settings`; another application composes its own settings from `LogSettings` and passes values to the library.
-- Library code receives settings as arguments, such as `setup_logging(LogSettings(...))`.
-- A new third-party dependency belongs to the lowest layer that needs it, and to that layer's extra.
+import-linter enforces the rules marked *contract* with `uv run poe lint-imports`; the contracts are in `pyproject.toml` and named after the rule. Other rules are checked by Ruff or in review.
 
-import-linter checks the layers, access to the core through `my_lib`, and the third-party packages of each layer with `uv run poe lint-imports`; the contracts are in `pyproject.toml`. Rules that the contracts do not cover are checked in review.
+### R1. Layer order (contract)
+
+`main → cli → (logs | sources) → core`. A layer imports only layers below it; `logs` and `sources` never import each other.
+
+### R2. API surfaces
+
+- `deadwax` (`deadwax/__init__.py`, `__all__`) is the public API covered by semantic versioning.
+- The `deadwax.core` package (`core/__init__.py`, `__all__`) is the core's surface for the library's own outer code. It is a superset of what `deadwax` re-exports.
+- All other modules are internal.
+
+### R3. Who imports what (contract)
+
+| Importer | May import | Must not import |
+| --- | --- | --- |
+| `main` | `deadwax.cli.app`, lazily inside `main()`; stdlib | other `deadwax` modules |
+| `cli` | `deadwax` public names, `deadwax.logs`, `deadwax.cli.*` | `deadwax.core`, `deadwax.sources` |
+| `logs` | `deadwax.logs.*` | `deadwax.core`, `deadwax.sources` |
+| `sources` | the `deadwax.core` package, `deadwax.sources.*` within R4 | `deadwax.core.<module>` |
+| `core` | `deadwax.core.*` within R5 | any other `deadwax` layer |
+
+### R4. Inside `sources` (contract, added with the modules)
+
+From top to bottom:
+
+```
+deadwax.sources.lookup        composition: builds adapters and runs the orchestrator
+musicbrainz | odesli | discogs | bandcamp | lastfm | wikipedia
+deadwax.sources._html
+deadwax.sources._http
+deadwax.sources.config
+```
+
+Adapters are independent: they never import each other, and data found by one adapter reaches another only through `LookupContext`. A helper needed by two adapters moves down into `_html` or `_http`.
+
+### R5. Inside `core` (contract, added with the modules)
+
+From top to bottom:
+
+```
+orchestrator
+adapter | merge | markdown
+matching
+versions
+normalize
+models
+query
+errors
+```
+
+A change to this order is recorded in the decision log of `DEADWAX_PLAN.md`.
+
+### R6. Third-party packages (contract)
+
+| Package | Allowed only in |
+| --- | --- |
+| pydantic | every layer |
+| httpx, selectolax | `deadwax.sources` |
+| curl_cffi | `deadwax.sources._http.impersonate` |
+| playwright | `deadwax.sources._http.browser` |
+| structlog | `deadwax.logs` |
+| pydantic_settings, platformdirs | `deadwax.cli.settings` |
+| typer | `deadwax.cli` |
+| rich | `deadwax.cli.render` |
+
+Transitive dependencies (anyio, h2, httpcore, click, and others) are never imported directly; add a package as a direct dependency before importing it.
+
+### R7. Lazy optional imports
+
+curl_cffi and Playwright are imported inside the function that needs them; a missing package raises `ConfigurationError` naming the extra. Type-only references go under `if TYPE_CHECKING:`. `import deadwax` does not load structlog, Pydantic Settings, Typer, rich, platformdirs, curl_cffi, or Playwright; `tests/test_package.py` checks this in a fresh interpreter.
+
+### R8. Style (Ruff and review)
+
+- Absolute `deadwax.` imports. Relative imports only in `__init__.py` re-exports of sibling modules (`from .module import Name`, never `..`).
+- Every re-exporting `__init__.py` defines `__all__`; no `import *`.
+- Import names (`from deadwax.core import Dossier`), except stdlib and third-party packages conventionally used as namespaces (`import asyncio`, `import httpx`).
+- A module or package whose name starts with `_` is imported only from its parent package and that package's subpackages.
+- Import order: stdlib, third-party, first-party.
+- Every package with more than one module has a layers contract, so imports cannot form cycles.
+
+### R9. Code outside the package
+
+Tests may import internal modules to test them; CLI tests go through `deadwax.cli.app`. `docs/` scripts import only `deadwax` and `deadwax.cli.settings`. Development scripts in `scripts/` import only `deadwax` and `deadwax.sources`.
 
 ## Public API
 
-Everything listed in `my_lib.__all__` is public and follows semantic versioning. Other modules can be imported but are not covered by compatibility guarantees, except `my_lib.logs`, which applications use for setup. The `my-lib` command and its `MY_LIB_*` variables are a separate interface for end users. A removal or incompatible change to the public API is a breaking change (`feat!:` or a `BREAKING CHANGE:` footer).
+Everything listed in `deadwax.__all__` is public and follows semantic versioning. Other modules can be imported but are not covered by compatibility guarantees, except `deadwax.logs`, which applications use for setup. The `deadwax` command and its `DEADWAX_*` variables are a separate interface for end users. A removal or incompatible change to the public API is a breaking change (`feat!:` or a `BREAKING CHANGE:` footer).
 
 ## Import-time behaviour
 
-`import my_lib` does not read the environment or `.env`, configure logging or structlog, add handlers outside the `my_lib` logger, import optional dependencies, or perform I/O. `tests/test_package.py` checks this in a fresh interpreter.
+`import deadwax` does not read the environment or `.env`, configure logging or structlog, add handlers outside the `deadwax` logger, import optional dependencies, create HTTP clients, or perform I/O.
+
+## Configuration
+
+The library never reads the environment or `.env`. Only the CLI does, in `deadwax.cli.settings`; another application builds the library's settings objects itself and passes them as arguments.
 
 ## Logging
 
-Library modules log through `logging.getLogger(__name__)`. The `NullHandler` on `my_lib` keeps records silent until the application configures logging, and records then follow the application's levels and handlers.
+Library modules log through `logging.getLogger(__name__)`. The `NullHandler` on `deadwax` keeps records silent until the application configures logging, and records then follow the application's levels and handlers.
 
-`my_lib.logs.setup_logging()` is a helper for applications that do not have their own setup:
+`deadwax.logs.setup_logging()` is a helper for applications that do not have their own setup:
 
 1. Without arguments it uses the `LogSettings` defaults; it never reads the environment.
 2. It creates all handlers first; if one fails, the previous configuration stays in place.
@@ -45,23 +127,14 @@ Library modules log through `logging.getLogger(__name__)`. The `NullHandler` on 
 4. It adds a stderr handler (console or JSON) and, when a log directory is set, a rotating JSON file handler.
 5. It configures structlog to render through the same stdlib handlers, so structlog and stdlib records share one format.
 
-The `my-lib` command calls it with `LogSettings` loaded from `MY_LIB_LOG__*`.
+The `deadwax` command calls it with `LogSettings` loaded from `DEADWAX_LOG__*`.
 
 ## Errors
 
 | Error | Base classes | Raised when |
 | --- | --- | --- |
-| `MyLibError` | `Exception` | Base for every expected library failure |
-| `InvalidInputError` | `MyLibError`, `ValueError` | The input cannot be processed |
+| `DeadwaxError` | `Exception` | Base for every expected library failure |
+| `InvalidQueryError` | `DeadwaxError`, `ValueError` | The query cannot be parsed or is inconsistent |
+| `ConfigurationError` | `DeadwaxError` | A setting, credential, or optional dependency required for an operation is missing |
 
-Callers can catch `MyLibError` for all library failures or the built-in base for a specific one. Add a subclass for each new kind of expected failure. Unexpected exceptions are not wrapped.
-
-## Adding functionality
-
-- Put the code in `core/` and raise a `MyLibError` subclass for expected failures.
-- Accept settings or values as arguments; do not read the environment from the core.
-- Export public names from `core/__init__.py` and `my_lib/__init__.py`, and add them to `__all__`.
-- Test the behaviour in `tests/core/`.
-- To expose it on the command line, add a command in `cli/app.py` that imports it from `my_lib`.
-
-`core/example.py` shows this pattern.
+Callers can catch `DeadwaxError` for all library failures or the built-in base for a specific one. Add a subclass for each new kind of expected failure. Unexpected exceptions are not wrapped. A failing adapter does not raise out of a lookup; its failure is recorded in the dossier.

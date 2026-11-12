@@ -1,29 +1,29 @@
 # PROJECT ----------------------------------------------------------------------
 [project]
-name = "my-lib"
+name = "deadwax"
 version = "0.1.0"
-description = "Add your description here"
+description = "Collect what open sources know about a track or album: texts, credits, relations, version identity and listening links"
 authors = [
     { name = "Igor Lashkov", email = "rwrotson@yandex.ru" },
 ]
 maintainers = []
 keywords = [
-    "template",
-    "example",
-    "library",
-    "structlog",
-    "pydantic-settings",
-    "typer",
-    "uv",
-    "pytest",
-    "ruff",
-    "mypy",
-    "precommit",
-    "properdocs",
+    "music",
+    "metadata",
+    "discography",
+    "musicbrainz",
+    "discogs",
+    "bandcamp",
+    "lastfm",
+    "wikipedia",
+    "odesli",
+    "cli",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
+    "Environment :: Console",
+    "Topic :: Multimedia :: Sound/Audio",
     "Programming Language :: Python :: 3.14",
     "Typing :: Typed",
 ]
@@ -32,40 +32,56 @@ license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "httpx[http2]>=0.28.1",
     "pydantic>=2.12.0",
+    "selectolax>=1.0.2",
 ]
 
 [project.urls]
-Repository = "https://github.com/rwrotson/python-lib-template"
-Documentation = "https://rwrotson.github.io/python-lib-template"
-Changelog = "https://github.com/rwrotson/python-lib-template/blob/main/CHANGELOG.md"
+Repository = "https://github.com/rwrotson/deadwax"
+Documentation = "https://rwrotson.github.io/deadwax"
+Changelog = "https://github.com/rwrotson/deadwax/blob/main/CHANGELOG.md"
 
 [project.scripts]
-my-lib = "my_lib.main:main"
+deadwax = "deadwax.main:main"
 
 [project.optional-dependencies]
 logs = [
     "structlog>=26.1.0",
 ]
 cli = [
-    "my-lib[logs]",
+    "deadwax[logs]",
+    "platformdirs>=4.12.4",
     "pydantic-settings>=2.15.0",
+    "rich>=15.0.0",
     "typer>=0.27.3",
+]
+stealth = [
+    "curl-cffi>=0.17.0",
+]
+browser = [
+    "playwright>=1.65.1",
 ]
 
 [dependency-groups]
 dev = [
     "commitizen>=4.19.2",
+    "curl-cffi>=0.17.0",
     "import-linter>=2.15",
     "mypy>=2.4.0",
+    "platformdirs>=4.12.4",
+    "playwright>=1.65.1",
     "poethepoet>=0.48.0",
     "pre-commit>=4.6.2",
     "pydantic-settings>=2.15.0",
     "pytest>=9.1.1",
+    "pytest-asyncio>=1.5.0",
     "pytest-cov>=7.1.0",
     "pytest-randomly>=5.0.0",
+    "pytest-socket>=0.8.1",
     "pytest-timeout>=2.4.0",
     "pytest-xdist>=3.8.0",
+    "rich>=15.0.0",
     "ruff>=0.16.10",
     "structlog>=26.1.0",
     "typer>=0.27.3",
@@ -95,20 +111,23 @@ constraint-dependencies = [
 ]
 
 [tool.uv.build-backend]
-module-name = "my_lib"
+module-name = "deadwax"
 module-root = "src"
 
 
 # PYTEST -----------------------------------------------------------------------
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --tb=short --strict-markers --strict-config -n auto"
+# Sockets are disabled so tests never reach the network; xdist workers talk over Unix sockets.
+addopts = "-ra --tb=short --strict-markers --strict-config -n auto --disable-socket --allow-unix-socket"
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
 xfail_strict = true
 filterwarnings = ["error"]
 timeout = 30
 
 [tool.coverage.run]
-source = ["my_lib"]
+source = ["deadwax"]
 omit = ["*/__init__.py"]
 branch = true
 parallel = true
@@ -218,7 +237,7 @@ ban-relative-imports = "all"
 max-complexity = 8
 
 [tool.ruff.lint.isort]
-known-first-party = ["my_lib"]
+known-first-party = ["deadwax"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -241,33 +260,98 @@ major_version_zero = true
 
 # IMPORT-LINTER ----------------------------------------------------------------
 [tool.importlinter]
-root_package = "my_lib"
+root_package = "deadwax"
 include_external_packages = true
 
-[[tool.importlinter.contracts]]
-name = "Package layers"
-type = "layers"
-layers = ["my_lib.main", "my_lib.cli", "my_lib.logs", "my_lib.core"]
+# Import rules R1-R9 are described in docs/architecture.md.
 
 [[tool.importlinter.contracts]]
-name = "Applications use the core only through the my_lib public API"
+name = "R1: package layers"
+type = "layers"
+layers = ["deadwax.main", "deadwax.cli", "deadwax.logs | deadwax.sources", "deadwax.core"]
+
+[[tool.importlinter.contracts]]
+name = "R3: applications use the library only through the deadwax public API"
 type = "forbidden"
-source_modules = ["my_lib.main", "my_lib.cli", "my_lib.logs"]
-forbidden_modules = ["my_lib.core"]
-# The my_lib package itself re-exports the core.
+source_modules = ["deadwax.main", "deadwax.cli", "deadwax.logs"]
+forbidden_modules = ["deadwax.core", "deadwax.sources"]
+# The deadwax package itself re-exports the core and sources.
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
-name = "The core uses only Pydantic among third-party packages"
+name = "R3: sources use the core only through the deadwax.core package"
 type = "forbidden"
-source_modules = ["my_lib.core"]
-forbidden_modules = ["structlog", "pydantic_settings", "typer"]
+source_modules = ["deadwax.sources"]
+forbidden_modules = ["deadwax.core.*"]
+# deadwax.core re-exports its modules.
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
-name = "Logging setup does not use settings loading or CLI packages"
+name = "R6: the core uses only Pydantic among third-party packages"
 type = "forbidden"
-source_modules = ["my_lib.logs"]
-forbidden_modules = ["pydantic_settings", "typer"]
+source_modules = ["deadwax.core"]
+forbidden_modules = [
+    "httpx",
+    "selectolax",
+    "curl_cffi",
+    "playwright",
+    "structlog",
+    "pydantic_settings",
+    "platformdirs",
+    "typer",
+    "rich",
+]
+
+[[tool.importlinter.contracts]]
+name = "R6: sources do not use logging setup or CLI packages"
+type = "forbidden"
+source_modules = ["deadwax.sources"]
+forbidden_modules = ["structlog", "pydantic_settings", "platformdirs", "typer", "rich"]
+
+[[tool.importlinter.contracts]]
+name = "R6: logging setup does not use HTTP, settings loading or CLI packages"
+type = "forbidden"
+source_modules = ["deadwax.logs"]
+forbidden_modules = [
+    "httpx",
+    "selectolax",
+    "curl_cffi",
+    "playwright",
+    "pydantic_settings",
+    "platformdirs",
+    "typer",
+    "rich",
+]
+
+[[tool.importlinter.contracts]]
+name = "R6: HTTP and HTML packages are used only by sources"
+type = "forbidden"
+source_modules = ["deadwax.main", "deadwax.cli"]
+forbidden_modules = ["httpx", "selectolax", "curl_cffi", "playwright"]
+# The CLI reaches them through the deadwax package.
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "R6: transitive dependencies are not imported directly"
+type = "forbidden"
+source_modules = ["deadwax"]
+forbidden_modules = [
+    "anyio",
+    "certifi",
+    "click",
+    "greenlet",
+    "h11",
+    "h2",
+    "httpcore",
+    "idna",
+    "markdown_it",
+    "pygments",
+    "shellingham",
+    "sniffio",
+    "typing_extensions",
+]
+# Direct dependencies import them internally.
+allow_indirect_imports = true
 
 
 # POETHEPOET -------------------------------------------------------------------

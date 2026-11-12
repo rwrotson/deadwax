@@ -5,9 +5,9 @@ from collections.abc import Iterator
 import mkdocs_gen_files
 from pydantic.fields import FieldInfo
 
-from my_lib.cli.settings import Settings, env_fields, nested_model
+from deadwax.cli.settings import Settings, env_fields, nested_model
 
-PREFIX = "MY_LIB_"
+PREFIX = "DEADWAX_"
 
 
 def type_name(field: FieldInfo) -> str:
@@ -43,7 +43,7 @@ def table(rows: Iterator[tuple[str, FieldInfo]]) -> list[str]:
 lines = [
     "# Configuration",
     "",
-    f"This page is generated from `my_lib.cli.settings.Settings`. The `my-lib` command reads "
+    f"This page is generated from `deadwax.cli.settings.Settings`. The `deadwax` command reads "
     f"`{PREFIX}*` environment variables and `.env` in the working directory; the process "
     "environment wins. The library itself does not read them. "
     f"Nested sections use `__`, for example `{PREFIX}LOG__LEVEL`. Empty values use the default.",
@@ -67,4 +67,4 @@ for name, field in Settings.model_fields.items():
 with mkdocs_gen_files.open("configuration.md", "w") as fd:
     fd.write("\n".join(lines) + "\n")
 
-mkdocs_gen_files.set_edit_path("configuration.md", "../src/my_lib/cli/settings.py")
+mkdocs_gen_files.set_edit_path("configuration.md", "../src/deadwax/cli/settings.py")

@@ -4,8 +4,8 @@ from types import ModuleType
 
 import pytest
 
-import my_lib.cli.app as cli_app
-from my_lib.main import main
+import deadwax.cli.app as cli_app
+from deadwax.main import main
 
 
 def test_main_runs_the_cli(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -30,7 +30,7 @@ def _fail_cli_import(monkeypatch: pytest.MonkeyPatch, missing: str) -> None:
         fromlist: Sequence[str] = (),
         level: int = 0,
     ) -> ModuleType:
-        if name == "my_lib.cli.app":
+        if name == "deadwax.cli.app":
             raise ModuleNotFoundError(f"No module named {missing!r}", name=missing)
         return original_import(name, globals, locals, fromlist, level)
 
@@ -47,7 +47,7 @@ def test_main_reports_missing_cli_extra(
         main()
 
     assert error.value.code == 1
-    assert "my-lib[cli]" in capsys.readouterr().err
+    assert "deadwax[cli]" in capsys.readouterr().err
 
 
 def test_main_reraises_unrelated_import_errors(monkeypatch: pytest.MonkeyPatch) -> None:

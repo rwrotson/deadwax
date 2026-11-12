@@ -4,9 +4,13 @@ This file describes repository conventions for coding agents.
 
 ## Project Overview
 
-A template for building typed Python libraries with a small public API that depends only on Pydantic, an optional structlog-based logging setup for applications (`logs` extra), and an optional Typer command configured through Pydantic Settings (`cli` extra).
+deadwax is a typed Python library and command that, for one track or album, collects what open sources know about that exact recording: texts describing its sound, credits, relations for further digging, version identity with discrepancies between sources, and listening links. Every fact carries its source and URL; nothing is invented. It was created from a library template whose conventions below remain the guardrails.
 
-Distribution name: `my-lib` | Python package: `my_lib` | Environment prefix: `MY_LIB_`
+The base install depends on Pydantic, httpx, and selectolax. Extras: `logs` (structlog setup for applications), `cli` (Typer command with Pydantic Settings, rich, platformdirs), `stealth` (curl_cffi TLS impersonation), `browser` (Playwright).
+
+Implementation is staged. `DEADWAX_PLAN.md` is the specification and multi-session handoff journal: read it before work, implement only the first incomplete stage, append dated evidence, and stop at the stage boundary.
+
+Distribution name: `deadwax` | Python package: `deadwax` | Environment prefix: `DEADWAX_`
 
 ## Commands
 
@@ -70,7 +74,7 @@ uv run --group docs properdocs build --strict
 - Do not lower coverage thresholds, disable checks, relax import-linter contracts, or add lint and type suppressions solely to pass CI. Explain necessary suppressions at the affected line.
 - Use non-rewriting checks (`poe fmt-check`, `poe lint`) for verification; run formatters or `--fix` only when intentionally editing files. Pre-commit's Ruff hooks rewrite files.
 - Report which checks ran, which were skipped, and why. `poe test-fast` is not the full CI suite: it skips coverage, and CI also runs tests on macOS, the lowest-dependency job, package and docs builds, and security scans.
-- Treat everything exported from `my_lib/__init__.py` as public API. Mark removals and incompatible changes with `!` or a `BREAKING CHANGE:` footer so Commitizen bumps the version correctly.
+- Treat everything exported from `deadwax/__init__.py` as public API. Mark removals and incompatible changes with `!` or a `BREAKING CHANGE:` footer so Commitizen bumps the version correctly.
 - When changing settings, the public API, or the command, update `.env.example`, README, and the docs. Do not edit generated pages (configuration, API reference); edit `Settings` field descriptions and source docstrings instead.
 - Keep the user's `.env` and secrets untracked.
 
@@ -82,7 +86,7 @@ Parallel jobs:
 
 - **`quality`** — `poe fmt-check`, `poe lint`, `poe lint-imports`, `poe typecheck`.
 - **`test`** — `poe test` (95% branch coverage) on Ubuntu and macOS.
-- **`lowest`** — installs the lowest allowed direct dependencies with the `cli` extra
+- **`lowest`** — installs the lowest allowed direct dependencies with all extras
   (`--resolution lowest-direct`) and runs pytest; it checks the declared lower bounds, which the lock does not.
 - **`build`** — `uv build` with a wheel smoke test (base install without extras, then the `cli` extra),
   `properdocs build --strict`, `poe audit`, trivy filesystem scan
@@ -96,15 +100,15 @@ It runs CI first, then:
 - **`publish`** — tags only, and only when the repository variable `PUBLISH_TO_PYPI` is `true`;
   publishes `dist/` to **PyPI** with Trusted Publishing (OIDC, the `pypi` environment,
   `id-token: write`). No API token is stored. Without the variable, a release builds the package
-  and deploys docs; the template repository does not set it.
+  and deploys docs.
 - **`docs`** — builds the site with `properdocs build --strict` and deploys it to **GitHub Pages** via
   `actions/upload-pages-artifact` + `actions/deploy-pages` (the `github-pages` environment).
 
-To publish a project created from the template, set `PUBLISH_TO_PYPI=true` (Settings → Secrets and
+To publish, set `PUBLISH_TO_PYPI=true` (Settings → Secrets and
 variables → Actions → Variables) and add a PyPI trusted publisher for the repository with workflow
 `release.yml` and environment `pypi`. Pages Source must be set to **"GitHub Actions"** (Settings → Pages), and the
 `github-pages` environment must allow the `v*` tag. Site:
-https://rwrotson.github.io/python-lib-template/
+https://rwrotson.github.io/deadwax/
 
 Dependabot opens weekly grouped PRs for uv dependencies (`uv.lock`), GitHub Actions, and pre-commit
 hooks (`.github/dependabot.yml`).
@@ -113,46 +117,55 @@ hooks (`.github/dependabot.yml`).
 
 ### Package Layout & Build
 
-Source lives in `src/my_lib/` — the standard `src/` layout. The uv build backend is configured in `pyproject.toml`:
+Source lives in `src/deadwax/` — the standard `src/` layout. The uv build backend is configured in `pyproject.toml`:
 
 ```toml
 [tool.uv.build-backend]
-module-name = "my_lib"
+module-name = "deadwax"
 module-root = "src"
 ```
 
-`src/my_lib/py.typed` marks the package as typed (PEP 561); keep it in the wheel.
+`src/deadwax/py.typed` marks the package as typed (PEP 561); keep it in the wheel.
 
-Internal imports use the `my_lib.` prefix. Ruff bans relative imports except in package `__init__.py`, which may re-export from sibling modules (`from .module import ...`, never `..`):
+Internal imports use the `deadwax.` prefix. Ruff bans relative imports except in package `__init__.py`, which may re-export from sibling modules (`from .module import ...`, never `..`):
 
 ```python
-from my_lib.core.errors import InvalidInputError
-from my_lib.logs import LogSettings
+from deadwax.core import InvalidQueryError  # inside deadwax.sources
+from deadwax import Dossier  # inside deadwax.cli
 ```
 
 ### Layers & Public API
 
 ```
-src/my_lib/__init__.py  — Public API re-exported with __all__; NullHandler on the "my_lib" logger
-src/my_lib/core/        — Library functionality and the MyLibError hierarchy (base install)
-src/my_lib/logs/        — LogSettings and opt-in setup_logging() for applications (`my-lib[logs]`)
-src/my_lib/cli/         — Typer app, its MY_LIB_* Settings, composition root (`my-lib[cli]`)
-src/my_lib/main.py      — `my-lib` console script; reports a missing `cli` extra
+src/deadwax/__init__.py  — Public API re-exported with __all__; NullHandler on the "deadwax" logger
+src/deadwax/core/        — Models, query parsing, normalization, matching, merge, adapter protocol,
+                           orchestrator, DeadwaxError hierarchy (Pydantic only)
+src/deadwax/sources/     — Adapters, HTTP stack (rate limits, retries, cache, escalation), lookup()
+src/deadwax/logs/        — LogSettings and opt-in setup_logging() for applications (`deadwax[logs]`)
+src/deadwax/cli/         — Typer app, its DEADWAX_* Settings, rendering, composition root (`deadwax[cli]`)
+src/deadwax/main.py      — `deadwax` console script; reports a missing `cli` extra
 ```
 
-Follow the layers in `docs/architecture.md`. From top to bottom they are `main`, `cli`, `logs`, and `core`; a layer imports only layers below it. `main`, `cli`, and `logs` import library names only from `my_lib`, never from `my_lib.core` modules. Import a module or package whose name starts with `_` only from modules in the same package and its subpackages. The core uses only Pydantic among third-party packages; `logs` adds structlog, and `cli` adds Pydantic Settings and Typer. import-linter contracts in `pyproject.toml` enforce these rules (`uv run poe lint-imports`).
+Follow the import rules R1–R9 in `docs/architecture.md`; import-linter contracts in `pyproject.toml` enforce most of them (`uv run poe lint-imports`). In short:
 
-Expected failures raise a `MyLibError` subclass. Subclass a built-in exception as well when callers would reasonably catch it (`InvalidInputError` is also a `ValueError`).
+- Layers from top to bottom: `main`, `cli`, `logs | sources` (independent siblings), `core`. A layer imports only layers below it.
+- `main`, `cli`, and `logs` import library names only from `deadwax`. `sources` imports the core only from the `deadwax.core` package, never its submodules.
+- Inside `sources`, adapters never import each other; shared code lives in `_html`, `_http`, or `config`, and data passes between adapters only through `LookupContext`. Inside `core`, modules follow the order given in R5.
+- Third-party packages are confined: core uses only Pydantic; httpx and selectolax only in `sources`; curl_cffi and playwright only in their `sources._http` modules and imported lazily; structlog only in `logs`; Typer, rich, Pydantic Settings, platformdirs only in `cli`. Never import a transitive dependency.
+- Import a module or package whose name starts with `_` only from modules in the same package and its subpackages.
+- A new module that belongs to an intra-package layer contract (R4, R5) is added to that contract in the same change; import-linter fails on layers that do not exist yet.
 
-To add functionality: put it in `src/my_lib/core/`, export it from `core/__init__.py` and `my_lib/__init__.py` (`__all__`), test it in `tests/core/`, and list it in `docs/reference/index.md`. To expose it on the command line, add a command in `src/my_lib/cli/app.py` and test it in `tests/cli/`.
+Expected failures raise a `DeadwaxError` subclass. Subclass a built-in exception as well when callers would reasonably catch it (`InvalidQueryError` is also a `ValueError`). A failing source adapter never raises out of a lookup; its failure is recorded in the dossier's `errors`.
+
+To add library functionality: put it in the right layer, export public names from `core/__init__.py` (or `sources/__init__.py`) and `deadwax/__init__.py` (`__all__`), test it in the mirrored `tests/` directory, and list the module in `docs/reference/index.md`. To expose it on the command line, change `src/deadwax/cli/app.py` and test it in `tests/cli/`.
 
 ### Import-Time Behaviour
 
-Importing `my_lib` must not read the environment or `.env`, configure logging or structlog, add handlers outside the `my_lib` logger, import optional dependencies, or perform I/O. `tests/test_package.py` checks this in a fresh interpreter.
+Importing `deadwax` must not read the environment or `.env`, configure logging or structlog, add handlers outside the `deadwax` logger, import optional dependencies, or perform I/O. `tests/test_package.py` checks this in a fresh interpreter.
 
 ### CLI Configuration via Environment Variables
 
-`src/my_lib/cli/settings.py` defines the command's `Settings` (Pydantic `BaseSettings`, prefix `MY_LIB_`, nested delimiter `__`) from library models: `log` is `LogSettings` (`MY_LIB_LOG__*`). Only `load_settings()` in the CLI reads the environment and `.env`; empty values use defaults. Library code never reads the environment and takes settings objects as arguments.
+`src/deadwax/cli/settings.py` defines the command's `Settings` (Pydantic `BaseSettings`, prefix `DEADWAX_`, nested delimiter `__`) from library models: `log` is `LogSettings` (`DEADWAX_LOG__*`). Only `load_settings()` in the CLI reads the environment and `.env`; empty values use defaults. Library code never reads the environment and takes settings objects as arguments.
 
 Every setting needs a `Field(description=...)` and a line in `.env.example`; tests in `tests/cli/test_settings.py` enforce both. The docs configuration page is generated from `Settings` by `docs/gen_config_page.py`; do not edit it by hand.
 
@@ -160,7 +173,7 @@ Every setting needs a `Field(description=...)` and a line in `.env.example`; tes
 
 Library code logs through stdlib `logging.getLogger(__name__)` so records follow the application's configuration; the package logger has a `NullHandler`. Do not call `structlog.configure()` or `logging.basicConfig()` from library code.
 
-`setup_logging()` in `my_lib.logs` is an opt-in helper for applications. It configures structlog bridged through stdlib via `ProcessorFormatter`: a stderr handler (`ConsoleRenderer`, or JSON with `format="json"`) and, when `dir` is set, a rotating JSON file handler. Without arguments it uses `LogSettings` defaults. Calling it again replaces only its own handlers; if creating a handler fails, the previous configuration stays.
+`setup_logging()` in `deadwax.logs` is an opt-in helper for applications. It configures structlog bridged through stdlib via `ProcessorFormatter`: a stderr handler (`ConsoleRenderer`, or JSON with `format="json"`) and, when `dir` is set, a rotating JSON file handler. Without arguments it uses `LogSettings` defaults. Calling it again replaces only its own handlers; if creating a handler fails, the previous configuration stays.
 
 ### Documentation Generation
 
@@ -170,7 +183,9 @@ Library code logs through stdlib `logging.getLogger(__name__)` so records follow
 
 `tests/` mirrors the package (`core/`, `logs/`, `cli/`, `test_main.py`); `tests/test_package.py` covers the public API, import-time behaviour, and the missing-extra message.
 
-Tests run in parallel (pytest-xdist) and in random order (pytest-randomly); warnings are errors and each test has a 30-second timeout. Autouse fixtures in `tests/conftest.py` remove `MY_LIB_*` variables, run each test in a temporary working directory (so a local `.env` is not read), and restore logging and structlog configuration. pytest adds its own capture handlers to the root logger, so assert on the library's handlers only. Reproduce an order-dependent failure with `uv run pytest -p randomly --randomly-seed=<seed>`.
+Tests never use the network: pytest-socket disables sockets (Unix sockets stay allowed for xdist). Adapters receive their HTTP client, and tests serve recorded responses from `tests/fixtures/<source>/` through `httpx.MockTransport`. Async tests use pytest-asyncio in strict mode.
+
+Tests run in parallel (pytest-xdist) and in random order (pytest-randomly); warnings are errors and each test has a 30-second timeout. Autouse fixtures in `tests/conftest.py` remove `DEADWAX_*` variables, run each test in a temporary working directory (so a local `.env` is not read), and restore logging and structlog configuration. pytest adds its own capture handlers to the root logger, so assert on the library's handlers only. Reproduce an order-dependent failure with `uv run pytest -p randomly --randomly-seed=<seed>`.
 
 ### Type Checking
 

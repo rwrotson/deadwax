@@ -19,7 +19,7 @@ class LogSettings(BaseModel):
         default=None, description="Log directory; file logging is disabled if unset"
     )
     file_name: str = Field(
-        default="my-lib.log", description="Log file basename without directory separators"
+        default="deadwax.log", description="Log file basename without directory separators"
     )
     file_max_bytes: int = Field(
         default=4 * 1024 * 1024, ge=0, description="File size that triggers rotation"

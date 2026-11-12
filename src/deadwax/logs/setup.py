@@ -5,7 +5,7 @@ from typing import TextIO
 
 import structlog
 
-from my_lib.logs.settings import LogSettings
+from deadwax.logs.settings import LogSettings
 
 
 class _AppFileHandler(logging.handlers.RotatingFileHandler):
