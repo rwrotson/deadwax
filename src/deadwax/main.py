@@ -7,7 +7,7 @@ def main() -> None:
         # The console script exists in base installs, so import the optional CLI here.
         from deadwax.cli.app import app  # noqa: PLC0415
     except ModuleNotFoundError as error:
-        if error.name not in {"typer", "pydantic_settings", "structlog"}:
+        if error.name not in {"typer", "pydantic_settings", "structlog", "rich", "platformdirs"}:
             raise
         sys.stderr.write("CLI dependencies are missing. Install 'deadwax[cli]'.\n")
         raise SystemExit(1) from error

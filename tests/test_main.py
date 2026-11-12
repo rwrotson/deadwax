@@ -37,7 +37,9 @@ def _fail_cli_import(monkeypatch: pytest.MonkeyPatch, missing: str) -> None:
     monkeypatch.setattr(builtins, "__import__", fake_import)
 
 
-@pytest.mark.parametrize("missing", ["typer", "pydantic_settings", "structlog"])
+@pytest.mark.parametrize(
+    "missing", ["typer", "pydantic_settings", "structlog", "rich", "platformdirs"]
+)
 def test_main_reports_missing_cli_extra(
     missing: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

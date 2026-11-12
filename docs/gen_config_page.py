@@ -1,5 +1,6 @@
 import html
 import json
+import re
 from collections.abc import Iterator
 
 import mkdocs_gen_files
@@ -14,6 +15,7 @@ def type_name(field: FieldInfo) -> str:
     """Format a field type for a Markdown table cell."""
     name = str(field.annotation).replace("typing.", "").replace("pathlib.", "")
     name = name.replace("_local.", "").replace("<class '", "").replace("'>", "")
+    name = re.sub(r"\b(?:[a-z_]+\.)+([A-Za-z_]\w*)", r"\1", name)
 
     # A backslash-escaped pipe stays visible inside a code span, so use an HTML entity.
     return f"<code>{html.escape(name).replace('|', '&#124;')}</code>"
@@ -44,9 +46,12 @@ lines = [
     "# Configuration",
     "",
     f"This page is generated from `deadwax.cli.settings.Settings`. The `deadwax` command reads "
-    f"`{PREFIX}*` environment variables and `.env` in the working directory; the process "
-    "environment wins. The library itself does not read them. "
-    f"Nested sections use `__`, for example `{PREFIX}LOG__LEVEL`. Empty values use the default.",
+    "command-line flags, then "
+    f"`{PREFIX}*` environment variables, then `.env` in the working directory, then a TOML "
+    f"file (`--config`, `{PREFIX}CONFIG_FILE`, or `config.toml` in the user configuration "
+    "directory); the first one that sets a value wins. The library itself does not read them. "
+    f"Nested sections use `__`, for example `{PREFIX}LOG__LEVEL`; in TOML they are tables "
+    "such as `[log]`. Empty values use the default.",
 ]
 
 top_level = [

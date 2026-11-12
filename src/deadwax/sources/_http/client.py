@@ -241,7 +241,7 @@ class HttpClient:
                 self._level = level
                 return response
             reason = challenge
-            logger.info("%s: %s via %s", self.spec.source, challenge, fetcher.name)
+            logger.debug("%s: %s via %s", self.spec.source, challenge, fetcher.name)
         raise BlockedError(f"{reason} (tried {', '.join(tried)})", url=safe_url)
 
     def _should_retry(self, response: Response) -> bool:

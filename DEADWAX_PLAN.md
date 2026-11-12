@@ -4,7 +4,7 @@
 
 This is the implementation specification and multi-session handoff for deadwax. It is meant to be sufficient for an engineer or coding agent starting without the planning conversation. The original request (Russian, 2026-11-12) asked for a library and CLI that collects, for one track or album, everything open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links.
 
-- **Status:** Stages 0–3 complete; Stage 4 next (see the status table).
+- **Status:** Stages 0–4 complete; Stage 5 next (see the status table).
 - **Branch:** `main`. Stage 0 was committed by the user as `df3befa`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -168,7 +168,7 @@ Rate limits/TTL defaults per adapter in `sources/config.py`; all overridable.
 | 1 | Complete | Core: errors, models, query parsing, normalization, version detection, matching, merge, markdown. |
 | 2 | Complete | Adapter protocol, two-pass orchestrator; HTTP stack: profiles, rate limiter, retry, cache, challenge detection, escalation ladder. |
 | 3 | Complete | MusicBrainz, iTunes, Deezer, Odesli (key only), URL resolution, recorded fixtures, `lookup()`. |
-| 4 | Not started | CLI: lookup and `sources`, formats, settings with TOML config, cache directory; first manual run. |
+| 4 | Complete | CLI: lookup and `sources`, formats, settings with TOML config, cache directory; first manual run. |
 | 5 | Not started | Bandcamp and Discogs (reviews through the escalation ladder). |
 | 6 | Not started | Last.fm and Wikipedia/Wikidata. |
 | 7 | Not started | README source tiers, docs, full checks, manual runs on five records, final report. |
@@ -211,9 +211,9 @@ Rate limits/TTL defaults per adapter in `sources/config.py`; all overridable.
 
 ### Stage 4: command line
 
-- [ ] Default lookup with `--album/--track`, `--sources`, `--exclude`, `--format`, `--no-cache`, `--timeout`, `--config`; `deadwax sources`.
-- [ ] Settings for HTTP, cache, credentials, per-source enable flags; TOML config source; `.env.example`; rich pretty renderer; exit codes.
-- [ ] First live manual run recorded here.
+- [x] Default lookup with `--album/--track`, `--sources`, `--exclude`, `--format`, `--no-cache`, `--timeout`, `--config`; `deadwax sources`.
+- [x] Settings for HTTP, cache, credentials, per-source enable flags; TOML config source; `.env.example`; rich pretty renderer; exit codes.
+- [x] First live manual run recorded here.
 
 **Acceptance:** CliRunner tests for every option, format and exit code; settings tests; docs build. **Suggested message:** `feat(cli): add lookup and sources commands`.
 
@@ -293,9 +293,22 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-12 | Shared adapter code lives in `sources/_base.py` (R4 layer below the adapters); MusicBrainz is a package with its own layers contract. | R4 forbids adapters importing each other. | 3 |
 | 2026-11-12 | `deadwax` imports `deadwax.sources` lazily (module `__getattr__`). | httpx loads rich and click at import time when installed, which broke the import-time rule. | 3 |
 | 2026-11-12 | Retry backoff base is a setting (`http.retry_base`, default 1 s). | MusicBrainz answered "server busy" 503 through four 0.5 s-based retries from the shared development IP. | 3 |
+| 2026-11-12 | The Typer group runs `lookup` when the first argument is not a subcommand or a root option (`--help`, `--version`); every other option belongs to `lookup` or `sources`, so `deadwax --track Q`, `deadwax URL` and `deadwax sources` all work. | A query argument on the group callback would swallow `sources`; Typer 0.29 vendors click, so the override uses `typer.Context` with a commented `type: ignore[override]`. | 4 |
+| 2026-11-12 | Settings precedence: flags (init kwargs, deep-merged) > environment > `.env` > TOML (`--config`, `DEADWAX_CONFIG_FILE`, or `config.toml` in the platformdirs user config dir) > defaults. An explicitly named file must exist. `DEADWAX_CONFIG_FILE` is honoured from the process environment only. | Plan requirement; the TOML path must be known before settings load. | 4 |
+| 2026-11-12 | The CLI exposes every `SourcesConfig` section, including the planned Discogs, Bandcamp, Last.fm and Wikipedia settings (marked in `.env.example` as having no effect yet). | Stable variable names before the adapters land. | 4–6 |
+| 2026-11-12 | Pretty output groups tags into one line per scope and kind; JSON and Markdown keep every tag with its weight. httpx and httpcore loggers are set to WARNING unless `--verbose`. | Paranoid Android has 70+ single-vote MusicBrainz tags; httpx logs every request at INFO. | 4 |
+| 2026-11-12 | `--timeout` sets the per-source lookup timeout (`adapter_timeout`), not the HTTP request timeout. `deadwax sources` also prints JSON and Markdown. | The plan's forced-failure check uses `--timeout 0.01`; programs need the source list too. | 4 |
 | 2026-11-12 | Non-Latin names are compared as written; a store listing "Кино" as "Kino" yields `no_match`. Alias-aware matching is a later, separate change. | No transliteration (Stage 1 decision); MusicBrainz aliases are not yet carried in the context. | 3+ |
 
-**Current task:** Stage 3 complete. **Next action:** user review and commit; then Stage 4 on request.
+**Current task:** Stage 4 complete. **Next action:** user review and commit; then Stage 5 on request.
+
+### 2026-11-12 — Stage 4 qualification
+
+CLI: `cli/app.py` (group that defaults to `lookup`; `lookup` with `--album/--track` (both → exit 2), `--sources`, `--exclude`, `--format/-f pretty|json|markdown`, `--no-cache`, `--timeout`, `--config`, `--verbose/-V`; `sources` with `--format`, `--config`, `--verbose`; exit codes 0 found, 1 unexpected, 2 usage or configuration including `InvalidQueryError` and unknown source names, 3 nothing matched), `cli/settings.py` (every `SourcesConfig` section plus `log`, `adapter_timeout`, `config_file`; TOML source; `sources_config()` puts the cache at `responses.sqlite` in the platformdirs user cache dir), `cli/render.py` (rich sections Identity with highlighted disagreements, Tags, Credits, Texts truncated at 600 characters, Relations grouped by kind, Links, Errors; every fact names its sources once, linked to the first page; sources table shows `missing DEADWAX_ODESLI__API_KEY`). `main.py` also reports a missing extra for rich and platformdirs. `.env.example` lists all 48 settings; the configuration page explains the precedence and shows short type names. README and Getting Started describe the command and the library call.
+
+First live manual runs on 2026-11-12 (this machine, through the development proxy): `deadwax sources` (MusicBrainz, iTunes, Deezer ready; Odesli `missing DEADWAX_ODESLI__API_KEY`); `deadwax --track "Radiohead - Paranoid Android" --no-cache` exit 0 in 9.1 s with the 1997 original recording, two MusicBrainz 503 retries visible in the log, Deezer `blocked`; the same without `--no-cache` from the cache in 1.2 s; `--timeout 0.01` printed "Nothing matched the query" with three `timeout` errors and exit 3; the Spotify URL gave the same recording (exit 0); the Huerco S. album with `-f json` validated as `Dossier` (Proibito, 5 links); the Todd Terry remix with `-f markdown` showed version remix, `remix_of` Missing and the artist/date disagreements; `--sources spotify` exited 2 naming the known sources.
+
+Checks: `uv run poe check` passed (Ruff format and lint, 14 contracts kept, mypy strict on 88 files, 407 tests, 99.03% branch coverage); `uv run --group docs properdocs build --strict` passed; `uv build` produced sdist and wheel; wheel smoke: base install imports and `deadwax.lookup` loads without rich, bare `deadwax` exits 1 naming `deadwax[cli]`, with the `cli` extra `deadwax --version` prints `deadwax 0.1.0` and `deadwax sources` prints the table. Not run: pre-commit hooks, `poe audit`, CI. No commit was created.
 
 ### 2026-11-12 — Stage 3 qualification
 

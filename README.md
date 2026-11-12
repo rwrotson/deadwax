@@ -9,18 +9,18 @@ Collect what open sources know about one track or album:
 
 Every fact carries the source and URL where it was found. Nothing is invented: missing data leaves a field empty. The result is equally usable in a terminal and as JSON for other programs.
 
-> **Status:** under development. The specification, stages, and progress log are in [`DEADWAX_PLAN.md`](https://github.com/rwrotson/deadwax/blob/main/DEADWAX_PLAN.md). The library's `lookup()` works with the sources listed below; the command is planned.
+> **Status:** under development. The specification, stages, and progress log are in [`DEADWAX_PLAN.md`](https://github.com/rwrotson/deadwax/blob/main/DEADWAX_PLAN.md). The library's `lookup()` and the command work with the sources listed below.
 
-## Usage (planned)
+## Usage
 
 ```bash
 deadwax --track "Burial - Archangel"
-deadwax https://burial.bandcamp.com/album/untrue
-deadwax --album "Burial - Untrue" --sources musicbrainz,bandcamp --format json
+deadwax https://open.spotify.com/track/6LgJvl0Xdtc73RJ1mmpotq
+deadwax --album "Burial - Untrue" --sources musicbrainz,itunes --format json
 deadwax sources
 ```
 
-A text query must state `--album` or `--track`; a URL implies its kind.
+A text query must state `--album` or `--track`; a URL implies its kind. Other options: `--exclude`, `--format pretty|json|markdown`, `--no-cache`, `--timeout`, `--config`, `--verbose`. Exit codes: 0 found, 1 unexpected error, 2 usage or configuration error, 3 nothing matched.
 
 ```python
 import asyncio
@@ -57,7 +57,7 @@ Other sources are planned as separate adapters; the full list with tiers will be
 
 ## Configuration
 
-The library takes settings as arguments and never reads the environment. The `deadwax` command loads `deadwax.cli.settings.Settings` from `DEADWAX_*` environment variables and `.env`; sections are nested with `__` (for example `DEADWAX_LOG__LEVEL=DEBUG`). See `.env.example` and the generated configuration page in the documentation.
+The library takes settings as arguments and never reads the environment. The `deadwax` command loads `deadwax.cli.settings.Settings` from flags, `DEADWAX_*` environment variables, `.env`, and a TOML file (`--config`, `DEADWAX_CONFIG_FILE`, or `config.toml` in the user configuration directory), in that order of precedence; sections are nested with `__` (for example `DEADWAX_ODESLI__API_KEY=…`) or TOML tables (`[odesli]`). The command caches responses in the user cache directory. See `.env.example` and the generated configuration page in the documentation.
 
 ## Development
 

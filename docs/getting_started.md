@@ -22,13 +22,38 @@ uv run pre-commit install
 
 Ruff and mypy run from the locked project environment (`uv run --no-sync`), so hook and CI versions match.
 
+## Using the Command
+
+```bash
+deadwax --track "Radiohead - Paranoid Android"          # pretty output in the terminal
+deadwax https://open.spotify.com/track/6LgJvl0Xdtc73RJ1mmpotq
+deadwax --album "Huerco S. - For Those of You Who Have Never (And Also Those Who Have)" --format json
+deadwax --track "Кино - Группа крови" --sources musicbrainz --no-cache
+deadwax sources                                          # what each source contributes and whether it can run
+```
+
+A text query must state `--album` or `--track`; a URL implies its kind. Options: `--sources` and `--exclude` (comma-separated names), `--format pretty|json|markdown`, `--no-cache`, `--timeout SECONDS` per source, `--config PATH` (TOML), `--verbose`. Settings come from flags, `DEADWAX_*` variables, `.env`, and a TOML file, in that order of precedence; see [Configuration](configuration.md).
+
+| Exit code | Meaning |
+|-----------|---------|
+| 0 | A source identified the record |
+| 1 | Unexpected error |
+| 2 | Usage or configuration error |
+| 3 | Nothing matched the query |
+
 ## Using the Library
 
-The lookup API and the `deadwax` command are being implemented in stages; see `DEADWAX_PLAN.md` for the current status. Library errors derive from `DeadwaxError`:
-
 ```python
-from deadwax import DeadwaxError, InvalidQueryError
+import asyncio
+
+from deadwax import EntityKind, SourcesConfig, lookup, parse_query
+
+query = parse_query("Radiohead - Paranoid Android", EntityKind.TRACK)
+dossier = asyncio.run(lookup(query, SourcesConfig()))
+print(dossier.model_dump_json(indent=2))
 ```
+
+The library never reads the environment and caches nothing unless `SourcesConfig.cache.path` is set. A failing source never raises out of `lookup()`; it appears in `dossier.errors`. Library errors derive from `DeadwaxError`.
 
 A base install (`pip install deadwax`) depends on Pydantic, httpx, and selectolax. Optional extras add application features:
 

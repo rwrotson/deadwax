@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from deadwax import ConfigurationError, SourcesConfig
 from deadwax.cli.settings import Settings, env_fields, load_settings
 
 ENV_EXAMPLE = Path(__file__).parents[2] / ".env.example"
@@ -62,3 +63,50 @@ def test_env_example_documents_every_setting() -> None:
 
 def test_every_setting_has_a_description() -> None:
     assert [name for name, field in env_fields() if not field.description] == []
+
+
+def test_toml_file_sits_below_environment_and_flags(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config = tmp_path / "deadwax.toml"
+    config.write_text("adapter_timeout = 9\n[http]\nretries = 1\ntimeout = 5\n[cache]\nttl = 60\n")
+    monkeypatch.setenv("DEADWAX_HTTP__RETRIES", "2")
+
+    settings = load_settings(config, cache={"enabled": False})
+
+    assert settings.adapter_timeout == 9
+    assert (settings.http.retries, settings.http.timeout) == (2, 5)
+    assert (settings.cache.ttl, settings.cache.enabled) == (60, False)
+
+
+def test_config_file_from_the_environment_and_the_default(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, isolated_user_dirs: Path
+) -> None:
+    named = tmp_path / "named.toml"
+    named.write_text("[odesli]\napi_key = 'k'\n")
+    isolated_user_dirs.parent.mkdir()
+    isolated_user_dirs.write_text("[itunes]\nenabled = false\n")
+
+    default = load_settings()
+    monkeypatch.setenv("DEADWAX_CONFIG_FILE", str(named))
+    from_environment = load_settings()
+
+    assert not default.itunes.enabled
+    assert from_environment.itunes.enabled
+    assert from_environment.odesli.api_key is not None
+
+
+def test_named_config_file_must_exist(tmp_path: Path) -> None:
+    with pytest.raises(ConfigurationError, match="configuration file not found"):
+        load_settings(tmp_path / "missing.toml")
+
+
+def test_settings_cover_the_library_configuration(tmp_path: Path) -> None:
+    settings = load_settings(cache={"path": str(tmp_path / "own.sqlite")}, odesli={"rate": 2})
+
+    config = settings.sources_config()
+
+    assert set(SourcesConfig.model_fields) <= set(Settings.model_fields)
+    assert config.cache.path == tmp_path / "own.sqlite"
+    assert config.odesli.rate == 2
+    assert load_settings().sources_config().cache.path == tmp_path / "cache.sqlite"
