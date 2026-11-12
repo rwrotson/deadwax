@@ -1,0 +1,10 @@
+{
+ "recorded_at": "2026-11-12T19:06:49+00:00",
+ "interactions": {
+  "GET https://itunes.apple.com/search?entity=song&limit=25&media=music&term=Zzqx+Nonexistent+Artist+No+Such+Song+At+All": {
+   "status": 200,
+   "content_type": "text/javascript; charset=utf-8",
+   "body": "\n\n\n{\n \"resultCount\":0,\n \"results\": []\n}\n\n\n"
+  }
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "recorded_at": "2026-11-12T19:07:36+00:00",
+ "interactions": {
+  "GET https://itunes.apple.com/lookup?id=1333011553": {
+   "status": 200,
+   "content_type": "text/javascript; charset=utf-8",
+   "body": "\n\n\n{\n \"resultCount\":1,\n \"results\": [\n{\"wrapperType\":\"track\", \"kind\":\"song\", \"artistId\":621768190, \"collectionId\":1333010977, \"trackId\":1333011553, \"artistName\":\"Kino\", \"collectionName\":\"Группа крови\", \"trackName\":\"Группа крови\", \"collectionCensoredName\":\"Группа крови\", \"trackCensoredName\":\"Группа крови\", \"artistViewUrl\":\"https://music.apple.com/us/artist/kino/621768190?uo=4\", \"collectionViewUrl\":\"https://music.apple.com/us/album/%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0-%D0%BA%D1%80%D0%BE%D0%B2%D0%B8/1333010977?i=1333011553&uo=4\", \"trackViewUrl\":\"https://music.apple.com/us/album/%D0%B3%D1%80%D1%83%D0%BF%D0%BF%D0%B0-%D0%BA%D1%80%D0%BE%D0%B2%D0%B8/1333010977?i=1333011553&uo=4\", \n\"previewUrl\":\"https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/b8/93/9e/b8939e79-2152-223e-7983-64059ac86998/mzaf_17538330426059398011.plus.aac.p.m4a\", \"artworkUrl30\":\"https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/a2/f7/13/a2f713de-4af3-9e21-da3f-c73d747cd847/cover.jpg/30x30bb.jpg\", \"artworkUrl60\":\"https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/a2/f7/13/a2f713de-4af3-9e21-da3f-c73d747cd847/cover.jpg/60x60bb.jpg\", \"artworkUrl100\":\"https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/a2/f7/13/a2f713de-4af3-9e21-da3f-c73d747cd847/cover.jpg/100x100bb.jpg\", \"collectionPrice\":14.19, \"trackPrice\":1.29, \"releaseDate\":\"1988-01-01T12:00:00Z\", \"collectionExplicitness\":\"notExplicit\", \"trackExplicitness\":\"notExplicit\", \"discCount\":1, \"discNumber\":1, \"trackCount\":11, \"trackNumber\":1, \"trackTimeMillis\":284003, \"country\":\"USA\", \"currency\":\"USD\", \"primaryGenreName\":\"Rock\", \"isStreamable\":true}]\n}\n\n\n"
+  }
+ }
+}

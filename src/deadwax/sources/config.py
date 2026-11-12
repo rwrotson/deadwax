@@ -27,6 +27,9 @@ class HttpSettings(_Model):
         description="URL or e-mail address sent in the User-Agent of API requests",
     )
     retries: int = Field(default=3, ge=0, description="Retries after 429, 5xx, or network errors")
+    retry_base: float = Field(
+        default=1.0, gt=0, description="Seconds of the first backoff; it doubles on each retry"
+    )
     max_retry_wait: float = Field(
         default=60.0, ge=0, description="Longest Retry-After wait, in seconds, before giving up"
     )
@@ -72,17 +75,27 @@ class DiscogsSettings(SourceSettings):
     )
 
 
+class OdesliSettings(SourceSettings):
+    """Settings of the Odesli (song.link) source."""
+
+    api_key: SecretStr | None = Field(
+        default=None, description="API key; the keyless API was retired on 2026-07-31"
+    )
+
+
 class LastfmSettings(SourceSettings):
     """Settings of the Last.fm source."""
 
     api_key: SecretStr | None = Field(default=None, description="API key")
 
 
-# Requests per second each source allows: MusicBrainz 1/s, Odesli 10/min keyless,
-# Discogs 60/min with a token; scraped pages are fetched slowly on purpose.
+# Requests per second each source allows: MusicBrainz 1/s, iTunes Search about 20/min,
+# Deezer 50 per 5 s, Discogs 60/min with a token; scraped pages are fetched slowly on purpose.
 DEFAULT_RATES: dict[str, float] = {
     "musicbrainz": 1.0,
-    "odesli": 10 / 60,
+    "itunes": 0.3,
+    "deezer": 2.0,
+    "odesli": 1.0,
     "discogs": 1.0,
     "bandcamp": 0.5,
     "lastfm": 4.0,
@@ -97,7 +110,9 @@ class SourcesConfig(_Model):
     cache: CacheSettings = CacheSettings()
     adapter_timeout: float = Field(default=30.0, gt=0, description="Seconds per source lookup")
     musicbrainz: SourceSettings = SourceSettings()
-    odesli: SourceSettings = SourceSettings()
+    itunes: SourceSettings = SourceSettings()
+    deezer: SourceSettings = SourceSettings()
+    odesli: OdesliSettings = OdesliSettings()
     discogs: DiscogsSettings = DiscogsSettings()
     bandcamp: SourceSettings = SourceSettings()
     lastfm: LastfmSettings = LastfmSettings()

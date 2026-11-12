@@ -1,0 +1,10 @@
+{
+ "recorded_at": "2026-11-12T19:06:28+00:00",
+ "interactions": {
+  "GET https://api.deezer.com/track/isrc:GBAYE9701376": {
+   "status": 403,
+   "content_type": "text/html",
+   "body": "<HTML><HEAD>\n<TITLE>Access Denied</TITLE>\n</HEAD><BODY>\n<H1>Access Denied</H1>\n \nYou don't have permission to access \"http&#58;&#47;&#47;api&#46;deezer&#46;com&#47;track&#47;isrc&#58;GBAYE9701376\" on this server.<P>\nReference&#32;&#35;18&#46;86641102&#46;1794510388&#46;947a8ca\n<P>https&#58;&#47;&#47;errors&#46;edgesuite&#46;net&#47;18&#46;86641102&#46;1794510388&#46;947a8ca</P>\n</BODY>\n</HTML>\n"
+  }
+ }
+}

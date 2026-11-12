@@ -9,7 +9,7 @@ Collect what open sources know about one track or album:
 
 Every fact carries the source and URL where it was found. Nothing is invented: missing data leaves a field empty. The result is equally usable in a terminal and as JSON for other programs.
 
-> **Status:** under development. The specification, stages, and progress log are in [`DEADWAX_PLAN.md`](https://github.com/rwrotson/deadwax/blob/main/DEADWAX_PLAN.md). The command below describes the planned interface.
+> **Status:** under development. The specification, stages, and progress log are in [`DEADWAX_PLAN.md`](https://github.com/rwrotson/deadwax/blob/main/DEADWAX_PLAN.md). The library's `lookup()` works with the sources listed below; the command is planned.
 
 ## Usage (planned)
 
@@ -45,7 +45,15 @@ print(dossier.model_dump_json(indent=2))
 
 ## Sources
 
-The first version implements MusicBrainz, Odesli, Discogs, Bandcamp, Last.fm, and Wikipedia/Wikidata. Other sources are planned as separate adapters; the full list with tiers will be documented here.
+| Source | Status | Contributes |
+|--------|--------|-------------|
+| MusicBrainz | implemented | identity, ISRCs, labels, credits, tags and genres, members, covers, remixes, samples, appearances on releases and compilations, streaming links, Discogs and Wikidata IDs; resolves MusicBrainz and Spotify URLs |
+| iTunes Search | implemented | Apple Music links and previews, release date, genre; resolves Apple Music URLs |
+| Deezer | implemented | Deezer links and previews, ISRC, barcode, label; resolves Deezer URLs. The API may refuse some networks; this is reported as `blocked` |
+| Odesli (song.link) | implemented, needs `odesli.api_key` | links on every platform; the keyless API was retired on 2026-07-31 |
+| Discogs, Bandcamp, Last.fm, Wikipedia/Wikidata | planned | |
+
+Other sources are planned as separate adapters; the full list with tiers will be documented here. Names written in a non-Latin script are compared as written: a store that lists "Кино" as "Kino" is reported as `no_match`.
 
 ## Configuration
 
@@ -81,9 +89,12 @@ src/
     ├── cli/                 # deadwax[cli]: Typer app, DEADWAX_* settings, rendering
     ├── logs/                # deadwax[logs]: LogSettings, setup_logging()
     ├── sources/             # adapters, HTTP stack, lookup()
+    │   ├── musicbrainz/     # MusicBrainz models, parsers, adapter
     │   └── _http/           # rate limits, retries, cache, escalation transports
     └── core/                # models, matching, orchestrator, errors (Pydantic only)
 tests/                       # mirrors the package; network is disabled
+├── fixtures/<source>/       # recorded responses, one file per source and scenario
+scripts/record_fixtures.py   # re-records the fixtures from the live sources
 ```
 
 ## CI/CD

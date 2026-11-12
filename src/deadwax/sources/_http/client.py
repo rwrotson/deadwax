@@ -116,7 +116,9 @@ class HttpClient:
         self._settings = config.http
         self._resources = resources
         self._policy = RetryPolicy(
-            retries=self._settings.retries, max_wait=self._settings.max_retry_wait
+            retries=self._settings.retries,
+            base=self._settings.retry_base,
+            max_wait=self._settings.max_retry_wait,
         )
         profile_headers = (
             api_headers(self._settings.contact)

@@ -8,9 +8,11 @@ from .config import (
     Escalation,
     HttpSettings,
     LastfmSettings,
+    OdesliSettings,
     SourcesConfig,
     SourceSettings,
 )
+from .lookup import build_adapters, describe_sources, lookup
 
 __all__ = [
     "DEFAULT_CONTACT",
@@ -20,6 +22,10 @@ __all__ = [
     "Escalation",
     "HttpSettings",
     "LastfmSettings",
+    "OdesliSettings",
     "SourceSettings",
     "SourcesConfig",
+    "build_adapters",
+    "describe_sources",
+    "lookup",
 ]

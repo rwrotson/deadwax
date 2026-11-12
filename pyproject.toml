@@ -144,7 +144,7 @@ fail_under = 95
 python_version = "3.14"
 mypy_path = "src"
 explicit_package_bases = true
-files = ["src", "tests", "docs"]
+files = ["src", "tests", "docs", "scripts"]
 exclude_gitignore = true
 strict = true
 disallow_any_unimported = true
@@ -283,8 +283,20 @@ layers = [
 name = "R4: sources modules"
 type = "layers"
 containers = ["deadwax.sources"]
-# Adapters, _html and lookup join above _http when they are added.
-layers = ["_http", "config"]
+# Bandcamp, Discogs, Last.fm, Wikipedia and _html join when they are added.
+layers = [
+    "lookup",
+    "musicbrainz | itunes | deezer | odesli",
+    "_base",
+    "_http",
+    "config",
+]
+
+[[tool.importlinter.contracts]]
+name = "R8: MusicBrainz adapter modules"
+type = "layers"
+containers = ["deadwax.sources.musicbrainz"]
+layers = ["adapter", "parse", "models"]
 
 [[tool.importlinter.contracts]]
 name = "R8: HTTP stack modules"

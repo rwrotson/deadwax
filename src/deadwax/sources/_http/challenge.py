@@ -15,6 +15,8 @@ _REFUSAL_MARKERS = (
     ("g-recaptcha", "reCAPTCHA"),
     ("h-captcha", "hCaptcha"),
     ("cf-turnstile", "Cloudflare Turnstile"),
+    ("errors.edgesuite.net", "Akamai block"),
+    ("errors&#46;edgesuite&#46;net", "Akamai block"),
 )
 _SCAN_BYTES = 32_768
 _REFUSAL_STATUSES = frozenset({403, 429, 503})

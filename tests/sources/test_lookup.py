@@ -1,0 +1,185 @@
+from collections.abc import Callable
+from pathlib import Path
+
+import httpx
+import pytest
+
+from deadwax import (
+    CacheSettings,
+    Dossier,
+    EntityKind,
+    ErrorKind,
+    IdKind,
+    LinkTarget,
+    Pass,
+    Query,
+    RelationKind,
+    SourcesConfig,
+    SourceState,
+    VersionKind,
+    describe_sources,
+    lookup,
+    parse_query,
+)
+
+Replay = Callable[..., httpx.MockTransport]
+
+PARANOID_ANDROID = parse_query("Radiohead - Paranoid Android", EntityKind.TRACK)
+ORIGINAL_RECORDING = "9f9cf187-d6f9-437f-9d98-d59cdbd52757"
+
+
+async def replayed(query: Query, scenario: str, replay: Replay, config: SourcesConfig) -> Dossier:
+    seen: list[str] = []
+    dossier = await lookup(query, config, transport=replay(scenario, seen))
+    assert seen
+    assert [e for e in dossier.errors if e.kind is ErrorKind.FAILED] == []
+    return dossier
+
+
+def ids(dossier: Dossier) -> dict[IdKind, str]:
+    return {external.kind: external.value for external in dossier.identity.external_ids}
+
+
+def errors(dossier: Dossier) -> dict[str, ErrorKind]:
+    return {error.source: error.kind for error in dossier.errors}
+
+
+def relation_kinds(dossier: Dossier) -> set[RelationKind]:
+    return {relation.kind for relation in dossier.relations}
+
+
+@pytest.mark.asyncio
+async def test_mainstream_track(replay: Replay, config: SourcesConfig) -> None:
+    dossier = await replayed(PARANOID_ANDROID, "paranoid_android", replay, config)
+
+    identity = dossier.identity
+    assert identity.title is not None
+    assert identity.title.value == "Paranoid Android"
+    assert {source.source for source in identity.title.sources} == {"musicbrainz", "itunes"}
+    assert identity.version.kind is VersionKind.ORIGINAL
+    assert identity.date is not None
+    assert identity.date.value == "1997-05-21"
+    assert "GBAYE9701376" in [isrc.value for isrc in identity.isrcs]
+    assert ids(dossier) | {
+        IdKind.MUSICBRAINZ_RECORDING: ORIGINAL_RECORDING,
+        IdKind.DISCOGS_MASTER: "21491",
+        IdKind.WIKIDATA: "Q1751357",
+        IdKind.APPLE_MUSIC: "1097861770",
+    } == ids(dossier)
+    assert ("producer", "Nigel Godrich") in {(c.role, c.name) for c in dossier.credits}
+    assert {"art rock", "alternative rock"} <= {tag.name for tag in dossier.tags}
+    assert {RelationKind.MEMBER, RelationKind.COVERED_BY, RelationKind.SAMPLED_BY} <= (
+        relation_kinds(dossier)
+    )
+    assert {"spotify", "deezer", "tidal", "apple_music"} <= {link.service for link in dossier.links}
+    assert errors(dossier) == {"odesli": ErrorKind.SKIPPED, "deezer": ErrorKind.BLOCKED}
+
+
+@pytest.mark.asyncio
+async def test_album_on_a_small_label(replay: Replay, config: SourcesConfig) -> None:
+    query = parse_query(
+        "Huerco S. - For Those of You Who Have Never (And Also Those Who Have)", EntityKind.ALBUM
+    )
+
+    dossier = await replayed(query, "huerco_s", replay, config)
+
+    assert dossier.identity.kind is EntityKind.ALBUM
+    assert [(label.name, label.catalog_number) for label in dossier.identity.labels] == [
+        ("Proibito", "PRB018")
+    ]
+    assert ids(dossier)[IdKind.DISCOGS_MASTER] == "1016511"
+    assert ("producer", "Brian Leeds") in {(c.role, c.name) for c in dossier.credits}
+    bandcamp = [link for link in dossier.links if link.service == "bandcamp"]
+    assert [link.target for link in bandcamp] == [LinkTarget.ALBUM]
+
+
+@pytest.mark.asyncio
+async def test_cyrillic_track_is_not_transliterated(replay: Replay, config: SourcesConfig) -> None:
+    query = parse_query("Кино - Группа крови", EntityKind.TRACK)
+
+    dossier = await replayed(query, "kino", replay, config)
+
+    assert dossier.identity.artist is not None
+    assert dossier.identity.artist.value == "Кино"
+    assert dossier.identity.labels == []
+    assert ("lyricist", "Виктор Цой") in {(c.role, c.name) for c in dossier.credits}
+    assert errors(dossier)["itunes"] is ErrorKind.NO_MATCH
+
+
+@pytest.mark.asyncio
+async def test_remix_is_not_merged_with_the_original(replay: Replay, config: SourcesConfig) -> None:
+    query = parse_query("Everything but the Girl - Missing (Todd Terry Remix)", EntityKind.TRACK)
+
+    dossier = await replayed(query, "missing_remix", replay, config)
+
+    version = dossier.identity.version
+    assert version.kind is VersionKind.REMIX
+    assert version.detail is not None
+    assert "Todd Terry" in version.detail
+    assert ids(dossier)[IdKind.MUSICBRAINZ_RECORDING] != "e956a427-0d6b-4d5c-b31f-0fde4b3d49a6"
+    assert ("remixer", "Todd Terry") in {(c.role, c.name) for c in dossier.credits}
+    remix_of = [r for r in dossier.relations if r.kind is RelationKind.REMIX_OF]
+    assert [r.target.name for r in remix_of] == ["Missing"]
+    assert RelationKind.COVERED_BY not in relation_kinds(dossier)
+    assert {d.field for d in dossier.identity.discrepancies} >= {"artist", "date"}
+
+
+@pytest.mark.parametrize(
+    ("url", "scenario"),
+    [
+        ("https://open.spotify.com/track/6LgJvl0Xdtc73RJ1mmpotq", "spotify_url"),
+        (
+            "https://music.apple.com/us/album/paranoid-android/1097861387?i=1097861770",
+            "apple_url",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_streaming_urls_resolve_to_the_same_recording(
+    url: str, scenario: str, replay: Replay, config: SourcesConfig
+) -> None:
+    dossier = await replayed(parse_query(url), scenario, replay, config)
+
+    assert dossier.identity.kind is EntityKind.TRACK
+    assert ids(dossier)[IdKind.MUSICBRAINZ_RECORDING] == ORIGINAL_RECORDING
+    assert ids(dossier)[IdKind.APPLE_MUSIC] == "1097861770"
+
+
+@pytest.mark.asyncio
+async def test_unknown_record_has_no_identity(replay: Replay, config: SourcesConfig) -> None:
+    query = parse_query("Zzqx Nonexistent Artist - No Such Song At All", EntityKind.TRACK)
+
+    dossier = await replayed(query, "no_match", replay, config)
+
+    assert not dossier.found
+    assert errors(dossier)["musicbrainz"] is ErrorKind.NOT_FOUND
+    assert errors(dossier)["itunes"] is ErrorKind.NOT_FOUND
+
+
+@pytest.mark.asyncio
+async def test_selection_and_cache(replay: Replay, config: SourcesConfig, tmp_path: Path) -> None:
+    cached = config.model_copy(update={"cache": CacheSettings(path=tmp_path / "cache.sqlite")})
+
+    query = parse_query("https://music.apple.com/us/album/x/1097861387?i=1097861770")
+
+    first = await lookup(query, cached, include=["itunes"], transport=replay("apple_url"))
+    second = await lookup(
+        query,
+        cached,
+        exclude=["musicbrainz", "deezer", "odesli"],
+        transport=replay("no_match"),
+    )
+
+    assert first.identity.title is not None
+    assert second.identity == first.identity
+    assert first.errors == second.errors == []
+
+
+def test_describe_sources() -> None:
+    sources = {info.source: info for info in describe_sources()}
+
+    assert list(sources) == ["musicbrainz", "odesli", "itunes", "deezer"]
+    assert sources["musicbrainz"].pass_ is Pass.IDENTITY
+    assert sources["odesli"].status.state is SourceState.MISSING_CREDENTIAL
+    assert [r.setting for r in sources["odesli"].requires] == ["odesli.api_key"]
+    assert sources["itunes"].status.ready

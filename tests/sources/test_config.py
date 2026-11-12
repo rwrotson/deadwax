@@ -14,7 +14,7 @@ def test_rates_use_source_defaults_and_overrides() -> None:
 
     assert config.rate("musicbrainz") == 0.5
     assert config.rate("odesli") == DEFAULT_RATES["odesli"]
-    assert config.rate("deezer") == 1.0
+    assert config.rate("unknown") == 1.0
 
 
 def test_ttl_uses_cache_default_unless_overridden() -> None:

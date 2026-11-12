@@ -131,14 +131,14 @@ _URL_RULES = (
     ),
     _UrlRule(
         _APPLE_MUSIC,
-        re.compile(r"^/[a-z]{2}/song/[^/]+/(?P<id>\d+)"),
+        re.compile(r"^/[a-z]{2}/song/(?:[^/]+/)?(?P<id>\d+)"),
         EntityKind.TRACK,
         IdKind.APPLE_MUSIC,
     ),
 )
 
 # Apple Music album URLs point at a track when they carry the `i` parameter.
-_APPLE_ALBUM_PATH = re.compile(r"^/[a-z]{2}/album/[^/]+/(?P<id>\d+)")
+_APPLE_ALBUM_PATH = re.compile(r"^/[a-z]{2}/album/(?:[^/]+/)?(?P<id>\d+)")
 
 # Hyphen, non-breaking hyphen, figure dash, en and em dashes, horizontal bar, minus sign.
 DASHES = "-\u2010\u2011\u2012\u2013\u2014\u2015\u2212"

@@ -4,7 +4,7 @@
 
 This is the implementation specification and multi-session handoff for deadwax. It is meant to be sufficient for an engineer or coding agent starting without the planning conversation. The original request (Russian, 2026-11-12) asked for a library and CLI that collects, for one track or album, everything open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links.
 
-- **Status:** Stages 0–2 complete; Stage 3 next (see the status table).
+- **Status:** Stages 0–3 complete; Stage 4 next (see the status table).
 - **Branch:** `main`. Stage 0 was committed by the user as `df3befa`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -16,7 +16,7 @@ This is the implementation specification and multi-session handoff for deadwax. 
 | Names | Distribution `deadwax`, package `deadwax`, command `deadwax`, env prefix `DEADWAX_`, error base `DeadwaxError`. |
 | Entity kind | Text queries **must** state `--album` or `--track` (mutually exclusive; missing → usage error, exit 2). A URL implies its kind (Bandcamp `/album/` vs `/track/`, MB `release-group`/`recording`, Discogs `master`/`release`, Odesli entity type); a flag that contradicts the URL is a usage error. |
 | Anti-bot | Full ladder: browser-like header profiles + HTTP/2 + cookies + jitter + Retry-After + challenge detection on plain httpx; optional `stealth` extra (curl_cffi TLS impersonation) and `browser` extra (Playwright Chromium) as escalation transports for HTML adapters only. Official APIs (MusicBrainz, Discogs API, Wikimedia, Last.fm, Odesli) always use an honest `deadwax/<ver> (+contact)` User-Agent, as their policies require. |
-| Odesli seed | When no streaming URL is known after pass 1, the Odesli adapter seeds itself with Deezer search, then iTunes Search (open, keyless). They are internal lookups, not fact sources; only Odesli facts appear. |
+| Streaming links | Superseded on 2026-11-12 (Odesli retired its keyless API): links come from MusicBrainz URL relations, an iTunes Search adapter, and a keyless Deezer adapter; Odesli runs only with `odesli.api_key`. See the decision log. |
 | Manual check | User has Discogs token and Last.fm key (in `.env`); I choose the five records (below) and confirm them at Stage 7. |
 | Language | Code, docs, plan journal, commit messages in English. |
 | Git | No agent commits; stop after each stage with a Conventional Commit suggestion (AGENTS.md "Commit Handoff"). |
@@ -25,7 +25,7 @@ This is the implementation specification and multi-session handoff for deadwax. 
 
 deadwax is general-purpose: output is equally useful to a person in a terminal (`--format pretty|markdown`) and to a program reading JSON. Every fact carries `source` (adapter) and `url`. Nothing is invented or "completed": no data means an empty field. A candidate with a different version is never merged into the main record; it goes to relations or is dropped, and the disagreement is recorded in identity. A failing adapter never breaks the others; it appears in `errors`.
 
-Out of scope for v1 (listed in README as planned): Boomkat, Juno, Norman, Forced Exposure, Hard Wax, Phonica, Soundohm, Bleep, Rough Trade, AllMusic, press reviews (one generic adapter with per-site rules; RA GraphQL), Apple Music, Rate Your Music (browser only), Genius, Album of the Year, ListenBrainz, NTS, Mixcloud, SecondHandSongs, WhoSampled (ToS — not without a separate decision), 1001Tracklists/KEXP/WFMU/BBC Sounds, Spotify (search and link only), Deezer/iTunes/YouTube as fact sources, SoundCloud, Beatport/Juno Download/Traxsource. Never used: Every Noise at Once, direct Metacritic scraping (ratings come from Wikipedia), Spotify audio-features.
+Out of scope for v1 (listed in README as planned): Boomkat, Juno, Norman, Forced Exposure, Hard Wax, Phonica, Soundohm, Bleep, Rough Trade, AllMusic, press reviews (one generic adapter with per-site rules; RA GraphQL), Apple Music, Rate Your Music (browser only), Genius, Album of the Year, ListenBrainz, NTS, Mixcloud, SecondHandSongs, WhoSampled (ToS — not without a separate decision), 1001Tracklists/KEXP/WFMU/BBC Sounds, Spotify (search and link only), YouTube as a fact source, SoundCloud, Beatport/Juno Download/Traxsource. Never used: Every Noise at Once, direct Metacritic scraping (ratings come from Wikipedia), Spotify audio-features.
 
 ## Architecture
 
@@ -121,7 +121,9 @@ src/deadwax/
 | Adapter | Access | Takes |
 | --- | --- | --- |
 | MusicBrainz | WS/2 JSON, 1 req/s, honest UA | search recording / release-group (Lucene, with aliases for non-Latin); recording: artist-credits, ISRCs, releases (+ compilations via secondary types), tags/genres with counts, artist-rels (producer, engineer, instrument, vocal, remixer), recording-rels (remix, DJ-mix, samples), work-rels → work's other recordings flagged cover; release-group/release: labels, catno, barcode, url-rels (Discogs, Bandcamp, Wikidata, streaming, AllMusic, review links); artist member-of rels for members/projects |
-| Odesli | `api.song.link/v1-alpha.1/links`, ≤10 req/min keyless | links per platform with entity type, ISRC/UPC hints; seed: known URL → Deezer search → iTunes Search |
+| iTunes Search | keyless `itunes.apple.com/search` and `/lookup`, ~20 req/min | Apple Music track, album and artist links with previews, release date, genre; looks up the Apple Music link MusicBrainz curates before searching; resolves Apple Music URLs |
+| Deezer | keyless `api.deezer.com` | track by ISRC or album by barcode from pass 1, else search; links, previews, ISRC, barcode, label, genres; resolves Deezer URLs; refused (Akamai) from the development network |
+| Odesli | `api.song.link/v1-alpha.1/links`, API key required since 2026-07-31 | links on every platform, seeded by the query URL or a streaming link found in pass 1; skipped without `odesli.api_key` |
 | Discogs | API v2, 60/min with token (25 without); token needed for search | master/release: genres+styles, extraartists credits with roles, notes, labels+catno, identifiers (barcode), tracklist positions & track-level credits; master versions (reissues/remasters → other_version); `database/search?track=&format=Compilation` → compilations; label → neighbouring releases; artist members/groups. User reviews from release HTML page via browser-profile ladder (blocked → `AdapterError(blocked)`) |
 | Bandcamp | no API | page `data-tralbum` + `data-embed` + JSON-LD (`MusicAlbum`/`MusicRecording`: keywords tags, description/about, credits, datePublished, publisher label, tracks, ISRC if present); “supported by” fan blurbs → `Text(user)`; recommendations block → `similar`; label/band page → label releases. Search via `bcsearch_public_api` autocomplete endpoint, fallback HTML `/search`. Fallback: mobile `api/mobile/24/tralbum_details` JSON |
 | Last.fm | API key | `track.getInfo` / `album.getInfo` (wiki summary+content, toptags with counts → weight, url), `track.getSimilar` → similar; artist tags only as `scope=artist` |
@@ -165,7 +167,7 @@ Rate limits/TTL defaults per adapter in `sources/config.py`; all overridable.
 | 0 | Complete | Template renamed to deadwax, dependencies, import rules R1–R9 and contracts, docs adapted, this journal. |
 | 1 | Complete | Core: errors, models, query parsing, normalization, version detection, matching, merge, markdown. |
 | 2 | Complete | Adapter protocol, two-pass orchestrator; HTTP stack: profiles, rate limiter, retry, cache, challenge detection, escalation ladder. |
-| 3 | Not started | MusicBrainz and Odesli (Deezer/iTunes seed), URL resolution, recorded fixtures. |
+| 3 | Complete | MusicBrainz, iTunes, Deezer, Odesli (key only), URL resolution, recorded fixtures, `lookup()`. |
 | 4 | Not started | CLI: lookup and `sources`, formats, settings with TOML config, cache directory; first manual run. |
 | 5 | Not started | Bandcamp and Discogs (reviews through the escalation ladder). |
 | 6 | Not started | Last.fm and Wikipedia/Wikidata. |
@@ -201,9 +203,9 @@ Rate limits/TTL defaults per adapter in `sources/config.py`; all overridable.
 
 ### Stage 3: identity and links adapters
 
-- [ ] MusicBrainz (search, recording, release-group, release, work, artist relations); Odesli with Deezer then iTunes seed; input URL resolution.
-- [ ] `scripts/record_fixtures.py`; fixtures for the check records and edge cases.
-- [ ] `lookup()` composition and `source_statuses()` exported from `deadwax`.
+- [x] MusicBrainz (search, recording, release-group, release, work, artist relations); ~~Odesli with Deezer then iTunes seed~~ iTunes and Deezer adapters, Odesli with an API key only; input URL resolution.
+- [x] `scripts/record_fixtures.py`; fixtures for the check records and edge cases.
+- [x] `lookup()` composition and ~~`source_statuses()`~~ `describe_sources()` exported from `deadwax`.
 
 **Acceptance:** parser tests on fixtures for all four goals the adapters serve; lookup integration test over MockTransport. **Suggested message:** `feat(sources): add MusicBrainz and Odesli adapters`.
 
@@ -282,8 +284,30 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-12 | Default API contact is the repository URL, not a personal address; overridable by `http.contact`. | API policies need a contact; no personal data by default. | 2 |
 | 2026-11-12 | Plain httpx transport lives in `_http.plain`; a layers contract ("R8: HTTP stack modules") orders `_http` modules. | R8 requires a layers contract for every multi-module package. | 2 |
 | 2026-11-12 | Captcha widget markers count as a challenge only on 403/429/503; Cloudflare interstitial markers count on any status. | Ordinary pages embed reCAPTCHA in login forms. | 2, 5 |
+| 2026-11-12 | Odesli is no longer the link backbone: MusicBrainz URL relations, an iTunes Search adapter, and a keyless Deezer adapter provide links and resolve their URLs; Odesli needs `odesli.api_key` and is skipped without it. Supersedes "Odesli seeded by Deezer, then iTunes". | Linktree retired the keyless song.link API on 2026-07-31 (`401 PUBLIC_API_ACCESS_DEPRECATED`, verified live); user choice. | 3 |
+| 2026-11-12 | iTunes and Deezer contribute facts (candidate, links, genre, ISRC, barcode) like other adapters, so the matching gate drops a store result for another version. | Their results must pass the same version check as everything else. | 3 |
+| 2026-11-12 | MusicBrainz track search: official album/EP/single releases first (`status:official AND primarytype:(album OR single OR ep)`), then a plain search, then the same with the title's base; candidates ranked by appearing on such a release, year, and number of releases; DJ-mix excerpts and videos excluded. | A plain search returned 25 equal-score live and bootleg recordings without the original; partial dates sorted before full ones. | 3 |
+| 2026-11-12 | MusicBrainz disambiguation comments set a version only for live, demo, instrumental, acoustic, remix, edit, remaster, alternate; "original mix"/"album version" mean original. | Comments are free text ("“Amplified Heart” album original mix"). | 3 |
+| 2026-11-12 | A non-original recording relates to its work as `remix_of`/`cover_of`/`other_version`; only an original lists the work's covers. Release IDs and the Discogs master of a track are those of its first release; its Wikidata ID is the song's (from the work). | MusicBrainz often lacks a direct remix relation; IDs of a track's album are needed by later adapters. | 3, 5, 6 |
+| 2026-11-12 | `describe_sources()` returns `SourceInfo` (pass, capabilities, requirements, status) instead of `source_statuses()`. | The `sources` command needs more than the status. | 3, 4 |
+| 2026-11-12 | Shared adapter code lives in `sources/_base.py` (R4 layer below the adapters); MusicBrainz is a package with its own layers contract. | R4 forbids adapters importing each other. | 3 |
+| 2026-11-12 | `deadwax` imports `deadwax.sources` lazily (module `__getattr__`). | httpx loads rich and click at import time when installed, which broke the import-time rule. | 3 |
+| 2026-11-12 | Retry backoff base is a setting (`http.retry_base`, default 1 s). | MusicBrainz answered "server busy" 503 through four 0.5 s-based retries from the shared development IP. | 3 |
+| 2026-11-12 | Non-Latin names are compared as written; a store listing "Кино" as "Kino" yields `no_match`. Alias-aware matching is a later, separate change. | No transliteration (Stage 1 decision); MusicBrainz aliases are not yet carried in the context. | 3+ |
 
-**Current task:** Stage 2 complete. **Next action:** user review and commit; then Stage 3 on request.
+**Current task:** Stage 3 complete. **Next action:** user review and commit; then Stage 4 on request.
+
+### 2026-11-12 — Stage 3 qualification
+
+Live checks before coding: MusicBrainz WS/2 answered; `api.song.link` answered `401 PUBLIC_API_ACCESS_DEPRECATED` for every request (retired 2026-07-31); `api.deezer.com` answered an Akamai "Access Denied" 403 from this network (not retried with other headers); iTunes Search answered. The user chose keyless sources with Odesli behind a key.
+
+Added `sources/_base.py` (`HttpAdapter` with lazy client and status from settings, `service_for_url`, `link_target`, `search_key`), the `musicbrainz` package (`models`, `parse`, `adapter`: lookup by MusicBrainz IDs, by any URL through `ws/2/url`, by ISRC from earlier passes, or by search; recording, first release, its release group, work and artist; release group, first release with track-level credits, and artist for albums), `itunes`, `deezer` (errors inside HTTP 200 bodies mapped to not found / rate limited / failed), `odesli` (key only, `key` stripped from cache keys and URLs), `lookup` (`lookup`, `build_adapters`, `describe_sources`; resolver order MusicBrainz, Odesli, iTunes, Deezer). Config gained `itunes`, `deezer`, `odesli.api_key`, `http.retry_base`; challenge detection recognises Akamai block pages (also entity-encoded). Core: `SourceInfo`; Apple Music URLs without a title slug are recognised. `deadwax` exports `lookup`, `describe_sources`, the settings classes, `SourceInfo`, `SourceStatus`, `SourceState`, `Pass`, `Capability`, `Requirement`, loading `deadwax.sources` lazily. Contracts: R4 now `lookup` → adapters → `_base` → `_http` → `config`; new "R8: MusicBrainz adapter modules".
+
+Fixtures: `scripts/record_fixtures.py` ran the real `lookup()` through a recording transport (uncompressed, last response per request, secret parameters dropped) on 2026-11-12 for seven scenarios: `paranoid_android`, `huerco_s`, `kino`, `missing_remix`, `spotify_url`, `apple_url`, `no_match` (2.3 MB in `tests/fixtures/{musicbrainz,itunes,deezer}/`). Deezer fixtures contain only the 403 block pages; Deezer and Odesli parsers are tested with hand-written responses in their documented shape, so their success paths are not live-verified.
+
+Live-verified on 2026-11-12 (recording runs, reviewed as Markdown): Paranoid Android resolves to the 1997 original recording (`9f9cf187…`) with ISRCs, 35 credits, writers from the work, members, covers, a mash-up, Discogs master 21491, Wikidata Q1751357, Spotify/Deezer/Apple/Tidal links; the Spotify and Apple URLs reach the same recording; the Huerco S. album has Proibito PRB018, producer Brian Leeds per track, Bandcamp/Boomkat/Amazon links; Кино keeps Cyrillic names, iTunes reports `no_match` for "Kino"; the Todd Terry remix stays separate from the 1994 original (`remix_of` the work "Missing", remixer Todd Terry, artist and date disagreements with iTunes shown); the unknown query yields no identity and `not_found` errors. Recording runs hit MusicBrainz 503 "server busy" on many requests; retries recovered except twice, which were re-recorded after raising the retry base.
+
+Checks: `uv run poe check` passed (Ruff format and lint, 14 contracts kept, mypy strict on 85 files including `scripts/`, 378 tests, 99.08% branch coverage); `uv run --group docs properdocs build --strict` passed. No commit was created.
 
 ### 2026-11-12 — Stage 2 qualification
 

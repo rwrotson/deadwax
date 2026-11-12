@@ -6,6 +6,7 @@ from .adapter import (
     LookupContext,
     Pass,
     Requirement,
+    SourceInfo,
     SourceState,
     SourceStatus,
 )
@@ -107,6 +108,7 @@ __all__ = [
     "Requirement",
     "Scope",
     "SourceError",
+    "SourceInfo",
     "SourceState",
     "SourceStatus",
     "Sourced",

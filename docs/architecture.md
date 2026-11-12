@@ -46,13 +46,14 @@ From top to bottom:
 
 ```
 deadwax.sources.lookup        composition: builds adapters and runs the orchestrator
-musicbrainz | odesli | discogs | bandcamp | lastfm | wikipedia
+musicbrainz | itunes | deezer | odesli | discogs | bandcamp | lastfm | wikipedia
+deadwax.sources._base         adapter base class, service names of URLs, search keys
 deadwax.sources._html
 deadwax.sources._http
 deadwax.sources.config
 ```
 
-Adapters are independent: they never import each other, and data found by one adapter reaches another only through `LookupContext`. A helper needed by two adapters moves down into `_html` or `_http`. The contract lists the layers that exist; adapters, `_html`, and `lookup` join it when they are added.
+Adapters are independent: they never import each other, and data found by one adapter reaches another only through `LookupContext`. A helper needed by two adapters moves down into `_base`, `_html`, or `_http`. The contract lists the layers that exist; Discogs, Bandcamp, Last.fm, Wikipedia, and `_html` join it when they are added. An adapter that grows into a package gets its own layers contract (`musicbrainz`: `adapter`, `parse`, `models`).
 
 Inside `deadwax.sources._http` (contract "R8: HTTP stack modules"), from top to bottom:
 
@@ -96,7 +97,7 @@ Transitive dependencies (anyio, h2, httpcore, click, and others) are never impor
 
 ### R7. Lazy optional imports
 
-curl_cffi and Playwright are imported inside the function that needs them; a missing package raises `ConfigurationError` naming the extra. Type-only references go under `if TYPE_CHECKING:`. `import deadwax` does not load structlog, Pydantic Settings, Typer, rich, platformdirs, curl_cffi, or Playwright; `tests/test_package.py` checks this in a fresh interpreter.
+curl_cffi and Playwright are imported inside the function that needs them; a missing package raises `ConfigurationError` naming the extra. Type-only references go under `if TYPE_CHECKING:`. `import deadwax` does not load structlog, Pydantic Settings, Typer, rich, platformdirs, curl_cffi, or Playwright; `tests/test_package.py` checks this in a fresh interpreter. `deadwax` imports `deadwax.sources` on first use of one of its names (`lookup`, `SourcesConfig`, …), because httpx loads rich and click at import time whenever they are installed.
 
 ### R8. Style (Ruff and review)
 

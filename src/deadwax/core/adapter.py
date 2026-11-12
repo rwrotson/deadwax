@@ -58,6 +58,16 @@ class SourceStatus(_Model):
         return self.state is SourceState.READY
 
 
+class SourceInfo(_Model):
+    """What an adapter contributes and whether it can run."""
+
+    source: str
+    pass_: Pass
+    capabilities: list[Capability]
+    requires: list[Requirement]
+    status: SourceStatus
+
+
 class LookupContext(_Model):
     """What earlier passes established about the record."""
 

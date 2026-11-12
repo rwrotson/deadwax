@@ -98,6 +98,16 @@ def test_text_query_requires_kind() -> None:
             EntityKind.TRACK,
             {IdKind.APPLE_MUSIC: "266476578"},
         ),
+        (
+            "https://music.apple.com/gb/song/1097861770",
+            EntityKind.TRACK,
+            {IdKind.APPLE_MUSIC: "1097861770"},
+        ),
+        (
+            "https://music.apple.com/us/album/1097861387",
+            EntityKind.ALBUM,
+            {IdKind.APPLE_MUSIC: "1097861387"},
+        ),
         ("https://song.link/s/3a1lNhkSLSkpJE4MSHpDu9", None, {}),
         ("https://burial.bandcamp.com/", None, {}),
     ],

@@ -1,0 +1,15 @@
+{
+ "recorded_at": "2026-11-12T19:06:49+00:00",
+ "interactions": {
+  "GET https://musicbrainz.org/ws/2/recording?fmt=json&limit=100&query=recording%3A%22No+Such+Song+At+All%22+AND+artist%3A%22Zzqx+Nonexistent+Artist%22+AND+status%3Aofficial+AND+primarytype%3A%28album+OR+single+OR+ep%29": {
+   "status": 200,
+   "content_type": "application/json",
+   "body": "{\"created\":\"2026-11-12T19:04:04.996Z\",\"count\":0,\"offset\":0,\"recordings\":[]}"
+  },
+  "GET https://musicbrainz.org/ws/2/recording?fmt=json&limit=100&query=recording%3A%22No+Such+Song+At+All%22+AND+artist%3A%22Zzqx+Nonexistent+Artist%22": {
+   "status": 200,
+   "content_type": "application/json",
+   "body": "{\"created\":\"2026-11-12T19:04:07.161Z\",\"count\":0,\"offset\":0,\"recordings\":[]}"
+  }
+ }
+}

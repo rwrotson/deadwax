@@ -15,6 +15,13 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.core.adapter` | Define the adapter protocol, source status, and lookup context |
 | `deadwax.core.orchestrator` | Run adapters in two passes and merge their results |
 | `deadwax.sources.config` | Define HTTP, cache, and per-source settings |
+| `deadwax.sources.lookup` | Build the adapters and look a query up |
+| `deadwax.sources.musicbrainz.adapter` | Find recordings and release groups in MusicBrainz |
+| `deadwax.sources.musicbrainz.parse` | Turn MusicBrainz responses into identity and facts |
+| `deadwax.sources.musicbrainz.models` | Model MusicBrainz web service responses |
+| `deadwax.sources.itunes` | Find Apple Music links and previews with the iTunes Search API |
+| `deadwax.sources.deezer` | Find Deezer links, ISRCs and barcodes with the Deezer API |
+| `deadwax.sources.odesli` | Expand a streaming link to all platforms with Odesli (API key) |
 | `deadwax.logs.settings` | Define logging settings |
 | `deadwax.logs.setup` | Configure console and file logging for applications |
 | `deadwax.cli.settings` | Load command settings from the environment |

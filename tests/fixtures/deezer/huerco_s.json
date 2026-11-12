@@ -1,0 +1,10 @@
+{
+ "recorded_at": "2026-11-12T19:05:58+00:00",
+ "interactions": {
+  "GET https://api.deezer.com/search/album?limit=25&q=artist%3A%22Huerco+S.%22+album%3A%22For+Those+of+You+Who+Have+Never+%28And+Also+Those+Who+Have%29%22": {
+   "status": 403,
+   "content_type": "text/html",
+   "body": "<HTML><HEAD>\n<TITLE>Access Denied</TITLE>\n</HEAD><BODY>\n<H1>Access Denied</H1>\n \nYou don't have permission to access \"http&#58;&#47;&#47;api&#46;deezer&#46;com&#47;search&#47;album&#63;\" on this server.<P>\nReference&#32;&#35;18&#46;ae641102&#46;1794510358&#46;19d718d9\n<P>https&#58;&#47;&#47;errors&#46;edgesuite&#46;net&#47;18&#46;ae641102&#46;1794510358&#46;19d718d9</P>\n</BODY>\n</HTML>\n"
+  }
+ }
+}

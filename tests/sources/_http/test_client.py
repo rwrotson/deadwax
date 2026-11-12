@@ -193,7 +193,7 @@ async def test_server_errors_are_retried_with_backoff() -> None:
         response = await client.get(URL)
 
     assert response.text == "ok"
-    assert any(0 <= wait <= 0.5 for wait in setup.time.sleeps)
+    assert any(0 <= wait <= 1.0 for wait in setup.time.sleeps)
 
 
 @pytest.mark.asyncio
