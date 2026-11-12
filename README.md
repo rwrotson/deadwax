@@ -51,7 +51,9 @@ print(dossier.model_dump_json(indent=2))
 | iTunes Search | implemented | Apple Music links and previews, release date, genre; resolves Apple Music URLs |
 | Deezer | implemented | Deezer links and previews, ISRC, barcode, label; resolves Deezer URLs. The API may refuse some networks; this is reported as `blocked` |
 | Odesli (song.link) | implemented, needs `odesli.api_key` | links on every platform; the keyless API was retired on 2026-07-31 |
-| Discogs, Bandcamp, Last.fm, Wikipedia/Wikidata | planned | |
+| Discogs | implemented; search needs `discogs.token` | genres and styles, credits with roles and tracks, database notes, labels with catalog numbers, barcodes, other versions of the master, compilations (with token), the label's other releases, members, groups and aliases; user reviews from the release page through the escalation ladder (a refused page is reported as `blocked` and costs only the reviews); resolves Discogs URLs. Without a token it reads records by the Discogs IDs MusicBrainz gives, at 25 requests a minute. Discogs refused deadwax's own User-Agent on 2026-11-12, so it is sent httpx's (`discogs.user_agent` overrides it) |
+| Bandcamp | implemented | tags, About and Credits texts, simple credits, fan comments, recommendations as similar releases, label from the mobile API, the label's other releases; resolves album and track pages on `bandcamp.com` subdomains. A track found on another artist's album (a compilation) contributes only its identity, links and own notes |
+| Last.fm, Wikipedia/Wikidata | planned | |
 
 Other sources are planned as separate adapters; the full list with tiers will be documented here. Names written in a non-Latin script are compared as written: a store that lists "Кино" as "Kino" is reported as `no_match`.
 
@@ -70,6 +72,7 @@ uv run pre-commit install
 uv run poe check       # format check, lint, import contracts, type check, tests with coverage
 uv run poe fmt
 uv run poe test-fast
+uv run poe test-live   # opt-in lookups of real tracks against the live sources (tests/integration)
 uv run poe docs
 uv run poe audit
 uv build
@@ -90,10 +93,13 @@ src/
     ├── logs/                # deadwax[logs]: LogSettings, setup_logging()
     ├── sources/             # adapters, HTTP stack, lookup()
     │   ├── musicbrainz/     # MusicBrainz models, parsers, adapter
+    │   ├── discogs/         # Discogs models, parsers, adapter
+    │   ├── bandcamp/        # Bandcamp models, page parsers, adapter
     │   └── _http/           # rate limits, retries, cache, escalation transports
     └── core/                # models, matching, orchestrator, errors (Pydantic only)
 tests/                       # mirrors the package; network is disabled
 ├── fixtures/<source>/       # recorded responses, one file per source and scenario
+├── integration/             # live lookups, collected only with --live (poe test-live)
 scripts/record_fixtures.py   # re-records the fixtures from the live sources
 ```
 

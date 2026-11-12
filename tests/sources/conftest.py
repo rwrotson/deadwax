@@ -1,3 +1,4 @@
+import hashlib
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -16,10 +17,13 @@ FAST = {"rate": 1000}
 
 
 def fixture_key(request: httpx.Request) -> str:
-    """Key of a request in the fixtures: method and URL with sorted, non-secret parameters."""
+    """Fixture key: method, URL with sorted non-secret parameters, and a body hash."""
     parts = urlsplit(str(request.url))
     params = sorted((k, v) for k, v in parse_qsl(parts.query) if k not in SECRET_PARAMS)
-    return f"{request.method} {urlunsplit(parts._replace(query=urlencode(params)))}"
+    key = f"{request.method} {urlunsplit(parts._replace(query=urlencode(params)))}"
+    if request.content:
+        key += f" #{hashlib.sha256(request.content).hexdigest()[:16]}"
+    return key
 
 
 def load(scenario: str) -> dict[str, dict[str, object]]:
@@ -53,10 +57,16 @@ def transport(scenario: str, seen: list[str] | None = None) -> httpx.MockTranspo
 
 
 def fast_config(**changes: object) -> SourcesConfig:
-    """Configuration without rate-limit waits and without a cache."""
+    """Configuration without rate-limit waits, cache, or escalation.
+
+    Escalation stays off because curl_cffi opens its own sockets, which pytest-socket
+    cannot block, and Playwright would launch a browser.
+    """
     fields: dict[str, object] = {
-        name: dict(FAST) for name in ("musicbrainz", "itunes", "deezer", "odesli")
+        name: dict(FAST)
+        for name in ("musicbrainz", "itunes", "deezer", "odesli", "discogs", "bandcamp")
     }
+    fields["http"] = {"escalation": "none"}
     return SourcesConfig.model_validate(fields | changes)
 
 
@@ -68,3 +78,13 @@ def replay() -> Callable[..., httpx.MockTransport]:
 @pytest.fixture
 def config() -> SourcesConfig:
     return fast_config()
+
+
+@pytest.fixture
+def recorded() -> Callable[[str, str], bytes]:
+    """Return the recorded body of one request of a scenario."""
+
+    def body(scenario: str, key: str) -> bytes:
+        return str(load(scenario)[key]["body"]).encode()
+
+    return body

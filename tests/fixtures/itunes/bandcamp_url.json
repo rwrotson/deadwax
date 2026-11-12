@@ -1,0 +1,10 @@
+{
+ "recorded_at": "2026-11-12T20:19:05+00:00",
+ "interactions": {
+  "GET https://itunes.apple.com/search?entity=album&limit=25&media=music&term=Huerco+S.+For+Those+Of+You+Who+Have+Never+%28And+Also+Those+Who+Have%29": {
+   "status": 200,
+   "content_type": "text/javascript; charset=utf-8",
+   "body": "\n\n\n{\n \"resultCount\":1,\n \"results\": [\n{\"wrapperType\":\"collection\", \"collectionType\":\"Album\", \"artistId\":445482393, \"collectionId\":1111704765, \"amgArtistId\":2841360, \"artistName\":\"Huerco S.\", \"collectionName\":\"For Those of You Who Have Never (And Also Those Who Have)\", \"collectionCensoredName\":\"For Those of You Who Have Never (And Also Those Who Have)\", \"artistViewUrl\":\"https://music.apple.com/us/artist/huerco-s/445482393?uo=4\", \"collectionViewUrl\":\"https://music.apple.com/us/album/for-those-of-you-who-have-never-and-also-those-who-have/1111704765?uo=4\", \"artworkUrl60\":\"https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/f0/d6/19/f0d6199b-d1ea-dbb8-a05a-f7077c4d43a5/816216020998.jpg/60x60bb.jpg\", \"artworkUrl100\":\"https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/f0/d6/19/f0d6199b-d1ea-dbb8-a05a-f7077c4d43a5/816216020998.jpg/100x100bb.jpg\", \"collectionPrice\":8.99, \"collectionExplicitness\":\"notExplicit\", \"trackCount\":9, \"copyright\":\"℗ 2016 Proibito\", \"country\":\"USA\", \"currency\":\"USD\", \"releaseDate\":\"2016-06-10T07:00:00Z\", \"primaryGenreName\":\"Electronic\"}]\n}\n\n\n"
+  }
+ }
+}

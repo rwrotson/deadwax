@@ -1,0 +1,10 @@
+{
+ "recorded_at": "2026-11-12T20:18:47+00:00",
+ "interactions": {
+  "POST https://bandcamp.com/api/bcsearch_public_api/1/autocomplete_elastic #f22b1d2976805a06": {
+   "status": 200,
+   "content_type": "application/json",
+   "body": "{\"auto\":{\"results\":[],\"stat_params_for_tag\":\"search_item_id=2&search_item_type=%40&search_match_part=%3F&search_page_id=5959782815&search_page_no=0&search_rank=1\",\"time_ms\":235},\"tag\":{},\"genre\":{}}"
+  }
+ }
+}

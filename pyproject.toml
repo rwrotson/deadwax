@@ -283,11 +283,11 @@ layers = [
 name = "R4: sources modules"
 type = "layers"
 containers = ["deadwax.sources"]
-# Bandcamp, Discogs, Last.fm, Wikipedia and _html join when they are added.
+# Last.fm and Wikipedia join when they are added.
 layers = [
     "lookup",
-    "musicbrainz | itunes | deezer | odesli",
-    "_base",
+    "musicbrainz | itunes | deezer | odesli | discogs | bandcamp",
+    "_base | _html",
     "_http",
     "config",
 ]
@@ -296,6 +296,18 @@ layers = [
 name = "R8: MusicBrainz adapter modules"
 type = "layers"
 containers = ["deadwax.sources.musicbrainz"]
+layers = ["adapter", "parse", "models"]
+
+[[tool.importlinter.contracts]]
+name = "R8: Bandcamp adapter modules"
+type = "layers"
+containers = ["deadwax.sources.bandcamp"]
+layers = ["adapter", "parse", "models"]
+
+[[tool.importlinter.contracts]]
+name = "R8: Discogs adapter modules"
+type = "layers"
+containers = ["deadwax.sources.discogs"]
 layers = ["adapter", "parse", "models"]
 
 [[tool.importlinter.contracts]]
@@ -415,6 +427,8 @@ lint-imports = "lint-imports"
 typecheck = "mypy"
 test = "pytest --cov"
 test-fast = "pytest"
+# Live lookups of tests/integration, one at a time to respect the sources' rate limits.
+test-live = "pytest tests/integration --live -n 0 -p no:randomly"
 docs = "properdocs serve"
 check = ["fmt-check", "lint", "lint-imports", "typecheck", "test"]
 

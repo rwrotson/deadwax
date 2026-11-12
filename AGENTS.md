@@ -29,6 +29,7 @@ uv run poe lint-imports # import-linter layer contracts
 uv run poe typecheck    # mypy (strict: src, tests, docs)
 uv run poe test         # pytest (parallel, 95% branch coverage enforced)
 uv run poe test-fast    # pytest without coverage, parallel, random order
+uv run poe test-live    # opt-in live lookups in tests/integration (network, sequential)
 uv run poe docs         # properdocs serve
 uv run poe audit        # pip-audit over locked dependencies
 
@@ -183,7 +184,7 @@ Library code logs through stdlib `logging.getLogger(__name__)` so records follow
 
 `tests/` mirrors the package (`core/`, `logs/`, `cli/`, `test_main.py`); `tests/test_package.py` covers the public API, import-time behaviour, and the missing-extra message.
 
-Tests never use the network: pytest-socket disables sockets (Unix sockets stay allowed for xdist). Adapters receive their HTTP client, and tests serve recorded responses from `tests/fixtures/<source>/` through `httpx.MockTransport`. Async tests use pytest-asyncio in strict mode.
+Tests never use the network: pytest-socket disables sockets (Unix sockets stay allowed for xdist), and source tests turn escalation off because curl_cffi opens sockets pytest-socket cannot block. The exception is `tests/integration/`, which is collected only with `--live` (`poe test-live`) and checks invariants of real lookups, not exact values. Adapters receive their HTTP client, and tests serve recorded responses from `tests/fixtures/<source>/` through `httpx.MockTransport`. Async tests use pytest-asyncio in strict mode.
 
 Tests run in parallel (pytest-xdist) and in random order (pytest-randomly); warnings are errors and each test has a 30-second timeout. Autouse fixtures in `tests/conftest.py` remove `DEADWAX_*` variables, run each test in a temporary working directory (so a local `.env` is not read), and restore logging and structlog configuration. pytest adds its own capture handlers to the root logger, so assert on the library's handlers only. Reproduce an order-dependent failure with `uv run pytest -p randomly --randomly-seed=<seed>`.
 

@@ -7,6 +7,19 @@ import pytest
 import structlog
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--live", action="store_true", help="also run tests/integration against live sources"
+    )
+
+
+def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool | None:
+    """Collect the live integration tests only with --live, so normal runs stay offline."""
+    if collection_path.name == "integration" and not config.getoption("--live"):
+        return True
+    return None
+
+
 @pytest.fixture(autouse=True)
 def isolated_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Keep the developer's DEADWAX_* variables and .env file out of every test."""

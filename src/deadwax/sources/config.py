@@ -65,6 +65,10 @@ class SourceSettings(_Model):
     ttl: float | None = Field(
         default=None, ge=0, description="Cache lifetime in seconds; the cache default when unset"
     )
+    user_agent: str | None = Field(
+        default=None,
+        description="User-Agent of this source's requests; the source default when unset",
+    )
 
 
 class DiscogsSettings(SourceSettings):

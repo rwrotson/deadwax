@@ -5,8 +5,10 @@ import httpx
 from deadwax.core import Dossier, LookupOptions, Query, SourceInfo, run
 from deadwax.sources._base import HttpAdapter
 from deadwax.sources._http import HttpResources, open_cache
+from deadwax.sources.bandcamp import BandcampAdapter
 from deadwax.sources.config import SourcesConfig
 from deadwax.sources.deezer import DeezerAdapter
+from deadwax.sources.discogs import DiscogsAdapter
 from deadwax.sources.itunes import ItunesAdapter
 from deadwax.sources.musicbrainz import MusicBrainzAdapter
 from deadwax.sources.odesli import OdesliAdapter
@@ -17,6 +19,8 @@ ADAPTERS: tuple[type[HttpAdapter], ...] = (
     OdesliAdapter,
     ItunesAdapter,
     DeezerAdapter,
+    DiscogsAdapter,
+    BandcampAdapter,
 )
 
 

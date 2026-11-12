@@ -227,6 +227,9 @@ def print_dossier(dossier: Dossier, output: OutputFormat, console: Console | Non
 def _status(info: SourceInfo) -> Text:
     status = info.status
     if status.state is SourceState.READY:
+        if status.detail and info.requires:
+            wanted = ", ".join(f"{env_variable(r.setting)} for {r.purpose}" for r in info.requires)
+            return Text(f"ready; set {wanted}", style="green")
         return Text("ready", style="green")
     if status.state is SourceState.MISSING_CREDENTIAL and info.requires:
         names = ", ".join(env_variable(r.setting) for r in info.requires)

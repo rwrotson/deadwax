@@ -22,6 +22,12 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.sources.itunes` | Find Apple Music links and previews with the iTunes Search API |
 | `deadwax.sources.deezer` | Find Deezer links, ISRCs and barcodes with the Deezer API |
 | `deadwax.sources.odesli` | Expand a streaming link to all platforms with Odesli (API key) |
+| `deadwax.sources.discogs.adapter` | Read masters, releases, versions, artists, labels, and reviews from Discogs |
+| `deadwax.sources.discogs.parse` | Turn Discogs responses into identity and facts |
+| `deadwax.sources.discogs.models` | Model Discogs API responses |
+| `deadwax.sources.bandcamp.adapter` | Find and read Bandcamp album and track pages |
+| `deadwax.sources.bandcamp.parse` | Read Bandcamp page data, JSON-LD, search results, and label pages |
+| `deadwax.sources.bandcamp.models` | Model Bandcamp page data and API responses |
 | `deadwax.logs.settings` | Define logging settings |
 | `deadwax.logs.setup` | Configure console and file logging for applications |
 | `deadwax.cli.settings` | Load command settings from the environment |

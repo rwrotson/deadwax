@@ -191,7 +191,10 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
         "odesli": "missing_credential",
         "itunes": "disabled",
         "deezer": "ready",
+        "discogs": "ready",
+        "bandcamp": "ready",
     }
+    assert "DEADWAX_DISCOGS__TOKEN" in table.stdout
 
 
 def test_settings_configure_logging(

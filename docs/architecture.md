@@ -47,13 +47,12 @@ From top to bottom:
 ```
 deadwax.sources.lookup        composition: builds adapters and runs the orchestrator
 musicbrainz | itunes | deezer | odesli | discogs | bandcamp | lastfm | wikipedia
-deadwax.sources._base         adapter base class, service names of URLs, search keys
-deadwax.sources._html
+deadwax.sources._base | _html adapter base class, service names of URLs, search keys | HTML and JSON-LD helpers
 deadwax.sources._http
 deadwax.sources.config
 ```
 
-Adapters are independent: they never import each other, and data found by one adapter reaches another only through `LookupContext`. A helper needed by two adapters moves down into `_base`, `_html`, or `_http`. The contract lists the layers that exist; Discogs, Bandcamp, Last.fm, Wikipedia, and `_html` join it when they are added. An adapter that grows into a package gets its own layers contract (`musicbrainz`: `adapter`, `parse`, `models`).
+Adapters are independent: they never import each other, and data found by one adapter reaches another only through `LookupContext`. A helper needed by two adapters moves down into `_base`, `_html`, or `_http`; `_base` and `_html` are independent of each other. The contract lists the layers that exist; Last.fm and Wikipedia join it when they are added. An adapter that grows into a package gets its own layers contract with `adapter`, `parse`, `models` (`musicbrainz`, `discogs`, `bandcamp`).
 
 Inside `deadwax.sources._http` (contract "R8: HTTP stack modules"), from top to bottom:
 

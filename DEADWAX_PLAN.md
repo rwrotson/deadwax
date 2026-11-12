@@ -4,7 +4,7 @@
 
 This is the implementation specification and multi-session handoff for deadwax. It is meant to be sufficient for an engineer or coding agent starting without the planning conversation. The original request (Russian, 2026-11-12) asked for a library and CLI that collects, for one track or album, everything open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links.
 
-- **Status:** Stages 0–4 complete; Stage 5 next (see the status table).
+- **Status:** Stages 0–5 complete; Stage 6 next (see the status table).
 - **Branch:** `main`. Stage 0 was committed by the user as `df3befa`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -169,7 +169,7 @@ Rate limits/TTL defaults per adapter in `sources/config.py`; all overridable.
 | 2 | Complete | Adapter protocol, two-pass orchestrator; HTTP stack: profiles, rate limiter, retry, cache, challenge detection, escalation ladder. |
 | 3 | Complete | MusicBrainz, iTunes, Deezer, Odesli (key only), URL resolution, recorded fixtures, `lookup()`. |
 | 4 | Complete | CLI: lookup and `sources`, formats, settings with TOML config, cache directory; first manual run. |
-| 5 | Not started | Bandcamp and Discogs (reviews through the escalation ladder). |
+| 5 | Complete | Bandcamp and Discogs (reviews through the escalation ladder). |
 | 6 | Not started | Last.fm and Wikipedia/Wikidata. |
 | 7 | Not started | README source tiers, docs, full checks, manual runs on five records, final report. |
 
@@ -219,8 +219,8 @@ Rate limits/TTL defaults per adapter in `sources/config.py`; all overridable.
 
 ### Stage 5: Bandcamp and Discogs
 
-- [ ] Bandcamp: data-tralbum, data-embed, JSON-LD, supported-by, recommendations, label page, search API with HTML fallback, mobile API fallback.
-- [ ] Discogs: master, release, versions, compilations search, label releases, artist members, reviews through the escalation ladder.
+- [x] Bandcamp: data-tralbum, data-embed, JSON-LD, supported-by, recommendations, label page, search API with HTML fallback, mobile API fallback.
+- [x] Discogs: master, release, versions, compilations search, label releases, artist members, reviews through the escalation ladder.
 
 **Acceptance:** fixture tests for every extraction path, missing token behaviour, blocked page. **Suggested message:** `feat(sources): add Bandcamp and Discogs adapters`.
 
@@ -299,8 +299,29 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-12 | Pretty output groups tags into one line per scope and kind; JSON and Markdown keep every tag with its weight. httpx and httpcore loggers are set to WARNING unless `--verbose`. | Paranoid Android has 70+ single-vote MusicBrainz tags; httpx logs every request at INFO. | 4 |
 | 2026-11-12 | `--timeout` sets the per-source lookup timeout (`adapter_timeout`), not the HTTP request timeout. `deadwax sources` also prints JSON and Markdown. | The plan's forced-failure check uses `--timeout 0.01`; programs need the source list too. | 4 |
 | 2026-11-12 | Non-Latin names are compared as written; a store listing "Кино" as "Kino" yields `no_match`. Alias-aware matching is a later, separate change. | No transliteration (Stage 1 decision); MusicBrainz aliases are not yet carried in the context. | 3+ |
+| 2026-11-12 | Every source has a `user_agent` setting; Discogs defaults to httpx's own (`python-httpx/<version>`), the other API sources keep `deadwax/<version> (+contact)`, Bandcamp the browser profile. | Discogs answered 403 to every User-Agent naming deadwax (`deadwax/0.1.0`, with and without `(+URL)`, `DeadwaxClient/0.1 +URL`) and 200 to `curl/8.7.1` and `python-httpx/0.28.1` from the same network (checked by the user); user choice. | 5 |
+| 2026-11-12 | Discogs is ready without a token: it reads records by the Discogs IDs earlier passes found, at 25 requests a minute; search and compilations need `discogs.token`, and a lookup that would need search returns a `skipped` error. `deadwax sources` shows `ready; set DEADWAX_DISCOGS__TOKEN for search and compilations`. | MusicBrainz gives Discogs masters for most records; Discogs' anonymous limit is 25/min. | 5 |
+| 2026-11-12 | Discogs reviews come from the release page through the browser profile and the ladder; a refused page (or a missing escalation browser) adds a `blocked`/`failed` error with a `reviews:` reason and keeps every API fact. Reviews are read from JSON-LD `review` entries. | The page answered 403 to plain httpx; its markup could not be inspected, so the parser follows schema.org and is not live-verified. | 5 |
+| 2026-11-12 | Discogs' "Not On Label" placeholder (and catalog number "none") is not a label, and placeholder aliases ("Unknown") are not relations; " (2)" disambiguation suffixes are removed from names. | Kino's release is self-released; the old code would have listed the placeholder's catalog of unrelated releases. | 5 |
+| 2026-11-12 | Bandcamp reads the page (`data-tralbum`, `data-embed`, JSON-LD, recommendations) and also the mobile `tralbum_details` API, which alone names the label; the mobile API is also the fallback when a page is blocked. The label's `/music` page is read only when that label is the selling account. | Neither markup nor JSON-LD tells a label account from an artist account (`label-band-selector` is on every page); the publisher of Huerco S.'s album is the artist's personal account. | 5 |
+| 2026-11-12 | Bandcamp's HTML search runs only when the search endpoint fails, not when it finds nothing; the HTML search page is behind a Fastly "Client Challenge" (marker `/_fs-ch-` added to challenge detection). | A search without results reported `blocked` instead of `not_found`. | 5 |
+| 2026-11-12 | A Bandcamp track whose album has another artist (a compilation or third-party upload) contributes only identity, links, its own credits and notes, and a `compilation` relation; the album's tags, recommendations, fan texts, date, label, and seller are dropped. | The Todd Terry remix was found on an unofficial compilation whose SEO tags and 2007 date entered the dossier and a date discrepancy. | 5 |
+| 2026-11-12 | Fixtures are recorded in a hybrid mode: existing MusicBrainz, iTunes and Deezer fixtures are replayed and only Bandcamp and Discogs are recorded live (`--live` chooses); requests with a body are keyed with a body hash; recording and source tests run with `escalation=none`. | Keeps Stage 3 fixtures stable; Bandcamp search is a POST to one URL; curl_cffi opens sockets pytest-socket cannot block. | 5 |
+| 2026-11-12 | Tracks from the user's library are not fixtures but opt-in live integration tests (`tests/integration`, collected only with `--live`, `poe test-live`) that check invariants and print a report. | ~25–30 MB of fixtures otherwise; live data changes; user choice. | 5, 7 |
 
-**Current task:** Stage 4 complete. **Next action:** user review and commit; then Stage 5 on request.
+**Current task:** Stage 5 complete. **Next action:** user review and commit; then Stage 6 on request.
+
+### 2026-11-12 — Stage 5 qualification
+
+Live probes before coding (this machine, through the local proxy): Bandcamp album and track pages, the `bcsearch_public_api` autocomplete endpoint (POST JSON), and the mobile `api/mobile/24/tralbum_details` answered plain httpx; the HTML `/search` page answered a Fastly "Client Challenge" with status 200. Discogs API and pages answered a branded 403 to every User-Agent containing "deadwax" and 200 to library User-Agents (see decisions); with `python-httpx` the API shapes of master, release, versions, artist, and label releases were confirmed. The Discogs release page and Bandcamp HTML search could not be inspected: the auto-mode classifier refused fetching them with browser headers, and no workaround was tried.
+
+Added `sources/_html.py` (lexbor parser, text, attributes, JSON in attributes, JSON-LD by type), the `bandcamp` package (`models`, `parse`: page record from data attributes and JSON-LD, fan comments, recommendations, "X by Y" credit lines, mobile details, compilation rule, search results, HTML search, label grid; `adapter`: query URL, MusicBrainz links of the right kind first, search; album↔track page moves; mobile API for the label and as blocked-page fallback; label page), and the `discogs` package (`models`, `parse`: names without disambiguation, roles with details, track ranges, release and track credits, notes as wiki texts, labels without placeholders, barcodes, versions, members/groups/aliases, label releases, compilations, search results, JSON-LD reviews; `adapter`: query IDs, earlier-pass IDs, token search; master → main release; versions, artist, label catalog, compilations with token, reviews through a second browser-profile client). `SourceSettings.user_agent` for every source; `HttpAdapter.client_spec()`; Discogs status detail and the CLI sources table hint. Contracts: R4 now `lookup` → `musicbrainz | itunes | deezer | odesli | discogs | bandcamp` → `_base | _html` → `_http` → `config`; new "R8: Bandcamp adapter modules" and "R8: Discogs adapter modules" (16 contracts). `scripts/record_fixtures.py` gained the hybrid mode, `--live`, body-hash keys, the Discogs token from `DEADWAX_DISCOGS__TOKEN`, and scenarios `bandcamp_url`, `discogs_url`. `tests/integration/test_library.py` holds 22 tracks from the user's library (tags read from the files; "Various Artists" tracks use the artist from the title; one untagged file its name).
+
+Fixtures recorded by the user on 2026-11-12 (`uv run python scripts/record_fixtures.py`, no Discogs token, `escalation=none`): Bandcamp and Discogs for all nine scenarios (3.6 MB of new fixture files), all sources for `bandcamp_url` and `discogs_url` (MusicBrainz answered three 503s, recovered). Live-verified through that run: Discogs API by IDs from MusicBrainz for Paranoid Android (master 21491), Huerco S. (1016511), Кино (90716, a "Not On Label" self-release), and the OK Computer URL; the Discogs release page answered 403 every time (reported `blocked`, API facts kept); Bandcamp found Paranoid Android and OK Computer on `radiohead.bandcamp.com` and Кино on `kinogroup.bandcamp.com` through the search endpoint, read Huerco S. from the MusicBrainz link and from the URL query (resolver first), labelled it "West Mineral Ltd." from the mobile API, and found the Todd Terry remix only on a third-party compilation (now reduced by the compilation rule); the remix and the unknown query have no Discogs ID and report `skipped`. Afterwards one recorded entry each was removed: Bandcamp HTML search in `no_match` and the "Not On Label" catalog in `kino`, which the fixed code no longer requests.
+
+Mock-tested only: Discogs search and compilations (no token), reviews parsing (hand-written JSON-LD), the escalation path of the review page, Bandcamp HTML search markup, the label `/music` page as a lookup step (parsed from a real artist page), and the blocked-page mobile fallback. Not run: `deadwax` CLI live runs with escalation, `poe test-live`, pre-commit hooks, `poe audit`, CI.
+
+Checks: `uv run poe check` passed (Ruff format and lint, 16 contracts kept, mypy strict, 478 tests, 99.25% branch coverage); `uv run --group docs properdocs build --strict` passed. No commit was created.
 
 ### 2026-11-12 — Stage 4 qualification
 
