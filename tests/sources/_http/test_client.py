@@ -497,3 +497,55 @@ def test_default_resources() -> None:
     assert resources.now().tzinfo is UTC
     assert client_module._installed("json")
     assert not client_module._installed("deadwax_missing_package")
+
+
+type Traced = Callable[[str], list[dict[str, object]]]
+
+
+@pytest.mark.asyncio
+async def test_requests_are_traced_with_cache_state_and_body_digest(
+    tmp_path: Path,
+    traced: Traced,
+) -> None:
+    setup = Setup(Server([httpx.Response(200, text="ok")]))
+    setup.cache = ResponseCache(tmp_path / "cache.sqlite")
+
+    async with setup.client(secret_params=frozenset({"key"})) as client:
+        await client.get(URL, params={"q": "a", "key": "secret"})
+        await client.get(URL, params={"q": "a", "key": "secret"})
+    setup.cache.close()
+
+    miss, hit = traced("http.request")
+    assert miss["url"] == f"{URL}?q=a"
+    assert (miss["cache"], miss["status"], miss["attempts"]) == ("miss", 200, 1)
+    assert miss["fetchers"] == ["httpx"]
+    assert miss["bytes"] == 2
+    assert miss["sha256"] == "2689367b205c16ce32ed4200942b8b8b1e262dfc70d9bc9fbc77c49699a4f1df"
+    assert (hit["cache"], hit["attempts"], hit["sha256"]) == ("hit", 0, miss["sha256"])
+
+
+@pytest.mark.asyncio
+async def test_failed_requests_and_retries_are_traced(traced: Traced) -> None:
+    setup = Setup(Server([httpx.Response(503), httpx.Response(404)]))
+
+    async with setup.client() as client:
+        with pytest.raises(NotFoundError):
+            await client.get(URL)
+
+    [retry] = traced("http.retry")
+    assert retry["status"] == 503
+    [request] = traced("http.request")
+    assert (request["cache"], request["status"], request["attempts"]) == ("off", 404, 2)
+
+
+@pytest.mark.asyncio
+async def test_transport_failures_are_traced_as_errors(traced: Traced) -> None:
+    setup = Setup(Server([httpx.ConnectError("refused")]), retries=0)
+
+    async with setup.client() as client:
+        with pytest.raises(TransportError):
+            await client.get(URL)
+
+    [request] = traced("http.request")
+    assert "status" not in request
+    assert request["error"] == {"type": "TransportError", "message": "ConnectError: refused"}

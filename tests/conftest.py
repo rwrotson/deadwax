@@ -1,6 +1,6 @@
 import logging
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -52,3 +52,18 @@ def clean_root_logger(restore_logging: None) -> logging.Logger:
     root = logging.getLogger()
     root.handlers = []
     return root
+
+
+@pytest.fixture
+def traced(caplog: pytest.LogCaptureFixture) -> Callable[[str], list[dict[str, object]]]:
+    """Capture deadwax debug records; the returned function lists one event's fields."""
+    caplog.set_level(logging.DEBUG, logger="deadwax")
+
+    def events(name: str) -> list[dict[str, object]]:
+        return [
+            dict(getattr(record, "deadwax", {}))
+            for record in caplog.records
+            if record.getMessage() == name
+        ]
+
+    return events

@@ -1,7 +1,9 @@
+import logging
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from enum import StrEnum
 
+from deadwax.core.events import trace
 from deadwax.core.models import VersionInfo, VersionKind
 from deadwax.core.normalize import normalize_artist, normalize_text, split_artists
 from deadwax.core.query import EntityKind
@@ -16,6 +18,8 @@ COLLABORATION_SCORE = 0.9
 # Versions whose marker names a person or event: different details mean different recordings.
 _DETAILED_KINDS = frozenset({VersionKind.REMIX, VersionKind.LIVE})
 _DETAIL_THRESHOLD = 0.6
+
+logger = logging.getLogger(__name__)
 
 
 class Verdict(StrEnum):
@@ -39,6 +43,12 @@ class RecordKey:
     def resolved_version(self) -> VersionInfo:
         """Explicit version, or the one derived from the title."""
         return self.version if self.version is not None else parse_title(self.title).version
+
+    def describe(self) -> dict[str, object]:
+        """Return the key as JSON values for trace events."""
+        version = self.resolved_version
+        label = str(version.kind) if version.detail is None else f"{version.kind}: {version.detail}"
+        return {"artist": self.artist, "title": self.title, "kind": self.kind, "version": label}
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,11 +108,28 @@ def compare(reference: RecordKey, candidate: RecordKey) -> Match:
     """Decide whether a candidate is the reference record, another version of it, or unrelated."""
     artist_score = artist_similarity(reference.artist, candidate.artist)
     title_score = title_similarity(reference.title, candidate.title)
-    kinds_differ = None not in (reference.kind, candidate.kind) and reference.kind != candidate.kind
-    if kinds_differ or artist_score < ARTIST_THRESHOLD or title_score < TITLE_THRESHOLD:
+    failed: list[str] = []
+    if None not in (reference.kind, candidate.kind) and reference.kind != candidate.kind:
+        failed.append("kind")
+    if artist_score < ARTIST_THRESHOLD:
+        failed.append("artist")
+    if title_score < TITLE_THRESHOLD:
+        failed.append("title")
+    if failed:
         verdict = Verdict.NO_MATCH
     elif same_version(reference.resolved_version, candidate.resolved_version):
         verdict = Verdict.MATCH
     else:
         verdict = Verdict.OTHER_VERSION
+
+    trace(
+        logger,
+        "match.compare",
+        reference=reference.describe(),
+        candidate=candidate.describe(),
+        artist_score=round(artist_score, 3),
+        title_score=round(title_score, 3),
+        verdict=verdict,
+        failed=failed,
+    )
     return Match(verdict=verdict, artist_score=artist_score, title_score=title_score)

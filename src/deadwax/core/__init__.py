@@ -20,6 +20,7 @@ from .errors import (
     RateLimitedError,
     SourceError,
 )
+from .events import TRACE_ATTRIBUTE, TraceFilter, trace, trace_fields, trace_scope
 from .markdown import to_markdown
 from .matching import Match, RecordKey, Verdict, artist_similarity, compare, title_similarity
 from .merge import QUERY_SOURCE, build_identity, merge
@@ -70,6 +71,7 @@ from .versions import ParsedTitle, classify_marker, parse_title
 
 __all__ = [
     "QUERY_SOURCE",
+    "TRACE_ATTRIBUTE",
     "Adapter",
     "AdapterError",
     "Attributed",
@@ -122,6 +124,7 @@ __all__ = [
     "TagKind",
     "Text",
     "TextKind",
+    "TraceFilter",
     "Verdict",
     "VersionInfo",
     "VersionKind",
@@ -143,4 +146,7 @@ __all__ = [
     "split_featuring",
     "title_similarity",
     "to_markdown",
+    "trace",
+    "trace_fields",
+    "trace_scope",
 ]

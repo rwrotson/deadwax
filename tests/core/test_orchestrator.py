@@ -413,3 +413,61 @@ async def test_default_clock_is_aware() -> None:
     dossier = await run(TRACK, [])
 
     assert dossier.generated_at.tzinfo is not None
+
+
+type Traced = Callable[[str], list[dict[str, object]]]
+
+
+async def test_lookup_traces_selection_passes_and_adapter_outcomes(traced: Traced) -> None:
+    other = found("discogs", title="Driving")
+    adapters = [
+        FakeAdapter("musicbrainz", Pass.IDENTITY),
+        FakeAdapter("discogs", behaviour=returning(other)),
+        FakeAdapter("lastfm", behaviour=raising(NotFoundError("no page", url="https://x"))),
+        FakeAdapter("bandcamp", state=SourceState.MISSING_EXTRA),
+        FakeAdapter("kexp"),
+    ]
+    options = LookupOptions(exclude=frozenset({"kexp"}))
+
+    await lookup(adapters, options=options)
+
+    [selected] = traced("lookup.selected")
+    assert selected["ready"] == ["musicbrainz", "discogs", "lastfm"]
+    assert selected["skipped"] == {"bandcamp": "missing_extra"}
+    assert selected["not_selected"] == ["kexp"]
+    assert [(e["pass"], e["sources"]) for e in traced("pass.start")] == [
+        ("identity", ["musicbrainz"]),
+        ("enrich", ["discogs", "lastfm"]),
+    ]
+    ends = {event["source"]: event for event in traced("adapter.end")}
+    assert ends["musicbrainz"]["outcome"] == "ok"
+    assert ends["musicbrainz"]["pass"] == "identity"
+    assert ends["musicbrainz"]["facts"] == {
+        "tags": 1,
+        "credits": 0,
+        "texts": 0,
+        "relations": 0,
+        "metrics": 0,
+        "links": 0,
+    }
+    assert ends["lastfm"]["outcome"] == "error"
+    assert ends["lastfm"]["errors"] == [
+        {"kind": "not_found", "reason": "no page", "url": "https://x"},
+    ]
+    judged = {(e["source"], e["stage"]): e["verdict"] for e in traced("merge.judge")}
+    assert judged[("musicbrainz", "context")] == "match"
+    assert judged[("discogs", "final")] == "no_match"
+    compared = [e for e in traced("match.compare") if e.get("source") == "discogs"]
+    assert compared[-1]["failed"] == ["title"]
+
+
+async def test_url_lookup_traces_its_resolver_and_adopted_kind(traced: Traced) -> None:
+    query = Query(url="https://artist.bandcamp.com/x")
+    page = found("bandcamp", kind=EntityKind.ALBUM)
+    bandcamp = FakeAdapter("bandcamp", Pass.ENRICH, returning(page), resolves_urls=True)
+
+    await lookup([bandcamp], query)
+
+    assert traced("lookup.resolver") == [{"source": "bandcamp"}]
+    assert traced("lookup.kind_adopted") == [{"kind": "album"}]
+    assert [e["pass"] for e in traced("adapter.end")] == ["resolve"]

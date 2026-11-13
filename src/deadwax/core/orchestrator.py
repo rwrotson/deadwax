@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import logging
+import time
 from collections.abc import Callable, Collection, Sequence
 from datetime import UTC, datetime
 
@@ -14,6 +15,7 @@ from deadwax.core.errors import (
     RateLimitedError,
     SourceError,
 )
+from deadwax.core.events import trace, trace_scope
 from deadwax.core.merge import merge
 from deadwax.core.models import AdapterError, Dossier, ErrorKind, Partial
 from deadwax.core.query import Query
@@ -36,6 +38,28 @@ def _failure(adapter: Adapter, kind: ErrorKind, reason: str, url: str | None = N
     return Partial(source=adapter.name, errors=[error])
 
 
+def _milliseconds(start: float) -> int:
+    return round((time.monotonic() - start) * 1000)
+
+
+def _outcome(partial: Partial) -> dict[str, object]:
+    """Describe an adapter's result for the `adapter.end` event."""
+    candidate = partial.candidate
+    return {
+        "outcome": "error" if partial.errors else "ok",
+        "errors": [error.model_dump(mode="json", exclude={"source"}) for error in partial.errors],
+        "candidate": None if candidate is None else candidate.model_dump(mode="json"),
+        "facts": {
+            "tags": len(partial.tags),
+            "credits": len(partial.credits),
+            "texts": len(partial.texts),
+            "relations": len(partial.relations),
+            "metrics": len(partial.metrics),
+            "links": len(partial.links),
+        },
+    }
+
+
 async def _call(
     adapter: Adapter,
     query: Query,
@@ -47,8 +71,19 @@ async def _call(
 
     The timeout starts once the adapter has a slot, so waiting for one costs it nothing.
     """
-    async with slots or contextlib.nullcontext():
-        return await _timed(adapter, query, context, seconds)
+    queued = time.monotonic()
+    with trace_scope(source=adapter.name):
+        async with slots or contextlib.nullcontext():
+            started = time.monotonic()
+            partial = await _timed(adapter, query, context, seconds)
+        trace(
+            logger,
+            "adapter.end",
+            duration_ms=_milliseconds(started),
+            slot_wait_ms=round((started - queued) * 1000),
+            **_outcome(partial),
+        )
+        return partial
 
 
 async def _timed(adapter: Adapter, query: Query, context: LookupContext, seconds: float) -> Partial:
@@ -127,6 +162,20 @@ def _select(
         elif status.state is not SourceState.DISABLED:
             reason = status.detail or status.state.value
             skipped.append(AdapterError(source=adapter.name, kind=ErrorKind.SKIPPED, reason=reason))
+
+    trace(
+        logger,
+        "lookup.selected",
+        include=None if options.include is None else sorted(options.include),
+        exclude=sorted(options.exclude),
+        ready=[adapter.name for adapter in ready],
+        skipped={error.source: error.reason for error in skipped},
+        not_selected=sorted(
+            adapter.name
+            for adapter in adapters
+            if adapter not in ready and adapter.name not in {e.source for e in skipped}
+        ),
+    )
     return ready, skipped
 
 
@@ -139,13 +188,33 @@ class _Run:
         self.slots = asyncio.Semaphore(options.concurrency) if options.concurrency else None
 
     def context(self) -> LookupContext:
-        dossier = merge(self.query, self.partials, generated_at=self.now())
+        with trace_scope(stage="context"):
+            dossier = merge(self.query, self.partials, generated_at=self.now())
         return LookupContext(query=self.query, identity=dossier.identity, links=dossier.links)
 
-    async def run(self, adapters: Sequence[Adapter]) -> None:
+    async def run(self, adapters: Sequence[Adapter], pass_: str) -> None:
         if not adapters:
             return
+        with trace_scope(**{"pass": pass_}):
+            await self._run(adapters)
+
+    async def _run(self, adapters: Sequence[Adapter]) -> None:
         context = self.context()
+        identity = context.identity
+        trace(
+            logger,
+            "pass.start",
+            sources=[adapter.name for adapter in adapters],
+            query=self.query.model_dump(mode="json"),
+            identity={
+                "kind": identity.kind,
+                "artist": None if identity.artist is None else identity.artist.value,
+                "title": None if identity.title is None else identity.title.value,
+                "version": identity.version.model_dump(mode="json"),
+                "external_ids": len(identity.external_ids),
+            },
+            links=len(context.links),
+        )
         async with asyncio.TaskGroup() as group:
             tasks = [
                 group.create_task(
@@ -168,6 +237,7 @@ class _Run:
         candidate = self.partials[0].candidate
         if candidate is not None and candidate.kind is not None:
             self.query = self.query.model_copy(update={"kind": candidate.kind})
+            trace(logger, "lookup.kind_adopted", kind=candidate.kind)
 
 
 async def run(
@@ -185,12 +255,13 @@ async def run(
     resolver = None
     if query.url is not None:
         resolver = next((adapter for adapter in ready if adapter.resolves(query)), None)
+        trace(logger, "lookup.resolver", source=None if resolver is None else resolver.name)
     if resolver is not None:
-        await lookup.run([resolver])
+        await lookup.run([resolver], "resolve")
         lookup.adopt_kind()
 
     remaining = [adapter for adapter in ready if adapter is not resolver]
-    await lookup.run([adapter for adapter in remaining if adapter.pass_ is Pass.IDENTITY])
-    await lookup.run([adapter for adapter in remaining if adapter.pass_ is Pass.ENRICH])
-    await lookup.run([adapter for adapter in remaining if adapter.pass_ is Pass.LINKS])
-    return merge(query, lookup.partials, skipped, generated_at=now())
+    for pass_ in Pass:
+        await lookup.run([adapter for adapter in remaining if adapter.pass_ is pass_], pass_)
+    with trace_scope(stage="final"):
+        return merge(query, lookup.partials, skipped, generated_at=now())

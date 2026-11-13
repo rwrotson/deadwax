@@ -1,3 +1,4 @@
+import logging
 import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping
@@ -21,9 +22,15 @@ from deadwax.core import (
     Verdict,
     compare,
     recognize_url,
+    trace,
 )
 from deadwax.sources._http import ClientSpec, HttpClient, HttpResources, Profile
 from deadwax.sources.config import SourcesConfig, SourceSettings
+
+# Search results listed in a `search.pick` or `search.ranked` event.
+TRACED_HITS = 25
+
+logger = logging.getLogger(__name__)
 
 
 class HttpAdapter(ABC):
@@ -179,14 +186,29 @@ def pick_hit(reference: RecordKey, hits: Iterable[SearchHit]) -> SearchHit | Non
 
     The merge turns another version into a relation and a version discrepancy.
     """
-    other_version = None
+    seen: list[dict[str, object]] = []
+    picked = other_version = None
     for hit in hits:
         verdict = compare(reference, hit.key).verdict
+        seen.append(
+            {"url": hit.url, "artist": hit.key.artist, "title": hit.key.title, "verdict": verdict},
+        )
         if verdict is Verdict.MATCH:
-            return hit
+            picked = hit
+            break
         if verdict is Verdict.OTHER_VERSION and other_version is None:
             other_version = hit
-    return other_version
+    picked = picked or other_version
+
+    trace(
+        logger,
+        "search.pick",
+        reference=reference.describe(),
+        hits=seen[:TRACED_HITS],
+        compared=len(seen),
+        picked=None if picked is None else picked.url,
+    )
+    return picked
 
 
 class SearchPageAdapter(HttpAdapter):

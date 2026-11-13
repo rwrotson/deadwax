@@ -187,6 +187,26 @@ async def test_version_only_in_the_comment_is_found_with_the_base_title() -> Non
     assert partial.candidate.version.kind is VersionKind.REMIX
 
 
+@pytest.mark.asyncio
+async def test_search_narrowing_is_traced(
+    traced: Callable[[str], list[dict[str, object]]],
+) -> None:
+    query = parse_query("Everything but the Girl - Missing", EntityKind.TRACK)
+    other = {**RECORDING, "id": MBID.format(5), "title": "Driving"}
+    routes = {
+        "recording": {"recordings": [other, RECORDING]},
+        f"recording/{RECORDING['id']}": RECORDING,
+        **artist_route(),
+    }
+
+    await lookup(query, routes)
+
+    [event, *_] = traced("search.ranked")
+    assert event["results"] == 2
+    assert event["picked"] == RECORDING["id"]
+    assert event["matched"] == [{"id": RECORDING["id"], "title": "Missing"}]
+
+
 @pytest.mark.parametrize(
     "query",
     [

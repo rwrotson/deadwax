@@ -1,7 +1,9 @@
 import asyncio
+import hashlib
 import importlib.util
 import logging
 import random
+import time
 from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -17,6 +19,7 @@ from deadwax.core import (
     NotFoundError,
     RateLimitedError,
     SourceError,
+    trace,
 )
 from deadwax.sources._http.browser import BrowserFetcher
 from deadwax.sources._http.cache import ResponseCache, cache_key
@@ -129,6 +132,15 @@ class HttpResources:
     rng: random.Random = field(default_factory=random.Random)
 
 
+@dataclass(slots=True)
+class _Exchange:
+    """What happened to one request, for its `http.request` event."""
+
+    cache: str
+    fetchers: list[str] = field(default_factory=list)
+    attempts: int = 0
+
+
 @dataclass(frozen=True, slots=True)
 class ClientSpec:
     """How one adapter talks to its source."""
@@ -231,18 +243,60 @@ class HttpClient:
             headers=tuple((headers or {}).items()),
             body=body,
         )
+        exchange = _Exchange(cache="off" if self._resources.cache is None else "miss")
+        started = time.monotonic()
+        try:
+            response = await self._request(request, exchange)
+        except SourceError as error:
+            self._trace(request, exchange, started, None, error)
+            raise
+        self._trace(request, exchange, started, response, None)
+        return self._check(response)
+
+    def _trace(
+        self,
+        request: Request,
+        exchange: _Exchange,
+        started: float,
+        response: Response | None,
+        error: SourceError | None,
+    ) -> None:
+        fields: dict[str, object] = {
+            "method": request.method,
+            "url": redact(request.full_url, self.spec.secret_params),
+            "cache": exchange.cache,
+            "fetchers": exchange.fetchers,
+            "attempts": exchange.attempts,
+            "duration_ms": round((time.monotonic() - started) * 1000),
+        }
+        if response is not None:
+            fields |= {
+                "status": response.status,
+                "final_url": response.url,
+                "content_type": response.headers.get("content-type"),
+                "bytes": len(response.content),
+                "sha256": hashlib.sha256(response.content).hexdigest(),
+            }
+        if error is not None:
+            fields["error"] = {"type": type(error).__name__, "message": str(error)}
+        trace(logger, "http.request", **fields)
+
+    async def _request(self, request: Request, exchange: _Exchange) -> Response:
+        """Return the response from the cache or the source, without checking its status."""
         cache = self._resources.cache
         key = cache_key(self.spec.source, request, self.spec.secret_params)
         if cache is not None and (cached := await cache.get(key)) is not None:
-            logger.debug("%s cache hit %s", self.spec.source, cached.url)
+            exchange.cache = "hit"
             blocked = cached.headers.get(_BLOCKED_HEADER)
             if blocked is None:
-                return self._check(cached)
+                return cached
             if cached.headers.get(_ROUTE_HEADER, _ENVIRONMENT_ROUTE) == self._route:
+                exchange.cache = "blocked"
                 raise BlockedError(f"{blocked} (cached)", url=cached.url)
+            exchange.cache = "miss"
 
         try:
-            response = await self._fetch(request)
+            response = await self._fetch(request, exchange)
         except BlockedError as error:
             if cache is not None and error.url is not None:
                 marker = Response(
@@ -263,7 +317,7 @@ class HttpClient:
             await cache.put(key, response, self._config.ttl(self.spec.source))
         elif cache is not None and response.status == _NOT_FOUND:
             await cache.put(key, response, self._config.cache.not_found_ttl)
-        return self._check(response)
+        return response
 
     def _check(self, response: Response) -> Response:
         if response.ok:
@@ -282,14 +336,14 @@ class HttpClient:
             self._escalated[step] = self._resources.escalations[step](self._settings, self._proxy)
         return self._escalated[step]
 
-    async def _fetch(self, request: Request) -> Response:
+    async def _fetch(self, request: Request, exchange: _Exchange) -> Response:
         safe_url = redact(request.full_url, self.spec.secret_params)
         reason = ""
         tried: list[str] = []
         for level in range(self._level, len(self._steps) + 1):
             try:
                 fetcher = self._fetcher(level)
-                response = await self._attempt(fetcher, request, safe_url)
+                response = await self._attempt(fetcher, request, safe_url, exchange)
             except SourceError as error:
                 error.url = error.url or safe_url
                 raise
@@ -304,7 +358,7 @@ class HttpClient:
                 self._level = level
                 return response
             reason = challenge
-            logger.debug("%s: %s via %s", self.spec.source, challenge, fetcher.name)
+            trace(logger, "http.challenge", url=safe_url, challenge=challenge, fetcher=fetcher.name)
         unavailable = f"; {self._unavailable}" if self._unavailable else ""
         raise BlockedError(f"{reason} (tried {', '.join(tried)}{unavailable})", url=safe_url)
 
@@ -315,7 +369,7 @@ class HttpClient:
         setting keeps reporting the missing step as a configuration error.
         """
         step = self._steps[level - 1]
-        logger.debug("%s: %s step unavailable: %s", self.spec.source, step, error)
+        trace(logger, "http.step_dropped", step=step, reason=str(error))
         self._unavailable = f"{step} unavailable: {error}"
         del self._steps[level - 1 :]
         if (fetcher := self._escalated.pop(step, None)) is not None:
@@ -326,7 +380,13 @@ class HttpClient:
             return False
         return detect_challenge(response.status, response.headers, response.content) is None
 
-    async def _attempt(self, fetcher: Fetcher, request: Request, safe_url: str) -> Response:
+    async def _attempt(
+        self,
+        fetcher: Fetcher,
+        request: Request,
+        safe_url: str,
+        exchange: _Exchange,
+    ) -> Response:
         """Send one request through a transport, retrying on 429, 5xx, and network errors."""
         host = urlsplit(request.url).hostname or ""
         limiter = self._resources.limiters.get(host, self._config.rate(self.spec.source))
@@ -335,13 +395,15 @@ class HttpClient:
 
         while True:
             await limiter.acquire()
+            exchange.attempts += 1
+            exchange.fetchers.append(fetcher.name)
             try:
                 response = await fetcher.fetch(request)
             except TransportError as error:
                 if attempt >= self._policy.retries:
                     raise
                 delay = self._policy.backoff(attempt, rng)
-                logger.debug("%s retry %s after %s", self.spec.source, safe_url, error)
+                trace(logger, "http.retry", url=safe_url, error=str(error), delay_s=delay)
             else:
                 if attempt >= self._policy.retries or not self._should_retry(response):
                     return response
@@ -349,11 +411,6 @@ class HttpClient:
                 delay = self._policy.delay(attempt, retry_after, rng, self._resources.now())
                 if delay > self._policy.max_wait:
                     raise RateLimitedError(f"asked to wait {delay:.0f} s", url=safe_url)
-                logger.debug(
-                    "%s retry %s after HTTP %s",
-                    self.spec.source,
-                    safe_url,
-                    response.status,
-                )
+                trace(logger, "http.retry", url=safe_url, status=response.status, delay_s=delay)
             await self._resources.sleep(delay)
             attempt += 1

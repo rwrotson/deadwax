@@ -279,7 +279,7 @@ containers = ["deadwax.core"]
 layers = [
     "orchestrator",
     "adapter | merge | markdown",
-    "matching", "versions", "normalize", "models", "query", "errors"]
+    "matching", "versions", "normalize", "models", "query", "errors | events"]
 
 [[tool.importlinter.contracts]]
 name = "R4: sources modules"

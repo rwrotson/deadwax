@@ -1,3 +1,5 @@
+import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from deadwax.core import (
@@ -16,8 +18,9 @@ from deadwax.core import (
     Scope,
     SourceGroup,
     parse_title,
+    trace,
 )
-from deadwax.sources._base import HttpAdapter, search_key
+from deadwax.sources._base import TRACED_HITS, HttpAdapter, search_key
 from deadwax.sources.musicbrainz import models
 from deadwax.sources.musicbrainz import parse as p
 
@@ -43,6 +46,24 @@ _RESOLVED_IDS = (
 )
 
 type Target = tuple[EntityKind, str]
+
+logger = logging.getLogger(__name__)
+
+
+def _trace_ranked(
+    query: str,
+    results: int,
+    ranked: Sequence[models.Recording | models.ReleaseGroup],
+) -> None:
+    """Record how a search was narrowed to the entities that match the reference."""
+    trace(
+        logger,
+        "search.ranked",
+        query=query,
+        results=results,
+        matched=[{"id": entity.id, "title": entity.title} for entity in ranked[:TRACED_HITS]],
+        picked=ranked[0].id if ranked else None,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +164,7 @@ class MusicBrainzAdapter(HttpAdapter):
         except NotFoundError:
             return None
         ranked = p.rank_recordings(reference, found.recordings)
+        _trace_ranked(f"isrc:{isrc}", len(found.recordings), ranked)
         return (EntityKind.TRACK, ranked[0].id) if ranked else None
 
     async def _search_recordings(self, query: str) -> models.RecordingSearch:
@@ -163,19 +185,22 @@ class MusicBrainzAdapter(HttpAdapter):
             for query in (f"{plain} AND {_MAIN_RELEASES}", plain):
                 found = await self._search_recordings(query)
                 ranked = p.rank_recordings(reference, found.recordings)
+                _trace_ranked(query, len(found.recordings), ranked)
                 if ranked:
                     return EntityKind.TRACK, ranked[0].id
         return None
 
     async def _search_album(self, reference: RecordKey) -> Target | None:
         title, artist = p.phrase(reference.title), p.phrase(reference.artist)
+        query = f"releasegroup:{title} AND artist:{artist}"
         found = await self._get(
             models.ReleaseGroupSearch,
             "release-group",
-            query=f"releasegroup:{title} AND artist:{artist}",
+            query=query,
             limit=_SEARCH_LIMIT,
         )
         ranked = p.rank_release_groups(reference, found.release_groups)
+        _trace_ranked(query, len(found.release_groups), ranked)
         return (EntityKind.ALBUM, ranked[0].id) if ranked else None
 
     async def _members(self, artist_credit: list[models.ArtistCredit]) -> list[Relation]:

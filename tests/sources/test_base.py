@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 
 import httpx
 import pytest
@@ -229,3 +229,19 @@ def test_pick_hit_prefers_the_record_and_falls_back_to_another_version() -> None
     assert pick_hit(reference, [unrelated, remix, original]) == original
     assert pick_hit(reference, [unrelated, remix]) == remix
     assert pick_hit(reference, [unrelated]) is None
+
+
+def test_pick_hit_traces_the_hits_it_compared(
+    traced: Callable[[str], list[dict[str, object]]],
+) -> None:
+    reference = RecordKey("Everything but the Girl", "Missing", EntityKind.TRACK)
+
+    pick_hit(reference, [hit("Driving", "/driving"), hit("Missing", "/missing"), hit("X", "/x")])
+
+    [event] = traced("search.pick")
+    assert event["picked"] == "/missing"
+    assert event["compared"] == 2
+    assert [(h["url"], h["verdict"]) for h in event["hits"]] == [  # type: ignore[attr-defined]
+        ("/driving", "no_match"),
+        ("/missing", "match"),
+    ]

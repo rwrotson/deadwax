@@ -3,6 +3,7 @@ from collections.abc import Callable, Hashable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from deadwax.core.events import trace, trace_scope
 from deadwax.core.matching import RecordKey, Verdict, compare
 from deadwax.core.models import (
     AdapterError,
@@ -122,13 +123,22 @@ def _judge(reference: RecordKey | None, partials: Iterable[Partial]) -> _Judgeme
         if candidate is None or reference is None:
             judgement.accepted.append(partial)
             continue
-        verdict = compare(reference, _candidate_key(candidate)).verdict
+        with trace_scope(source=partial.source):
+            match = compare(reference, _candidate_key(candidate))
+            trace(
+                logger,
+                "merge.judge",
+                verdict=match.verdict,
+                artist_score=round(match.artist_score, 3),
+                title_score=round(match.title_score, 3),
+                candidate_url=candidate.url,
+            )
+        verdict = match.verdict
         if verdict is Verdict.MATCH:
             judgement.accepted.append(partial)
         elif verdict is Verdict.OTHER_VERSION:
             judgement.other_versions.append(partial)
         else:
-            logger.debug("%s candidate %r does not match", partial.source, candidate)
             judgement.errors.append(
                 AdapterError(
                     source=partial.source,
@@ -460,7 +470,14 @@ def merge(
     generated_at: datetime,
 ) -> Dossier:
     """Build a dossier from adapter results, keeping only facts about the queried version."""
-    judgement = _judge(_reference(query, partials), partials)
+    reference = _reference(query, partials)
+    trace(
+        logger,
+        "merge.reference",
+        reference=None if reference is None else reference.describe(),
+        partials=len(partials),
+    )
+    judgement = _judge(reference, partials)
     identity = build_identity(query, judgement.accepted, judgement.other_versions)
     facts = _facts(identity.kind or EntityKind.TRACK, judgement.accepted, judgement.other_versions)
     return Dossier(
