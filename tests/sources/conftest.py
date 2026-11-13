@@ -16,6 +16,7 @@ SECRET_PARAMS = frozenset({"key", "api_key", "token"})
 FAST = {"rate": 1000}
 SOURCES = (
     "musicbrainz", "itunes", "deezer", "odesli", "discogs", "bandcamp", "lastfm", "wikipedia",
+    "listenbrainz", "secondhandsongs", "kexp",
 )  # fmt: skip
 
 

@@ -37,6 +37,11 @@ HOSTS = {
     "bandcamp.com": "bandcamp",
     "ws.audioscrobbler.com": "lastfm",
     "www.wikidata.org": "wikipedia",
+    "api.listenbrainz.org": "listenbrainz",
+    "labs.api.listenbrainz.org": "listenbrainz",
+    "critiquebrainz.org": "listenbrainz",
+    "api.secondhandsongs.com": "secondhandsongs",
+    "api.kexp.org": "kexp",
 }
 
 # Sources recorded live by default; the others replay their existing fixtures when present.
@@ -62,6 +67,9 @@ SCENARIOS: dict[str, Query] = {
         "https://brianleeds.bandcamp.com/album/for-those-of-you-who-have-never-and-also-those-who-have",
     ),
     "discogs_url": parse_query("https://www.discogs.com/master/21491-Radiohead-OK-Computer"),
+    "siren_covers": parse_query("Tim Buckley - Song to the Siren", EntityKind.TRACK),
+    "stronger_samples": parse_query("Kanye West - Stronger", EntityKind.TRACK),
+    "reckoner": parse_query("Radiohead - Reckoner", EntityKind.TRACK),
 }
 
 

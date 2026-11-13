@@ -93,6 +93,10 @@ def dossier() -> Dossier:
                 },
                 {"kind": "user", "body": "Plain.", "scope": "release", "sources": mb},
             ],
+            "metrics": [
+                {"kind": "listens", "value": 3099604, "scope": "recording", "sources": mb},
+                {"kind": "listeners", "value": 4.5, "scale": 10, "scope": "release", "sources": mb},
+            ],
             "relations": [
                 {
                     "kind": "remix_of",

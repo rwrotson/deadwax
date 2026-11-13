@@ -34,9 +34,14 @@ Facts have a `scope`: `recording`, `work`, `release`, `release_group`, `artist`,
 |------|-------------|
 | `tags` | `name`, `kind` (`genre`, `style`, `mood`, `theme`, `descriptor`, `tag`), `weight` (0–1, the source's own weighting, when it has one) |
 | `credits` | `role`, `name`, `detail` (instruments or tracks the credit covers) |
-| `texts` | `kind` (`review`, `editorial`, `label`, `shop`, `wiki`, `user`), `body`, `title`, `author`, `publication`, `date`, `rating` (`value`, `scale`, `text`), `language` |
+| `texts` | `kind` (`review`, `editorial`, `label`, `shop`, `wiki`, `user`, `broadcast`), `body`, `title`, `author`, `publication`, `date`, `rating` (`value`, `scale`, `text`), `language` |
 | `relations` | `kind`, `target` (`type`, `name`, `artist`, `date`, `url`, `ids`), `note` |
+| `metrics` | `kind` (`listens`, `listeners`), `value`, `scale` (highest possible value, when bounded) |
 | `links` | `service`, `url`, `target` (`track`, `album`, `artist`, `label`, `other`), `preview_url` |
+
+A `broadcast` text is a radio host's note on a play, with the host as `author` and the station and program as `publication`. Metrics are counts one source reports; they are never combined across sources.
+
+Relations to the same target from several sources merge into one, with every source, and the merged target keeps the artist, date, URL, and IDs any of them gave. Broadcasts and mixes are also told apart by date.
 
 A score without review text (a ratings template on Wikipedia, a Wikidata review score) is a `review` text with an empty `body`, a `publication`, and a `rating`.
 

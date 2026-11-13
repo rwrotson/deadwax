@@ -6,7 +6,7 @@
 
 Every source belongs to one group: `core` (the v1 sources), `shops`, `press`, `catalogues`, `radio`, `streaming`, or `samples`. `--sources` and `--exclude` take source and group names, comma-separated; `--sources shops --exclude boomkat` runs every shop except Boomkat. An unknown name is a usage error that lists the known sources and groups.
 
-Without `--sources`, a lookup runs the sources named by `DEADWAX_DEFAULT_SOURCES`, which also takes source and group names; the default is `core`. Sources with official or open APIs join the default set as they are added; sources that scrape shop, press, radio, and sample pages run only when named. `DEADWAX_<SOURCE>__ENABLED=false` turns a source off even when it is named.
+Without `--sources`, a lookup runs the sources named by `DEADWAX_DEFAULT_SOURCES`, which also takes source and group names; the default is `core,listenbrainz,secondhandsongs,kexp`. Sources with official or open APIs join the default set as they are added; sources that scrape shop, press, radio, and sample pages run only when named. `DEADWAX_<SOURCE>__ENABLED=false` turns a source off even when it is named.
 
 `DEADWAX_CONCURRENCY` (default 8) caps how many sources of one lookup run at once. A source's `adapter_timeout` starts when it begins running, not while it waits for a slot.
 
@@ -14,7 +14,7 @@ Without `--sources`, a lookup runs the sources named by `DEADWAX_DEFAULT_SOURCES
 
 1. **URL resolution.** For a URL query, the first ready source that recognises the URL reads it alone. Its record becomes the reference, and for a URL that does not reveal its kind it sets the kind. The order is MusicBrainz, Odesli, iTunes, Deezer, Discogs, Bandcamp.
 2. **Identity pass.** MusicBrainz finds the recording or release group and gives later sources its IDs and links: ISRCs, barcodes, Discogs, Wikidata, Bandcamp, and streaming URLs.
-3. **Enrichment pass.** All other sources except Odesli run concurrently. Each one uses the IDs and links from the identity pass first and falls back to its own search.
+3. **Enrichment pass.** All other sources except Odesli run concurrently, at most `concurrency` at once. Each one uses the IDs and links from the identity pass first and falls back to its own search.
 4. **Links pass.** Odesli opens the song.link page of a streaming URL found by any earlier source, such as the Apple Music link from iTunes.
 
 Each source runs under `adapter_timeout` (`--timeout`). Every candidate passes the version-aware matching gate described in [Output](output.md).
@@ -24,7 +24,7 @@ Each source runs under `adapter_timeout` (`--timeout`). Every candidate passes t
 | Tier | Sources | Role |
 |------|---------|------|
 | 1, identity and links | MusicBrainz, iTunes Search, Deezer, Odesli | Which exact recording or release this is; listening links |
-| 2, enrichment | Discogs, Bandcamp, Last.fm, Wikipedia/Wikidata | Tags, credits, texts, relations |
+| 2, enrichment | Discogs, Bandcamp, Last.fm, Wikipedia/Wikidata, ListenBrainz, SecondHandSongs, KEXP | Tags, credits, texts, relations, metrics |
 
 The README lists sources planned for later versions and those deadwax will not use.
 
@@ -84,6 +84,29 @@ The README lists sources planned for later versions and those deadwax will not u
 - **Finds the record by:** the Wikidata ID from MusicBrainz, else a Wikidata search by title, type, and performer.
 - **Contributes:** genres, producers, composers, lyricists, labels, release date, the album a song is on, review scores (Wikidata P444 and the ratings templates of the articles), and the lead plus music-related sections of the English article and the article in the record's original language.
 - **Limits:** section headings are recognised in English, Russian, Japanese, German, and French; other languages contribute only the lead. A sitelink that redirects (a song's link to its album) is skipped.
+
+## ListenBrainz
+
+- **Group:** `catalogues`; in the default set.
+- **Access:** ListenBrainz API, its labs similarity endpoints, and the CritiqueBrainz API; keyless, honest User-Agent.
+- **Finds the record by:** the MusicBrainz recording, release group, and artist IDs from the identity pass; without them the source is `not_found`. It reports no candidate, since the IDs belong to the matched record.
+- **Contributes:** listen and listener counts as `metrics`; for a track, up to 20 recordings and 10 artists listened to in the same sessions as `similar`; CritiqueBrainz reviews of the recording and release group, as `user` texts, or as `review` texts naming the publication when CritiqueBrainz republishes one (such as BBC Music).
+- **Limits:** the labs endpoints are experimental; an empty answer gives no facts.
+
+## SecondHandSongs
+
+- **Group:** `catalogues`; in the default set. Optional `DEADWAX_SECONDHANDSONGS__API_KEY` raises the request limit.
+- **Access:** the JSON API at `api.secondhandsongs.com`, keyless; the website is behind a Cloudflare challenge and is not used.
+- **Finds the record by:** a performance search by title and performer, through the matching gate. Songs only: an album query contributes nothing.
+- **Contributes:** the performance's first release date; writers of the work as `writer` credits; for an original, its covers as `covered_by`; for a cover, the work and the dated original as `cover_of`; for a later recording by the original artist, the first performance as `other_version` and that performance's covers; adaptations (translations, new lyrics) as `cover_of` or `covered_by` works with the note `adaptation`.
+- **Limits:** without a key the API allows about 10–20 requests a minute; the default rate is 0.25 per second. Covers carry no dates, which would take one request per cover.
+
+## KEXP
+
+- **Group:** `radio`; in the default set.
+- **Access:** KEXP API v2, keyless.
+- **Finds the record by:** the MusicBrainz recording ID, else artist and title (the API ignores release group IDs, so albums are found by artist and album title); plays of other records or versions are dropped by the matching gate.
+- **Contributes:** the latest 25 plays as `broadcast` relations (program, date, hosts, playlist page); host comments as `broadcast` texts, split at dashed separator lines, with a repeated comment merged into one text.
 
 ## Escalation ladder
 

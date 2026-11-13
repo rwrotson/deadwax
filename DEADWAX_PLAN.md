@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stage 8 done; Stage 9 next.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–9 done; Stage 10 next.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -105,7 +105,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | Stage | Status | Deliverable |
 | --- | --- | --- |
 | 8 | Done | Foundation: source groups, default source set, per-lookup concurrency cap, shared search → page helper. |
-| 9 | Not started | ListenBrainz, SecondHandSongs, KEXP. |
+| 9 | Done | ListenBrainz, SecondHandSongs, KEXP. |
 | 10 | Not started | Spotify, YouTube (links only), SoundCloud. |
 | 11 | Not started | Beatport, Juno Download; BPM and key. |
 | 12 | Not started | Shops I: Juno, Hard Wax, Phonica, Soundohm; shop-text deduplication. |
@@ -140,9 +140,9 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 ### Stage 9: ListenBrainz, SecondHandSongs, KEXP
 
-- [ ] ListenBrainz by MBID: similar recordings and artists, listen counts; CritiqueBrainz reviews as `user` texts.
-- [ ] SecondHandSongs: original and first release, writers, covers and adaptations as directional relations.
-- [ ] KEXP: plays as `broadcast` relations with dates; DJ comments as texts.
+- [x] ListenBrainz by MBID: similar recordings and artists, listen counts; CritiqueBrainz reviews as `user` texts.
+- [x] SecondHandSongs: original and first release, writers, covers and adaptations as directional relations.
+- [x] KEXP: plays as `broadcast` relations with dates; DJ comments as texts.
 
 **Acceptance:** covers from SecondHandSongs and MusicBrainz merge into one relation per target. **Suggested message:** `feat(sources): add ListenBrainz, SecondHandSongs and KEXP adapters`.
 
@@ -258,6 +258,14 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-13 | The default set is the setting `default_sources` (`DEADWAX_DEFAULT_SOURCES`, source and group names, comma-separated); `--sources`/`include=` replaces it for one run, `--exclude` subtracts from either, and `<source>.enabled=false` still wins. | Users choose whole groups with one value. User choice. | 8 |
 | 2026-11-13 | Every adapter has one `SourceGroup`; group names never equal source names (tested). Groups are expanded in the orchestrator (`expand_names`), so `include` and `exclude` take both. | One selection rule for the library and the command. | 8 |
 | 2026-11-13 | `concurrency` setting, default 8: one semaphore per lookup across passes; an adapter's timeout starts when it gets a slot. | Lookups with many sources stay within rate limits without timing out queued sources. User choice of the default. | 8 |
+| 2026-11-13 | Counts are `Metric` facts (`kind` `listens`/`listeners`, `value`, `scale`) in `Partial.metrics` and `Dossier.metrics`, with `Capability.METRICS`; a source's counts are never combined with another's. | ListenBrainz counts now, Spotify popularity and SoundCloud counts in Stage 10. User choice. | 9, 10 |
+| 2026-11-13 | Radio hosts' notes are `TextKind.BROADCAST` texts (author the host, publication station and program). | Keeps them apart from editorial copy; NTS and WFMU reuse it in Stage 17. User choice. | 9, 17 |
+| 2026-11-13 | Relations to one target merge across sources; the kept target takes missing artist, date and URL and the union of IDs from the others. `broadcast` and `mix` targets also differ by date. | One relation per cover with both sources; one relation per play, not per program. | 9 |
+| 2026-11-13 | MusicBrainz work lookups include `artist-credits`, so covers listed by a work name their artist. Only the work entries of the MusicBrainz fixtures were re-fetched. | Without artists, MusicBrainz covers never merged with SecondHandSongs covers. | 9 |
+| 2026-11-13 | SecondHandSongs is read through `api.secondhandsongs.com` (the website answers a Cloudflare challenge); songs only; covers carry no dates; a later recording by the original artist is `other_version` of the first performance and shares its covers. Optional `secondhandsongs.api_key`. | Cover dates cost one request per cover at about 10–20 requests a minute; SecondHandSongs calls Tim Buckley's 1970 "Song to the Siren" a cover of his 1968 TV performance. | 9 |
+| 2026-11-13 | KEXP reads the latest 25 plays by recording MBID, else by artist and title; albums always by artist and album title. | The API ignores `release_group_id` and returns the station's latest plays (verified live; the matching gate dropped them). | 9 |
+| 2026-11-13 | ListenBrainz, SecondHandSongs and KEXP are JSON APIs, so they build on `HttpAdapter`, not `SearchPageAdapter`. | The helper is for HTML search and page sources. | 9 |
+| 2026-11-13 | Cover and sample check records: `--track "Tim Buckley - Song to the Siren"` (covers) and `--track "Kanye West - Stronger"` (samples). | User choice. | 9–19 |
 | 2026-11-13 | `SearchPageAdapter` order: query URL of its service, a page of its service from earlier passes, then search. `pick_hit` takes the first `MATCH`, else the first `other_version` hit, which the merge turns into a relation and a version discrepancy; `NO_MATCH` hits are never read. | Another version's page still informs identity, and the merge gate already handles it. | 8, 12–19 |
 
 ### 2026-11-13 — Stage 8 evidence
@@ -278,7 +286,31 @@ Commands and outcomes:
 
 Remains: nothing for Stage 8.
 
-**Current task:** Stage 9 (ListenBrainz, SecondHandSongs, KEXP). **Next action:** user review of Stage 8; at the start of Stage 9, verify each source's access notes.
+### 2026-11-13 — Stage 9 evidence
+
+Access checked live before coding: ListenBrainz popularity (POST), labs similar recordings and artists, CritiqueBrainz reviews; SecondHandSongs website behind a Cloudflare challenge, its `api.` host plain JSON without a key; KEXP plays and shows keyless, `recording_id` and `artist` + `song`/`album` filters work, `release_group_id` is ignored.
+
+Changed:
+
+- Core: `Metric`, `MetricKind`, `Partial.metrics`, `Dossier.metrics`, `Capability.METRICS`, `TextKind.BROADCAST`; merge keeps metrics per source, merges relations per target filling the target, and keys broadcasts and mixes by date; Markdown and pretty output have a Metrics section. `deadwax` exports `Metric`, `MetricKind`, `SecondHandSongsSettings`.
+- Sources: packages `listenbrainz`, `secondhandsongs`, `kexp` (adapter | parse | models, each with an R8 contract, in the R4 adapter row); rates 2, 0.25, 2; `DEFAULT_SOURCES = ("core", "listenbrainz", "secondhandsongs", "kexp")`; MusicBrainz work lookups add `artist-credits`.
+- CLI settings, `.env.example`, `docs/sources.md`, `docs/output.md`, `docs/architecture.md`, API reference index, README tables.
+- Fixtures: the three sources recorded for every scenario (others replayed); new scenarios `siren_covers`, `stronger_samples`, `reckoner`; MusicBrainz work entries re-fetched with artist credits.
+
+Commands and outcomes:
+
+- `uv run poe check`: format, lint, 21 import contracts kept, mypy strict clean, 621 tests passed, 99.16% branch coverage.
+- `uv run --group docs properdocs build --strict`: built without warnings.
+- `uv run poe test-live`: 22 passed (7 min 15 s).
+- Mock-tested: every ListenBrainz path (track, album, missing MBIDs, zero and null counts, user and republished reviews, empty review bodies, dates); SecondHandSongs original with covers, writers and adaptations, cover with the dated original, own later version, album, API key header, no key / no hit / 404, another version's candidate dropped by the merge with a version discrepancy; KEXP by recording ID, by text, album by text despite a release group ID, other-version and air-break plays dropped, show-less plays, comment splitting, playlist URLs; merge of metrics, relation filling, dated broadcasts; renderers. No blocked case: none of the three answered a challenge.
+- Acceptance, replayed: "Tim Buckley - Song to the Siren" gives one `covered_by` relation per target, 13 of them with both MusicBrainz and SecondHandSongs; Paranoid Android 19.
+- Live-verified (`--no-cache`, default set): Song to the Siren 23 s (13 merged covers, two SecondHandSongs writers including Larry Beckett, ListenBrainz counts, 2 KEXP plays); Reckoner 23 s (25 plays, 16 host comments); Paranoid Android 24 s (19 plays, 23 comments, BBC review via CritiqueBrainz); ESTADO DE BIENESTAR 4 s (ListenBrainz and KEXP `not_found`, SecondHandSongs nothing for an album); Huerco S. 38 s (release-group counts, similar artists, KEXP plays after the album fix); Кино 22 s (counts, similar, four SecondHandSongs writers and one relation); Todd Terry remix 25 s (SecondHandSongs `not_found`, still `remix_of` Missing); Untrue 19 s (counts, a CritiqueBrainz review, 25 KEXP plays); Stronger 25 s (12 SecondHandSongs relations, 4 merged covers).
+
+Found, not fixed (outside the stage): MusicBrainz picks an obscure recording of "Kanye West - Stronger" because `core.versions` classifies the disambiguation "explicit" as an `edit`, so the canonical recording counts as another version. The chosen recording has no sample relations or ListenBrainz counts. The `stronger_samples` scenario records this state.
+
+Remains: nothing for Stage 9.
+
+**Current task:** Stage 10 (Spotify, YouTube, SoundCloud). **Next action:** user review of Stage 9 and a decision on the "explicit" version bug; at the start of Stage 10, verify each source's access notes.
 
 ## Resume instructions
 

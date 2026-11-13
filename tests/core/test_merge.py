@@ -14,6 +14,8 @@ from deadwax.core import (
     IdKind,
     Link,
     LinkTarget,
+    Metric,
+    MetricKind,
     Partial,
     Provenance,
     Query,
@@ -396,3 +398,91 @@ def test_scores_without_body_are_kept_apart_by_publication_and_rating() -> None:
         ("AllMusic", 4),
     ]
     assert [p.source for p in dossier.texts[0].sources] == ["wikipedia", "lastfm"]
+
+
+def cover(artist: str | None, source: str, **target: object) -> Relation:
+    return Relation(
+        kind=RelationKind.COVERED_BY,
+        target=Entity.model_validate(
+            {"type": "recording", "name": "Missing", "artist": artist} | target,
+        ),
+        scope=Scope.WORK,
+        sources=provenance(source),
+    )
+
+
+def test_relations_of_one_target_merge_and_fill_the_target() -> None:
+    partials = [
+        partial(
+            "musicbrainz",
+            candidate(),
+            relations=[cover("Todd Terry", "musicbrainz", ids={IdKind.MUSICBRAINZ_RECORDING: "r"})],
+        ),
+        partial(
+            "secondhandsongs",
+            None,
+            relations=[
+                cover("todd terry", "secondhandsongs", date="1995", url="https://shs.example/1"),
+                cover("Someone Else", "secondhandsongs"),
+            ],
+        ),
+    ]
+
+    relations = merge(TRACK, partials, generated_at=NOW).relations
+
+    assert len(relations) == 2
+    merged = relations[0]
+    assert [p.source for p in merged.sources] == ["musicbrainz", "secondhandsongs"]
+    assert merged.target.artist == "Todd Terry"
+    assert (merged.target.date, merged.target.url) == ("1995", "https://shs.example/1")
+    assert merged.target.ids == {IdKind.MUSICBRAINZ_RECORDING: "r"}
+
+
+def test_broadcasts_on_other_dates_stay_apart() -> None:
+    def broadcast(date: str, source: str) -> Relation:
+        return Relation(
+            kind=RelationKind.BROADCAST,
+            target=Entity(type=EntityType.BROADCAST, name="KEXP: Variety Mix", date=date),
+            scope=Scope.RECORDING,
+            sources=provenance(source),
+        )
+
+    relations = merge(
+        TRACK,
+        [
+            partial("kexp", None, relations=[broadcast("2026-09-15", "kexp")]),
+            partial("other", None, relations=[broadcast("2026-09-15", "other")]),
+            partial("kexp2", None, relations=[broadcast("2025-01-02", "kexp2")]),
+        ],
+        generated_at=NOW,
+    ).relations
+
+    assert [(r.target.date, len(r.sources)) for r in relations] == [
+        ("2026-09-15", 2),
+        ("2025-01-02", 1),
+    ]
+
+
+def test_metrics_stay_per_source() -> None:
+    def metric(source: str, value: float, scope: Scope = Scope.RECORDING) -> Metric:
+        return Metric(kind=MetricKind.LISTENS, value=value, scope=scope, sources=provenance(source))
+
+    metrics = merge(
+        TRACK,
+        [
+            partial("listenbrainz", candidate(), metrics=[metric("listenbrainz", 10)]),
+            partial(
+                "lastfm",
+                candidate(),
+                metrics=[metric("lastfm", 99, Scope.ARTIST), metric("lastfm", 20)],
+            ),
+            partial("other", candidate(title="Missing (Live)"), metrics=[metric("other", 5)]),
+        ],
+        generated_at=NOW,
+    ).metrics
+
+    assert [(m.sources[0].source, m.value, m.scope) for m in metrics] == [
+        ("listenbrainz", 10, Scope.RECORDING),
+        ("lastfm", 20, Scope.RECORDING),
+        ("lastfm", 99, Scope.ARTIST),
+    ]

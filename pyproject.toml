@@ -287,7 +287,7 @@ type = "layers"
 containers = ["deadwax.sources"]
 layers = [
     "lookup",
-    "musicbrainz | itunes | deezer | odesli | discogs | bandcamp | lastfm | wikipedia",
+    "musicbrainz | itunes | deezer | odesli | discogs | bandcamp | lastfm | wikipedia | listenbrainz | secondhandsongs | kexp",
     "_base | _html",
     "_http",
     "config",
@@ -321,6 +321,24 @@ layers = ["adapter", "parse", "models"]
 name = "R8: Wikipedia adapter modules"
 type = "layers"
 containers = ["deadwax.sources.wikipedia"]
+layers = ["adapter", "parse", "models"]
+
+[[tool.importlinter.contracts]]
+name = "R8: ListenBrainz adapter modules"
+type = "layers"
+containers = ["deadwax.sources.listenbrainz"]
+layers = ["adapter", "parse", "models"]
+
+[[tool.importlinter.contracts]]
+name = "R8: SecondHandSongs adapter modules"
+type = "layers"
+containers = ["deadwax.sources.secondhandsongs"]
+layers = ["adapter", "parse", "models"]
+
+[[tool.importlinter.contracts]]
+name = "R8: KEXP adapter modules"
+type = "layers"
+containers = ["deadwax.sources.kexp"]
 layers = ["adapter", "parse", "models"]
 
 [[tool.importlinter.contracts]]

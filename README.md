@@ -21,7 +21,7 @@ deadwax --album "Burial - Untrue" --sources core --exclude bandcamp
 deadwax sources
 ```
 
-A text query must state `--album` or `--track`; a URL implies its kind. `--sources` and `--exclude` take source and group names (`core`, `shops`, `press`, `catalogues`, `radio`, `streaming`, `samples`); without `--sources`, the sources of `DEADWAX_DEFAULT_SOURCES` (default `core`) run. Other options: `--exclude`, `--format pretty|json|markdown`, `--no-cache`, `--timeout`, `--config`, `--verbose`. Exit codes: 0 found, 1 unexpected error, 2 usage or configuration error, 3 nothing matched.
+A text query must state `--album` or `--track`; a URL implies its kind. `--sources` and `--exclude` take source and group names (`core`, `shops`, `press`, `catalogues`, `radio`, `streaming`, `samples`); without `--sources`, the sources of `DEADWAX_DEFAULT_SOURCES` (default `core,listenbrainz,secondhandsongs,kexp`) run. Other options: `--exclude`, `--format pretty|json|markdown`, `--no-cache`, `--timeout`, `--config`, `--verbose`. Exit codes: 0 found, 1 unexpected error, 2 usage or configuration error, 3 nothing matched.
 
 ```python
 import asyncio
@@ -65,6 +65,9 @@ Every source is described in detail in [the sources guide](https://rwrotson.gith
 | Bandcamp | implemented | tags, About and Credits texts, credits, fan comments, recommendations as similar releases, label, the label's other releases; resolves `bandcamp.com` album and track pages | scraped pages; a track found on another artist's album contributes only its identity, links and own notes |
 | Last.fm | implemented, needs `lastfm.api_key` | weighted tags (artist-wide ones marked `artist`), wiki texts, similar tracks or artists | `skipped` without the key |
 | Wikipedia/Wikidata | implemented | genres, producers, composers, lyricists, labels, date, the album a song is on, review scores, lead and music sections of the English and original-language articles | section headings recognised in en, ru, ja, de, fr; other languages give the lead |
+| ListenBrainz | implemented | listen and listener counts, similar recordings and artists, CritiqueBrainz reviews | needs MusicBrainz IDs from the identity pass |
+| SecondHandSongs | implemented | first release date, writers, covers, the original of a cover, adaptations | songs only; about 10–20 requests a minute without `secondhandsongs.api_key` |
+| KEXP | implemented | the latest 25 plays as broadcasts with programs and hosts, host comments | |
 
 Names written in a non-Latin script are compared as written: a store that lists "Кино" as "Kino" is reported as `no_match`.
 
@@ -74,8 +77,8 @@ Names written in a non-Latin script are compared as written: a store that lists 
 |-------|---------|---------|
 | Shops | Boomkat, Juno, Norman, Forced Exposure, Hard Wax, Phonica, Soundohm, Bleep | shop copy as `shop` texts |
 | Reviews and press | AllMusic, Resident Advisor (GraphQL), press reviews through one adapter with per-site rules | |
-| Catalogues and communities | Rate Your Music, Genius, Album of the Year, ListenBrainz, SecondHandSongs | Rate Your Music only through a browser |
-| Radio and mixes | NTS, 1001Tracklists, KEXP, WFMU | |
+| Catalogues and communities | Rate Your Music, Genius, Album of the Year | Rate Your Music only through a browser |
+| Radio and mixes | NTS, 1001Tracklists, WFMU | |
 | Streaming and download stores | Spotify, SoundCloud, YouTube, Beatport, Juno Download | Spotify for search and links only; YouTube for links only |
 | Samples | WhoSampled | needs a separate decision on its terms of service |
 
@@ -121,6 +124,9 @@ src/
     │   ├── bandcamp/        # Bandcamp models, page parsers, adapter
     │   ├── lastfm/          # Last.fm models, parsers, adapter
     │   ├── wikipedia/       # Wikidata and Wikipedia models, parsers, adapter
+    │   ├── listenbrainz/    # ListenBrainz and CritiqueBrainz models, parsers, adapter
+    │   ├── secondhandsongs/ # SecondHandSongs models, parsers, adapter
+    │   ├── kexp/            # KEXP models, parsers, adapter
     │   └── _http/           # rate limits, retries, cache, escalation transports
     └── core/                # models, matching, orchestrator, errors (Pydantic only)
 tests/                       # mirrors the package; network is disabled

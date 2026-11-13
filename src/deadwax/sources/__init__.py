@@ -8,6 +8,7 @@ from .config import (
     Escalation,
     HttpSettings,
     LastfmSettings,
+    SecondHandSongsSettings,
     SourcesConfig,
     SourceSettings,
 )
@@ -21,6 +22,7 @@ __all__ = [
     "Escalation",
     "HttpSettings",
     "LastfmSettings",
+    "SecondHandSongsSettings",
     "SourceSettings",
     "SourcesConfig",
     "build_adapters",

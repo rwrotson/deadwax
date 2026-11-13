@@ -21,6 +21,7 @@ from deadwax import (
     DiscogsSettings,
     HttpSettings,
     LastfmSettings,
+    SecondHandSongsSettings,
     SourcesConfig,
     SourceSettings,
 )
@@ -78,6 +79,9 @@ class Settings(BaseSettings):
     bandcamp: SourceSettings = Field(default_factory=SourceSettings)
     lastfm: LastfmSettings = Field(default_factory=LastfmSettings)
     wikipedia: SourceSettings = Field(default_factory=SourceSettings)
+    listenbrainz: SourceSettings = Field(default_factory=SourceSettings)
+    secondhandsongs: SecondHandSongsSettings = Field(default_factory=SecondHandSongsSettings)
+    kexp: SourceSettings = Field(default_factory=SourceSettings)
 
     @classmethod
     def settings_customise_sources(

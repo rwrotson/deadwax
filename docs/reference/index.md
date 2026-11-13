@@ -34,6 +34,15 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.sources.wikipedia.adapter` | Read the Wikidata item and its Wikipedia articles |
 | `deadwax.sources.wikipedia.parse` | Turn Wikidata statements, article sections, and ratings templates into facts |
 | `deadwax.sources.wikipedia.models` | Model Wikidata and MediaWiki API responses |
+| `deadwax.sources.listenbrainz.adapter` | Read listen counts, similar recordings and artists, and CritiqueBrainz reviews by MBID |
+| `deadwax.sources.listenbrainz.parse` | Turn ListenBrainz and CritiqueBrainz responses into metrics, relations, and texts |
+| `deadwax.sources.listenbrainz.models` | Model ListenBrainz and CritiqueBrainz API responses |
+| `deadwax.sources.secondhandsongs.adapter` | Read originals, covers, adaptations, and writers of a song from SecondHandSongs |
+| `deadwax.sources.secondhandsongs.parse` | Turn SecondHandSongs responses into identity, credits, and relations |
+| `deadwax.sources.secondhandsongs.models` | Model SecondHandSongs API responses |
+| `deadwax.sources.kexp.adapter` | Read plays of a record on KEXP with programs, hosts, and comments |
+| `deadwax.sources.kexp.parse` | Turn KEXP plays into broadcast relations and host texts |
+| `deadwax.sources.kexp.models` | Model KEXP API responses |
 | `deadwax.logs.settings` | Define logging settings |
 | `deadwax.logs.setup` | Configure console and file logging for applications |
 | `deadwax.cli.settings` | Load command settings from the environment |

@@ -19,6 +19,7 @@ from deadwax.core.models import (
     LabelRef,
     Link,
     LinkTarget,
+    Metric,
     Partial,
     Provenance,
     RecordCandidate,
@@ -320,6 +321,39 @@ def _combine_tags(kept: Tag, other: Tag) -> Tag:
     return _combine(kept, other).model_copy(update={"weight": max(weights, default=None)})
 
 
+def _combine_relations(kept: Relation, other: Relation) -> Relation:
+    """Union the sources and fill what the kept target lacks from the other one."""
+    target = kept.target.model_copy(
+        update={
+            "artist": kept.target.artist or other.target.artist,
+            "date": kept.target.date or other.target.date,
+            "url": kept.target.url or other.target.url,
+            "ids": other.target.ids | kept.target.ids,
+        },
+    )
+    return _combine(kept, other).model_copy(update={"target": target})
+
+
+# Targets that are events: the same name on another date is another entity.
+_DATED_TARGETS = frozenset({EntityType.BROADCAST, EntityType.MIX})
+
+
+def _relation_key(relation: Relation) -> Hashable:
+    target = relation.target
+    return (
+        relation.kind,
+        target.type,
+        normalize_artist(target.artist or ""),
+        normalize_text(target.name),
+        target.date if target.type in _DATED_TARGETS else None,
+    )
+
+
+def _metric_key(metric: Metric) -> Hashable:
+    """Counts of different sources measure different audiences and are never combined."""
+    return (metric.kind, metric.scope, tuple(provenance.source for provenance in metric.sources))
+
+
 def _dedupe[T: Attributed](
     items: Iterable[T],
     key: Callable[[T], Hashable],
@@ -367,6 +401,7 @@ class _Facts:
     credits: list[Credit]
     texts: list[Text]
     relations: list[Relation]
+    metrics: list[Metric]
     links: list[Link]
 
 
@@ -402,15 +437,8 @@ def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Parti
     version_relations = (
         _other_version_relation(p, p.candidate) for p in other_versions if p.candidate is not None
     )
-    relations = _dedupe(
-        (*found_relations, *version_relations),
-        lambda r: (
-            r.kind,
-            r.target.type,
-            normalize_artist(r.target.artist or ""),
-            normalize_text(r.target.name),
-        ),
-    )
+    relations = _dedupe((*found_relations, *version_relations), _relation_key, _combine_relations)
+    metrics = _dedupe((metric for p in accepted for metric in p.metrics), _metric_key)
 
     links = _dedupe((link for p in accepted for link in p.links), lambda link: _url_key(link.url))
     link_order = _LINK_ORDER[kind]
@@ -419,6 +447,7 @@ def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Parti
         credits=sorted(credit_facts, key=scope_rank),
         texts=sorted(texts, key=lambda t: (scope_rank(t), _TEXT_ORDER.index(t.kind))),
         relations=sorted(relations, key=lambda r: (_RELATION_ORDER.index(r.kind), scope_rank(r))),
+        metrics=sorted(metrics, key=scope_rank),
         links=sorted(links, key=lambda link: link_order.index(link.target)),
     )
 
@@ -441,6 +470,7 @@ def merge(
         credits=facts.credits,
         texts=facts.texts,
         relations=facts.relations,
+        metrics=facts.metrics,
         links=facts.links,
         errors=[*errors, *judgement.errors],
         generated_at=generated_at,

@@ -6,6 +6,7 @@ from deadwax.core.models import (
     Dossier,
     Identity,
     Link,
+    Metric,
     Provenance,
     Relation,
     Sourced,
@@ -118,6 +119,16 @@ def _relation(relation: Relation) -> list[str]:
     return [f"- {relation.kind}: {name}{note} — {_sources(relation.sources)}"]
 
 
+def _number(value: float) -> str:
+    return str(int(value)) if value.is_integer() else f"{value:g}"
+
+
+def _metric(metric: Metric) -> list[str]:
+    value = _number(metric.value)
+    scale = f"/{_number(metric.scale)}" if metric.scale is not None else ""
+    return [f"- {metric.kind}: {value}{scale} ({metric.scope}) — {_sources(metric.sources)}"]
+
+
 def _link(link: Link) -> list[str]:
     return [f"- {link.service} ({link.target}): {link.url} — {_sources(link.sources)}"]
 
@@ -137,6 +148,7 @@ def to_markdown(dossier: Dossier) -> str:
         *_section("Credits", dossier.credits, _credit),
         *_section("Texts", dossier.texts, _text),
         *_section("Relations", dossier.relations, _relation),
+        *_section("Metrics", dossier.metrics, _metric),
         *_section("Links", dossier.links, _link),
         *_section("Errors", dossier.errors, _error),
     ]

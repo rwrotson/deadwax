@@ -46,7 +46,7 @@ def _split_names(value: object) -> object:
 type SourceNames = Annotated[tuple[str, ...], BeforeValidator(_split_names)]
 
 # Sources a lookup runs when no source list is given.
-DEFAULT_SOURCES: tuple[str, ...] = ("core",)
+DEFAULT_SOURCES: tuple[str, ...] = ("core", "listenbrainz", "secondhandsongs", "kexp")
 
 
 class Escalation(StrEnum):
@@ -154,8 +154,18 @@ class LastfmSettings(SourceSettings):
     api_key: SecretStr | None = Field(default=None, description="API key")
 
 
+class SecondHandSongsSettings(SourceSettings):
+    """Settings of the SecondHandSongs source."""
+
+    api_key: SecretStr | None = Field(
+        default=None,
+        description="API key raising the request limit; lookups work without it",
+    )
+
+
 # Requests per second each source allows: MusicBrainz 1/s, iTunes Search about 20/min,
-# Deezer 50 per 5 s, Discogs 60/min with a token; scraped pages are fetched slowly on purpose.
+# Deezer 50 per 5 s, Discogs 60/min with a token, SecondHandSongs 10-20/min without a key;
+# scraped pages are fetched slowly on purpose.
 DEFAULT_RATES: dict[str, float] = {
     "musicbrainz": 1.0,
     "itunes": 0.3,
@@ -165,6 +175,9 @@ DEFAULT_RATES: dict[str, float] = {
     "bandcamp": 0.5,
     "lastfm": 4.0,
     "wikipedia": 5.0,
+    "listenbrainz": 2.0,
+    "secondhandsongs": 0.25,
+    "kexp": 2.0,
 }
 
 
@@ -187,6 +200,9 @@ class SourcesConfig(_Model):
     bandcamp: SourceSettings = SourceSettings()
     lastfm: LastfmSettings = LastfmSettings()
     wikipedia: SourceSettings = SourceSettings()
+    listenbrainz: SourceSettings = SourceSettings()
+    secondhandsongs: SecondHandSongsSettings = SecondHandSongsSettings()
+    kexp: SourceSettings = SourceSettings()
 
     def rate(self, source: str) -> float:
         """Return the request rate of a source in requests per second."""

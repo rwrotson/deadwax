@@ -11,6 +11,8 @@ from deadwax.core import (
     IdKind,
     Link,
     LinkTarget,
+    Metric,
+    MetricKind,
     Partial,
     Provenance,
     Query,
@@ -117,6 +119,16 @@ def untrue_dossier() -> str:
                 sources=SOURCE,
             ),
         ],
+        metrics=[
+            Metric(kind=MetricKind.LISTENS, value=1200, scope=Scope.RELEASE_GROUP, sources=SOURCE),
+            Metric(
+                kind=MetricKind.LISTENERS,
+                value=0.5,
+                scale=1,
+                scope=Scope.RELEASE,
+                sources=SOURCE,
+            ),
+        ],
         links=[
             Link(
                 service="bandcamp",
@@ -142,6 +154,7 @@ def test_markdown_sections_and_sources() -> None:
         "## Credits",
         "## Texts",
         "## Relations",
+        "## Metrics",
         "## Links",
         "## Errors",
     ):
@@ -171,6 +184,8 @@ def test_markdown_sections_and_sources() -> None:
     assert "- label: [Hyperdub](https://hyperdub.net) (founded by Kode9)" in text
     assert "- similar: Burial — Rival Dealer — [bandcamp]" in text
     assert "- lastfm: skipped — no API key" in text
+    assert "- listens: 1200 (release_group) — [bandcamp]" in text
+    assert "- listeners: 0.5/1 (release) — [bandcamp]" in text
     assert "**discogs_master:** 89497" in text
     assert "**ISRC:** GBAAA0700001" in text
     assert "**UPC:** 5055300315829" in text

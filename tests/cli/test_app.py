@@ -197,11 +197,16 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
         "bandcamp": "ready",
         "lastfm": "missing_credential",
         "wikipedia": "ready",
+        "listenbrainz": "ready",
+        "secondhandsongs": "ready",
+        "kexp": "ready",
     }
     assert "DEADWAX_DISCOGS__TOKEN" in table.stdout
     assert "DEADWAX_LASTFM__API_KEY" in table.stdout
     assert {(row["group"], row["default"]) for row in json.loads(as_json.stdout)} == {
         ("core", True),
+        ("catalogues", True),
+        ("radio", True),
     }
 
 

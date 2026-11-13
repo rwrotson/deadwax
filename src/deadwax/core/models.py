@@ -57,6 +57,9 @@ class TextKind(StrEnum):
     WIKI = "wiki"
     USER = "user"
 
+    # Host's note on a radio play or show.
+    BROADCAST = "broadcast"
+
 
 class RelationKind(StrEnum):
     """How a related entity is connected to the record."""
@@ -77,6 +80,13 @@ class RelationKind(StrEnum):
     SAMPLED_BY = "sampled_by"
     SIMILAR = "similar"
     OTHER_VERSION = "other_version"
+
+
+class MetricKind(StrEnum):
+    """What a count measures."""
+
+    LISTENS = "listens"
+    LISTENERS = "listeners"
 
 
 class EntityType(StrEnum):
@@ -224,6 +234,14 @@ class Text(Fact):
     language: str | None = None
 
 
+class Metric(Fact):
+    """Count or score that one source reports; never combined across sources."""
+
+    kind: MetricKind
+    value: float
+    scale: float | None = Field(default=None, description="Highest possible value, if bounded")
+
+
 class Entity(_Model):
     """Something the record is related to."""
 
@@ -295,6 +313,7 @@ class Partial(_Model):
     credits: list[Credit] = []
     texts: list[Text] = []
     relations: list[Relation] = []
+    metrics: list[Metric] = []
     links: list[Link] = []
     errors: list[AdapterError] = []
 
@@ -308,6 +327,7 @@ class Dossier(_Model):
     credits: list[Credit] = []
     texts: list[Text] = []
     relations: list[Relation] = []
+    metrics: list[Metric] = []
     links: list[Link] = []
     errors: list[AdapterError] = []
     generated_at: AwareDatetime

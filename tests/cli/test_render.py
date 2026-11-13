@@ -27,7 +27,8 @@ def test_pretty_dossier_shows_every_section_with_sources(dossier: Dossier) -> No
     text = rendered(dossier)
 
     assert text.startswith("Everything but the Girl — Missing")
-    for section in ("Identity", "Tags", "Credits", "Texts", "Relations", "Links", "Errors"):
+    sections = ("Identity", "Tags", "Credits", "Texts", "Relations", "Metrics", "Links", "Errors")
+    for section in sections:
         assert f"\n{section}\n" in text
     assert "remix (Todd Terry remix)" in text
     assert "Blanco y Negro, NEG84CD" in text
@@ -40,6 +41,8 @@ def test_pretty_dossier_shows_every_section_with_sources(dossier: Dossier) -> No
     assert "remix of\n  Missing (the song this recording performs) — musicbrainz" in text
     assert "Now 32 (Various, 1995)" in text
     assert "blocked" in text
+    assert "listens    3,099,604  recording" in text
+    assert "4.5/10" in text
 
 
 def test_each_source_is_named_once_per_fact(dossier: Dossier) -> None:

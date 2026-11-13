@@ -30,6 +30,7 @@ class Capability(StrEnum):
     CREDITS = "credits"
     TEXTS = "texts"
     RELATIONS = "relations"
+    METRICS = "metrics"
 
 
 class SourceGroup(StrEnum):

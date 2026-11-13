@@ -72,6 +72,8 @@ async def test_mainstream_track(replay: Replay, config: SourcesConfig) -> None:
         "odesli",
         "lastfm",
         "wikipedia",
+        "secondhandsongs",
+        "kexp",
     }
     assert identity.version.kind is VersionKind.ORIGINAL
     assert identity.date is not None
@@ -256,7 +258,17 @@ async def test_selection_and_cache(replay: Replay, config: SourcesConfig, tmp_pa
     second = await lookup(
         query,
         cached,
-        exclude=["musicbrainz", "deezer", "odesli", "discogs", "bandcamp", "lastfm", "wikipedia"],
+        exclude=[
+            "musicbrainz",
+            "deezer",
+            "odesli",
+            "discogs",
+            "bandcamp",
+            "lastfm",
+            "wikipedia",
+            "catalogues",
+            "radio",
+        ],
         transport=replay("no_match"),
     )
 
@@ -335,7 +347,11 @@ def test_describe_sources_marks_groups_and_the_default_set() -> None:
         SourcesConfig.model_validate({"default_sources": "musicbrainz, deezer"}),
     )
 
-    assert {info.group for info in infos} == {SourceGroup.CORE}
+    assert {info.group for info in infos} == {
+        SourceGroup.CORE,
+        SourceGroup.CATALOGUES,
+        SourceGroup.RADIO,
+    }
     assert [info.source for info in infos if info.default] == ["musicbrainz", "deezer"]
     assert all(info.default for info in describe_sources())
 
@@ -349,6 +365,7 @@ def test_describe_sources() -> None:
 
     assert list(sources) == [
         "musicbrainz", "odesli", "itunes", "deezer", "discogs", "bandcamp", "lastfm", "wikipedia",
+        "listenbrainz", "secondhandsongs", "kexp",
     ]  # fmt: skip
     assert sources["musicbrainz"].pass_ is Pass.IDENTITY
     assert sources["odesli"].status.ready
@@ -360,3 +377,38 @@ def test_describe_sources() -> None:
     assert sources["lastfm"].status.state is SourceState.MISSING_CREDENTIAL
     assert [r.setting for r in sources["lastfm"].requires] == ["lastfm.api_key"]
     assert sources["wikipedia"].status.ready
+
+
+@pytest.mark.asyncio
+async def test_covers_from_two_sources_merge_per_target(
+    replay: Replay,
+    config: SourcesConfig,
+) -> None:
+    query = parse_query("Tim Buckley - Song to the Siren", EntityKind.TRACK)
+
+    dossier = await lookup(query, config, exclude=["lastfm"], transport=replay("siren_covers"))
+
+    covers = [r for r in dossier.relations if r.kind is RelationKind.COVERED_BY]
+    targets = [(r.target.artist, r.target.name) for r in covers]
+    assert len(targets) == len(set(targets))
+    by_artist = {r.target.artist: {s.source for s in r.sources} for r in covers}
+    assert by_artist["This Mortal Coil"] == {"musicbrainz", "secondhandsongs"}
+    first = next(r for r in dossier.relations if r.note == "first performance")
+    assert (first.kind, first.target.artist) == (RelationKind.OTHER_VERSION, "Tim Buckley")
+    assert ("writer", "Larry Beckett") in {(c.role, c.name) for c in dossier.credits}
+    assert {m.sources[0].source for m in dossier.metrics} == {"listenbrainz"}
+
+
+@pytest.mark.asyncio
+async def test_radio_plays_and_host_comments(replay: Replay, config: SourcesConfig) -> None:
+    query = parse_query("Radiohead - Reckoner", EntityKind.TRACK)
+
+    dossier = await lookup(query, config, exclude=["lastfm"], transport=replay("reckoner"))
+
+    broadcasts = [r for r in dossier.relations if r.kind is RelationKind.BROADCAST]
+    assert len({r.target.date for r in broadcasts}) == len(broadcasts) > 1
+    assert all(r.target.name.startswith("KEXP") for r in broadcasts)
+    comments = [t for t in dossier.texts if t.kind is TextKind.BROADCAST]
+    assert comments
+    assert any(len(t.sources) > 1 for t in comments)
+    assert [e for e in dossier.errors if e.kind is ErrorKind.FAILED] == []

@@ -174,6 +174,23 @@ def _relations(dossier: Dossier) -> list[Text | Table]:
     return parts
 
 
+def _number(value: float) -> str:
+    return f"{int(value):,}" if value.is_integer() else f"{value:g}"
+
+
+def _metrics(dossier: Dossier) -> list[Text | Table]:
+    table = _table("metric", "value", "scope", "sources")
+    for metric in dossier.metrics:
+        scale = f"/{_number(metric.scale)}" if metric.scale is not None else ""
+        table.add_row(
+            metric.kind.value,
+            f"{_number(metric.value)}{scale}",
+            metric.scope.value.replace("_", " "),
+            _sources(metric.sources),
+        )
+    return [_heading("Metrics"), table]
+
+
 def _links(dossier: Dossier) -> list[Text | Table]:
     table = _table("service", "target", "url", "sources")
     for link in dossier.links:
@@ -211,6 +228,7 @@ def pretty_dossier(dossier: Dossier) -> Group:
         (dossier.credits, _credits),
         (dossier.texts, _texts),
         (dossier.relations, _relations),
+        (dossier.metrics, _metrics),
         (dossier.links, _links),
         (dossier.errors, _errors),
     )
