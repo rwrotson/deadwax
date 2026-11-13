@@ -18,7 +18,13 @@ from deadwax.core import (
 )
 from deadwax.sources import SourcesConfig
 from deadwax.sources._http import HttpResources
-from deadwax.sources.odesli import OdesliAdapter, page_data, partial, service_name
+from deadwax.sources.odesli import (
+    OdesliAdapter,
+    PageData,
+    page_data,
+    partial,
+    service_name,
+)
 
 SPOTIFY = "https://open.spotify.com/track/6LgJvl0Xdtc73RJ1mmpotq"
 AMAZON = "https://music.amazon.com/albums/B01"
@@ -139,6 +145,38 @@ def test_unknown_record_redirects_to_a_page_without_data() -> None:
 def test_unexpected_pages(body: bytes) -> None:
     with pytest.raises(SourceError):
         page_data(body, "https://song.link/x")
+
+
+def test_links_to_another_record_on_the_seed_provider_are_dropped() -> None:
+    # song.link's page of Apple track 5027215 linked the instrumental 5027223 (2026-11-13).
+    original = "https://geo.music.apple.com/de/album/_/5027229?i=5027215&mt=1&app=music"
+    instrumental = "https://geo.music.apple.com/de/album/_/5027229?i=5027223&mt=1&app=music"
+    deezer = "https://www.deezer.com/track/67629072"
+    data = PageData.model_validate(
+        {
+            "entityUniqueId": "itunes|song|5027215",
+            "entityData": {
+                "type": "song",
+                "id": "5027215",
+                "provider": "itunes",
+                "title": "Planet of the Blue",
+                "artistName": "Billie Ray Martin",
+            },
+            "sections": [
+                {
+                    "links": [
+                        {"platform": "appleMusic", "url": instrumental},
+                        {"platform": "itunes", "url": original},
+                        {"platform": "deezer", "url": deezer},
+                    ],
+                },
+            ],
+        },
+    )
+
+    links = partial(data).links
+
+    assert [link.url for link in links] == [original, deezer]
 
 
 def test_page_without_entity_has_links_only() -> None:

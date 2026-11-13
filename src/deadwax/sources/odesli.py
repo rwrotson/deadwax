@@ -35,6 +35,13 @@ _PLATFORMS = {
     "youtubeMusic": "youtube_music",
 }
 
+# Platforms whose links name records in the ID space of an entity provider.
+_PROVIDER_PLATFORMS = {
+    "itunes": frozenset({"appleMusic", "itunes"}),
+    "youtube": frozenset({"youtube", "youtubeMusic"}),
+    "amazon": frozenset({"amazonMusic", "amazonStore"}),
+}
+
 
 class _Page(BaseModel):
     model_config = ConfigDict(frozen=True, extra="ignore", populate_by_name=True)
@@ -44,6 +51,8 @@ class Entity(_Page):
     """Song or album the page is about, as the seed platform knows it."""
 
     type: str
+    id: str | None = None
+    provider: str | None = None
     title: str | None = None
     artist_name: str | None = Field(default=None, alias="artistName")
     isrc: str | None = None
@@ -108,6 +117,20 @@ class _NextData(_Page):
     props: _Props = _Props()
 
 
+def contradicts(entity: Entity | None, link: PlatformLink) -> bool:
+    """Whether a link on the entity's own provider names another record than the entity.
+
+    song.link sometimes links a different version on the seed's platform, such as an
+    instrumental of the seed track.
+    """
+    if entity is None or entity.provider is None or entity.id is None or link.url is None:
+        return False
+    platforms = _PROVIDER_PLATFORMS.get(entity.provider, frozenset({entity.provider}))
+    if link.platform not in platforms:
+        return False
+    return entity.id not in re.findall(r"[A-Za-z0-9]+", link.url)
+
+
 def partial(data: PageData) -> Partial:
     """Describe the record and list its link on every platform Odesli matched."""
     entity = data.entity
@@ -130,7 +153,10 @@ def partial(data: PageData) -> Partial:
         link.url: link
         for section in data.sections
         for link in section.links
-        if link.url and link.show and re.match(r"^https?://", link.url)
+        if link.url
+        and link.show
+        and re.match(r"^https?://", link.url)
+        and not contradicts(entity, link)
     }
 
     return Partial(

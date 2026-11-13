@@ -47,7 +47,7 @@ The README lists sources planned for later versions and those deadwax will not u
 - **Access:** the song.link web page of a streaming link, fetched with the browser profile and the escalation ladder. Odesli has had no public API since 2026-07-31.
 - **Finds the record by:** the query URL, or a Spotify, Apple Music, Deezer, Tidal or YouTube link found by an earlier source. Without one it reports `not_found`.
 - **Contributes:** links on every platform Odesli matches, plus the title, artist, and ISRC or UPC of the record.
-- **Limits:** a platform that spells the artist differently gives `no_match`.
+- **Limits:** a platform that spells the artist differently gives `no_match`. song.link sometimes links another version on the seed's own platform, such as an instrumental; a link there that does not name the seed's ID is dropped. Links on other platforms are taken as song.link gives them.
 
 ## Discogs
 
