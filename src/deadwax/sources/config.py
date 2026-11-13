@@ -62,6 +62,8 @@ class Escalation(StrEnum):
     NONE = "none"
     IMPERSONATE = "impersonate"
     BROWSER = "browser"
+    PATCHRIGHT = "patchright"
+    NODRIVER = "nodriver"
 
 
 class HttpSettings(_Model):
@@ -86,6 +88,10 @@ class HttpSettings(_Model):
     escalation: Escalation | None = Field(
         default=None,
         description="Strongest transport for blocked HTML pages; unset: strongest installed",
+    )
+    browser_headless: bool = Field(
+        default=True,
+        description="Run Patchright and Nodriver without a visible browser window",
     )
     max_response_bytes: int = Field(
         default=10_000_000,

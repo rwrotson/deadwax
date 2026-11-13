@@ -14,6 +14,7 @@ from .client import (
 )
 from .impersonate import ImpersonateFetcher
 from .messages import Fetcher, Request, Response, ResponseTooLargeError, TransportError
+from .nodriver import NodriverFetcher
 from .plain import HttpxFetcher
 from .profiles import (
     BROWSERS,
@@ -42,6 +43,7 @@ __all__ = [
     "HttpResources",
     "HttpxFetcher",
     "ImpersonateFetcher",
+    "NodriverFetcher",
     "Profile",
     "RateLimiter",
     "Request",

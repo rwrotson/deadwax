@@ -167,17 +167,18 @@ Bandcamp, Beatport, Hard Wax, Soundohm, and Juno pages, the song.link page, and 
 |------|----------|
 | httpx | base install |
 | curl_cffi with Chrome TLS impersonation | `deadwax[stealth]` |
-| Playwright Chromium | `deadwax[browser]` and `playwright install chromium` |
+| Patchright Chromium | `deadwax[browser]` or `deadwax[patchright]`, then `patchright install chromium` |
+| Nodriver Chrome | `deadwax[nodriver]` and a local Chrome installation |
 
-`DEADWAX_HTTP__ESCALATION=none|impersonate|browser` caps the ladder. By default it goes up to the strongest available step: when a step cannot run (the `browser` extra is installed but Chromium is not), the ladder ends below it and the page is reported as `blocked` with the reason and the install hint. A step chosen explicitly that cannot run is a configuration error. API sources never escalate.
+`DEADWAX_HTTP__ESCALATION=none|impersonate|browser|patchright|nodriver` caps the ladder; `browser` is a compatible name for Patchright. By default it goes up to the strongest installed step. A step that cannot run ends the ladder with `blocked` and an install hint; an explicitly chosen step that cannot run is a configuration error. `DEADWAX_HTTP__BROWSER_HEADLESS=false` opens a visible browser window; the default is headless. API sources never escalate.
 
 A refused page is remembered in the cache for `cache.blocked_ttl` (default one day) and reported as `blocked … (cached)` without a request. After installing an escalation step, run once with `--no-cache`.
 
 ## Proxies
 
-By default every transport except Chromium uses the proxy from `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`, and `NO_PROXY` in the process environment. `.env` does not set these variables: deadwax reads it into its own settings only.
+By default HTTP transports use proxy variables from the environment; browsers use their own proxy configuration. `.env` does not set proxy variables for other processes.
 
-`DEADWAX_HTTP__PROXY` sets the proxy of every source, and `DEADWAX_<SOURCE>__PROXY` overrides it for one source. The value is `direct` (no proxy, the environment ignored) or an `http://` or `https://` proxy URL with a port, optionally with `user:password@`. The setting applies to httpx, curl_cffi, and Chromium. Bot protection sometimes refuses a proxy's exit address, for example Akamai for Deezer or Cloudflare for Discogs review pages. In that case, `DEADWAX_DEEZER__PROXY=direct` sends that source's requests past the proxy.
+`DEADWAX_HTTP__PROXY` sets the proxy of every source, and `DEADWAX_<SOURCE>__PROXY` overrides it for one source. The value is `direct` or an `http://` or `https://` proxy URL with a port. Nodriver cannot use a proxy that requires a user name and password; it reports a configuration error in that case. Bot protection can refuse a proxy's exit address; `DEADWAX_DEEZER__PROXY=direct` bypasses it for Deezer.
 
 A page refused on one route does not count as refused on another: changing a source's proxy ignores its cached `blocked` entries.
 

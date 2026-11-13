@@ -65,7 +65,8 @@ A base install (`pip install deadwax`) depends on Pydantic, httpx, and selectola
 | `deadwax[logs]` | `deadwax.logs`: `LogSettings` and `setup_logging()` (structlog) |
 | `deadwax[cli]` | The `deadwax` command (Typer, Pydantic Settings, rich, platformdirs) and the `logs` extra |
 | `deadwax[stealth]` | curl_cffi transport for pages behind bot protection |
-| `deadwax[browser]` | Playwright transport; run `playwright install chromium` once |
+| `deadwax[browser]` or `deadwax[patchright]` | Patchright transport; run `patchright install chromium` once |
+| `deadwax[nodriver]` | Nodriver transport; install Chrome separately |
 
 Configure logging in the application, or use the bundled helper:
 

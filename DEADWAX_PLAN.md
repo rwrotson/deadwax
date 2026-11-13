@@ -523,7 +523,13 @@ Decision (user): Phonica leaves Stage 12 and joins the unscheduled blocking item
 
 Stage 12 closed: Hard Wax, Soundohm, Juno, and shop-text deduplication meet the acceptance; Juno's live verification is the single agent run recorded above, Hard Wax and Soundohm were live-verified, deduplication is mock-tested only.
 
-**Current task:** Stage 13 (not started). **Next action:** check access to Boomkat, Norman Records, Forced Exposure and Bleep before coding.
+**Current task:** Stage 13 (access checked; adapters not started). **Next action:** use the Playwright-rendered Bleep pages and obtain saved search and product pages for Boomkat, Norman Records, and Forced Exposure, or working live access.
+
+### 2026-11-13 — Stage 13 access check (in progress)
+
+The working tree was clean before the check. Requests for the Boomkat `Untrue`, Norman Records `Untrue`, Bleep `Untrue`, and Forced Exposure home pages returned HTTP 403 from this environment. Norman Records returned a Cloudflare "Just a moment" page both with plain curl and with the installed curl_cffi Chrome impersonation. Removing proxy environment variables did not change its response. The search index shows product pages for Boomkat, Norman Records, Bleep, and Forced Exposure, but it does not expose their HTML structure or verify that deadwax can fetch them. No adapter or parser was added; Stage 13 remains open. Saved search and product pages, or working live access, are needed to build verified extraction fixtures.
+
+Playwright Chromium follow-up: Boomkat and Norman Records product URLs still returned 403 Cloudflare pages; a Forced Exposure product returned 403. Bleep's `Untrue` product returned HTTP 202 and, after eight seconds, rendered its actual page (artist, title, date, description, tracklist). Its search form is `GET /search/query?q=…`: `Burial Untrue` returned no results, while `Untrue` returned the release. The rendered product and search HTML were saved temporarily at `/tmp/bleep_untrue.html` and `/tmp/bleep_search_untrue.html` for parser research; they are not repository fixtures. No adapter or parser was added; the other three sources still need readable pages.
 
 ## Resume instructions
 

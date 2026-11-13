@@ -13,14 +13,14 @@ from deadwax.sources._http.profiles import CHROME, BrowserIdentity
 from deadwax.sources.config import DIRECT
 
 if TYPE_CHECKING:
-    from playwright.async_api import Browser, BrowserContext, Playwright
-    from playwright.async_api import Response as PageResponse
+    from patchright.async_api import Browser, BrowserContext, Playwright
+    from patchright.async_api import Response as PageResponse
 
 MISSING_EXTRA = (
     "browser fetching needs the 'browser' extra: pip install 'deadwax[browser]', "
-    "then run 'playwright install chromium'"
+    "then run 'patchright install chromium'"
 )
-MISSING_BROWSER = "Chromium for Playwright is not installed: run 'playwright install chromium'"
+MISSING_BROWSER = "Chromium for Patchright is not installed: run 'patchright install chromium'"
 
 # A challenge page reloads itself once solved; this bounds the wait for that, in milliseconds.
 _SETTLE_MS = 5000.0
@@ -42,7 +42,7 @@ def launch_proxy(proxy: str | None) -> dict[str, Any]:
 
 
 class BrowserFetcher:
-    """Headless Chromium that loads pages the way a visitor's browser does."""
+    """Patchright Chromium that loads pages the way a visitor's browser does."""
 
     name = "browser"
 
@@ -53,27 +53,29 @@ class BrowserFetcher:
         max_bytes: int,
         identity: BrowserIdentity = CHROME,
         proxy: str | None = None,
+        headless: bool = True,
     ) -> None:
         try:
-            import playwright.async_api  # noqa: F401, PLC0415 -- optional extra (R7)
+            import patchright.async_api  # noqa: F401, PLC0415 -- optional extra (R7)
         except ImportError as error:
             raise ConfigurationError(MISSING_EXTRA) from error
         self._timeout_ms = timeout * 1000
         self._max_bytes = max_bytes
         self._identity = identity
         self._proxy = proxy
+        self._headless = headless
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
 
     async def _open(self) -> BrowserContext:
-        from playwright.async_api import Error, async_playwright  # noqa: PLC0415 -- optional (R7)
+        from patchright.async_api import Error, async_playwright  # noqa: PLC0415 -- optional (R7)
 
         if self._context is None:
             self._playwright = await async_playwright().start()
             try:
                 self._browser = await self._playwright.chromium.launch(
-                    headless=True,
+                    headless=self._headless,
                     **launch_proxy(self._proxy),
                 )
             except Error as error:
@@ -90,7 +92,7 @@ class BrowserFetcher:
 
     async def fetch(self, request: Request) -> Response:
         """Load the page, wait for a challenge to clear, and return the rendered HTML."""
-        from playwright.async_api import Error  # noqa: PLC0415 -- optional extra (R7)
+        from patchright.async_api import Error  # noqa: PLC0415 -- optional extra (R7)
 
         if request.method != "GET":
             raise SourceError(f"the browser transport cannot send {request.method} requests")
@@ -124,11 +126,13 @@ class BrowserFetcher:
             await page.close()
         if len(content) > self._max_bytes:
             raise ResponseTooLargeError(f"response is larger than {self._max_bytes} bytes")
-        status = final.status if final is not None else 200
+        if final is None:
+            raise TransportError("the browser did not receive a document response")
+        status = final.status
         return Response(url=url, status=status, content=content, headers=headers)
 
     async def aclose(self) -> None:
-        """Close the browser and stop Playwright."""
+        """Close the browser and stop Patchright."""
         if self._context is not None:
             await self._context.close()
         if self._browser is not None:

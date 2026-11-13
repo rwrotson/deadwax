@@ -147,11 +147,11 @@ def scenario(monkeypatch: pytest.MonkeyPatch) -> Scenario:
         async def start(self) -> FakePlaywright:
             return FakePlaywright(state)
 
-    api = types.ModuleType("playwright.async_api")
+    api = types.ModuleType("patchright.async_api")
     api.Error = FakeError  # type: ignore[attr-defined]
     api.async_playwright = Manager  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "playwright", types.ModuleType("playwright"))
-    monkeypatch.setitem(sys.modules, "playwright.async_api", api)
+    monkeypatch.setitem(sys.modules, "patchright", types.ModuleType("patchright"))
+    monkeypatch.setitem(sys.modules, "patchright.async_api", api)
     return state
 
 
@@ -180,14 +180,12 @@ async def test_page_status_is_the_last_main_navigation(scenario: Scenario) -> No
 
 
 @pytest.mark.asyncio
-async def test_page_without_navigation_counts_as_ok(scenario: Scenario) -> None:
+async def test_page_without_navigation_fails(scenario: Scenario) -> None:
     scenario.statuses = []
     fetcher = BrowserFetcher(timeout=5, max_bytes=100)
 
-    response = await fetcher.fetch(PAGE)
-
-    assert response.status == 200
-    assert response.headers == {}
+    with pytest.raises(TransportError, match="did not receive a document response"):
+        await fetcher.fetch(PAGE)
 
 
 @pytest.mark.asyncio
@@ -210,14 +208,14 @@ async def test_missing_chromium_is_a_configuration_error(scenario: Scenario) -> 
     scenario.launch_fails = True
     fetcher = client_module._browser(HttpSettings(), None)
 
-    with pytest.raises(ConfigurationError, match="playwright install chromium"):
+    with pytest.raises(ConfigurationError, match="patchright install chromium"):
         await fetcher.fetch(PAGE)
 
     assert scenario.closed == ["playwright"]
 
 
 def test_missing_extra_is_named(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setitem(sys.modules, "playwright", None)
+    monkeypatch.setitem(sys.modules, "patchright", None)
 
     with pytest.raises(ConfigurationError, match=r"deadwax\[browser\]"):
         BrowserFetcher(timeout=5, max_bytes=5)

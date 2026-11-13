@@ -290,10 +290,14 @@ async def test_blocked_when_every_transport_meets_a_challenge() -> None:
     setup.fetchers = {
         Escalation.IMPERSONATE: FakeFetcher("impersonate", [page(403, CHALLENGE)]),
         Escalation.BROWSER: FakeFetcher("browser", [page(200, CHALLENGE)]),
+        Escalation.NODRIVER: FakeFetcher("nodriver", [page(200, CHALLENGE)]),
     }
 
     async with setup.client(Profile.BROWSER) as client:
-        with pytest.raises(BlockedError, match=r"tried httpx, impersonate, browser") as raised:
+        with pytest.raises(
+            BlockedError,
+            match=r"tried httpx, impersonate, browser, nodriver",
+        ) as raised:
             await client.get(URL)
 
     assert raised.value.url == URL
@@ -459,13 +463,24 @@ async def test_blocked_pages_are_not_cached_with_zero_ttl(tmp_path: Path) -> Non
     [
         (None, set(), []),
         (None, {"curl_cffi"}, [Escalation.IMPERSONATE]),
-        (None, {"playwright"}, [Escalation.BROWSER]),
-        (None, {"curl_cffi", "playwright"}, [Escalation.IMPERSONATE, Escalation.BROWSER]),
-        (Escalation.NONE, {"curl_cffi", "playwright"}, []),
+        (None, {"patchright"}, [Escalation.BROWSER]),
+        (None, {"nodriver"}, [Escalation.NODRIVER]),
+        (
+            None,
+            {"curl_cffi", "patchright", "nodriver"},
+            [Escalation.IMPERSONATE, Escalation.BROWSER, Escalation.NODRIVER],
+        ),
+        (Escalation.NONE, {"curl_cffi", "patchright"}, []),
         (Escalation.IMPERSONATE, set(), [Escalation.IMPERSONATE]),
-        (Escalation.IMPERSONATE, {"playwright"}, [Escalation.IMPERSONATE]),
+        (Escalation.IMPERSONATE, {"patchright"}, [Escalation.IMPERSONATE]),
         (Escalation.BROWSER, set(), [Escalation.BROWSER]),
         (Escalation.BROWSER, {"curl_cffi"}, [Escalation.IMPERSONATE, Escalation.BROWSER]),
+        (Escalation.PATCHRIGHT, {"curl_cffi"}, [Escalation.IMPERSONATE, Escalation.BROWSER]),
+        (
+            Escalation.NODRIVER,
+            {"curl_cffi", "patchright"},
+            [Escalation.IMPERSONATE, Escalation.BROWSER, Escalation.NODRIVER],
+        ),
     ],
 )
 def test_escalation_steps(
@@ -493,7 +508,11 @@ def test_default_resources() -> None:
     resources = HttpResources()
 
     assert resources.cache is None
-    assert set(resources.escalations) == {Escalation.IMPERSONATE, Escalation.BROWSER}
+    assert set(resources.escalations) == {
+        Escalation.IMPERSONATE,
+        Escalation.BROWSER,
+        Escalation.NODRIVER,
+    }
     assert resources.now().tzinfo is UTC
     assert client_module._installed("json")
     assert not client_module._installed("deadwax_missing_package")

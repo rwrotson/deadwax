@@ -45,7 +45,8 @@ print(dossier.model_dump_json(indent=2))
 | `deadwax[logs]` | `deadwax.logs`: `LogSettings`, `setup_logging()`, and the run journal (structlog) |
 | `deadwax[cli]` | The `deadwax` command (Typer, Pydantic Settings, rich, platformdirs) and `logs` |
 | `deadwax[stealth]` | curl_cffi browser TLS impersonation for pages behind bot protection |
-| `deadwax[browser]` | Playwright fallback for pages that need a real browser (`playwright install chromium`) |
+| `deadwax[browser]` or `deadwax[patchright]` | Patchright Chromium fallback (`patchright install chromium`) |
+| `deadwax[nodriver]` | Nodriver Chrome fallback (install Chrome separately) |
 
 ## Sources
 

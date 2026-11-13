@@ -11,7 +11,7 @@ Layers are listed from top to bottom. A layer may import any layer below it and 
 | Entry point | `deadwax/main.py` | `deadwax` console script; reports a missing `cli` extra | — | base |
 | CLI | `deadwax/cli/` | Composition root: loads `DEADWAX_*` settings, sets up logging, calls the library, renders output, maps errors to exit codes | Pydantic Settings, Typer, rich, platformdirs | `deadwax[cli]` |
 | Logging setup | `deadwax/logs/` | `LogSettings`, the opt-in `setup_logging()`, and the run journal (`run_journal()`) for applications | structlog | `deadwax[logs]` |
-| Sources | `deadwax/sources/` | Adapters, HTTP stack (rate limits, retries, cache, escalation), `lookup()` | httpx, selectolax; curl_cffi, Playwright | base; `deadwax[stealth]`, `deadwax[browser]` |
+| Sources | `deadwax/sources/` | Adapters, HTTP stack (rate limits, retries, cache, escalation), `lookup()` | httpx, selectolax; curl_cffi, Patchright, Nodriver | base; `deadwax[stealth]`, `deadwax[browser]`, `deadwax[nodriver]` |
 | Core | `deadwax/core/` | Models, query parsing, normalization, matching, merge, adapter protocol, orchestrator, `DeadwaxError` hierarchy | Pydantic | base |
 
 `deadwax/__init__.py` re-exports the supported names with `__all__` and attaches a `NullHandler` to the `deadwax` logger. `deadwax.logs` raises a `ModuleNotFoundError` that names the `logs` extra when structlog is missing.
@@ -58,7 +58,7 @@ Inside `deadwax.sources._http` (contract "R8: HTTP stack modules"), from top to 
 
 ```
 client
-impersonate | browser | plain | cache
+impersonate | browser | nodriver | plain | cache
 challenge | profiles | ratelimit | retry | messages
 ```
 
@@ -88,7 +88,8 @@ A change to this order is recorded in the decision log of `DEADWAX_PLAN.md`.
 | pydantic | every layer |
 | httpx, selectolax | `deadwax.sources` |
 | curl_cffi | `deadwax.sources._http.impersonate` |
-| playwright | `deadwax.sources._http.browser` |
+| patchright | `deadwax.sources._http.browser` |
+| nodriver | `deadwax.sources._http.nodriver` |
 | structlog | `deadwax.logs` |
 | pydantic_settings, platformdirs | `deadwax.cli.settings` |
 | typer | `deadwax.cli` |
@@ -98,7 +99,7 @@ Transitive dependencies (anyio, h2, httpcore, click, and others) are never impor
 
 ### R7. Lazy optional imports
 
-curl_cffi and Playwright are imported inside the function that needs them; a missing package raises `ConfigurationError` naming the extra. Type-only references go under `if TYPE_CHECKING:`. `import deadwax` does not load structlog, Pydantic Settings, Typer, rich, platformdirs, curl_cffi, or Playwright; `tests/test_package.py` checks this in a fresh interpreter. `deadwax` imports `deadwax.sources` on first use of one of its names (`lookup`, `SourcesConfig`, …), because httpx loads rich and click at import time whenever they are installed.
+curl_cffi, Patchright, and Nodriver are imported inside the function that needs them; a missing package raises `ConfigurationError` naming the extra. Type-only references go under `if TYPE_CHECKING:`. `import deadwax` does not load structlog, Pydantic Settings, Typer, rich, platformdirs, curl_cffi, Patchright, or Nodriver; `tests/test_package.py` checks this in a fresh interpreter. `deadwax` imports `deadwax.sources` on first use of one of its names (`lookup`, `SourcesConfig`, …), because httpx loads rich and click at import time whenever they are installed.
 
 ### R8. Style (Ruff and review)
 

@@ -38,7 +38,8 @@ OPTIONAL_PACKAGES = (
     "rich",
     "platformdirs",
     "curl_cffi",
-    "playwright",
+    "patchright",
+    "nodriver",
 )
 
 

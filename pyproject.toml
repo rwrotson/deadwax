@@ -60,7 +60,13 @@ stealth = [
     "curl-cffi>=0.17.0",
 ]
 browser = [
-    "playwright>=1.65.1",
+    "patchright>=1.64.4",
+]
+patchright = [
+    "patchright>=1.64.4",
+]
+nodriver = [
+    "nodriver>=0.50.99",
 ]
 
 [dependency-groups]
@@ -69,8 +75,9 @@ dev = [
     "curl-cffi>=0.17.0",
     "import-linter>=2.15",
     "mypy>=2.4.0",
+    "nodriver>=0.50.99",
+    "patchright>=1.64.4",
     "platformdirs>=4.12.4",
-    "playwright>=1.65.1",
     "poethepoet>=0.48.0",
     "pre-commit>=4.6.2",
     "pydantic-settings>=2.15.0",
@@ -386,7 +393,7 @@ type = "layers"
 containers = ["deadwax.sources._http"]
 layers = [
     "client",
-    "impersonate | browser | plain | cache",
+    "impersonate | browser | nodriver | plain | cache",
     "challenge | profiles | ratelimit | retry | messages",
 ]
 
@@ -414,7 +421,8 @@ forbidden_modules = [
     "httpx",
     "selectolax",
     "curl_cffi",
-    "playwright",
+    "patchright",
+    "nodriver",
     "structlog",
     "pydantic_settings",
     "platformdirs",
@@ -438,7 +446,8 @@ forbidden_modules = [
     "httpx",
     "selectolax",
     "curl_cffi",
-    "playwright",
+    "patchright",
+    "nodriver",
     "pydantic_settings",
     "platformdirs",
     "typer",
@@ -449,7 +458,7 @@ forbidden_modules = [
 name = "R6: HTTP and HTML packages are used only by sources"
 type = "forbidden"
 source_modules = ["deadwax.main", "deadwax.cli"]
-forbidden_modules = ["httpx", "selectolax", "curl_cffi", "playwright"]
+forbidden_modules = ["httpx", "selectolax", "curl_cffi", "patchright", "nodriver"]
 # The CLI reaches them through the deadwax package.
 allow_indirect_imports = true
 
@@ -461,11 +470,18 @@ forbidden_modules = ["curl_cffi"]
 ignore_imports = ["deadwax.sources._http.impersonate -> curl_cffi"]
 
 [[tool.importlinter.contracts]]
-name = "R6: Playwright is used only by the browser transport"
+name = "R6: Patchright is used only by the browser transport"
 type = "forbidden"
 source_modules = ["deadwax"]
-forbidden_modules = ["playwright"]
-ignore_imports = ["deadwax.sources._http.browser -> playwright"]
+forbidden_modules = ["patchright"]
+ignore_imports = ["deadwax.sources._http.browser -> patchright"]
+
+[[tool.importlinter.contracts]]
+name = "R6: Nodriver is used only by its transport"
+type = "forbidden"
+source_modules = ["deadwax"]
+forbidden_modules = ["nodriver"]
+ignore_imports = ["deadwax.sources._http.nodriver -> nodriver"]
 
 [[tool.importlinter.contracts]]
 name = "R6: transitive dependencies are not imported directly"

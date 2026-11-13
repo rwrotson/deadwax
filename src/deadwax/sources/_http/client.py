@@ -26,6 +26,7 @@ from deadwax.sources._http.cache import ResponseCache, cache_key
 from deadwax.sources._http.challenge import detect_challenge
 from deadwax.sources._http.impersonate import ImpersonateFetcher
 from deadwax.sources._http.messages import Fetcher, Request, Response, TransportError
+from deadwax.sources._http.nodriver import NodriverFetcher
 from deadwax.sources._http.plain import HttpxFetcher
 from deadwax.sources._http.profiles import CHROME, Profile, api_headers, browser_headers
 from deadwax.sources._http.ratelimit import HostLimiters, Sleep
@@ -48,7 +49,11 @@ _ENVIRONMENT_ROUTE = "environment"
 _TOO_MANY_REQUESTS = 429
 
 # Extras that provide each escalation step.
-_EXTRA_PACKAGES = {Escalation.IMPERSONATE: "curl_cffi", Escalation.BROWSER: "playwright"}
+_EXTRA_PACKAGES = {
+    Escalation.IMPERSONATE: "curl_cffi",
+    Escalation.BROWSER: "patchright",
+    Escalation.NODRIVER: "nodriver",
+}
 
 
 def _impersonate(settings: HttpSettings, proxy: str | None) -> Fetcher:
@@ -59,11 +64,21 @@ def _impersonate(settings: HttpSettings, proxy: str | None) -> Fetcher:
     )
 
 
+def _nodriver(settings: HttpSettings, proxy: str | None) -> Fetcher:
+    return NodriverFetcher(
+        timeout=settings.timeout,
+        max_bytes=settings.max_response_bytes,
+        proxy=proxy,
+        headless=settings.browser_headless,
+    )
+
+
 def _browser(settings: HttpSettings, proxy: str | None) -> Fetcher:
     return BrowserFetcher(
         timeout=settings.timeout,
         max_bytes=settings.max_response_bytes,
         proxy=proxy,
+        headless=settings.browser_headless,
     )
 
 
@@ -84,7 +99,9 @@ def escalation_steps(
     Unset means every installed one; an explicit setting keeps its own step even when the
     extra is missing, so that the missing extra is reported.
     """
-    steps = [Escalation.IMPERSONATE, Escalation.BROWSER]
+    steps = [Escalation.IMPERSONATE, Escalation.BROWSER, Escalation.NODRIVER]
+    if setting is Escalation.PATCHRIGHT:
+        setting = Escalation.BROWSER
     if setting is None:
         return [step for step in steps if installed(_EXTRA_PACKAGES[step])]
     allowed = steps[: steps.index(setting) + 1] if setting is not Escalation.NONE else []
@@ -124,6 +141,7 @@ class HttpResources:
         default_factory=lambda: {
             Escalation.IMPERSONATE: _impersonate,
             Escalation.BROWSER: _browser,
+            Escalation.NODRIVER: _nodriver,
         },
     )
     installed: Callable[[str], bool] = _installed
