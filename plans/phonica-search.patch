@@ -1,0 +1,536 @@
+diff --git a/pyproject.toml b/pyproject.toml
+index 4646042..b70524b 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -384,7 +384,7 @@ layers = ["adapter", "parse"]
+ name = "R8: Phonica adapter modules"
+ type = "layers"
+ containers = ["deadwax.sources.phonica"]
+-layers = ["adapter", "parse"]
++layers = ["adapter", "parse", "models"]
+ 
+ [[tool.importlinter.contracts]]
+ name = "R8: HTTP stack modules"
+diff --git a/src/deadwax/sources/phonica/adapter.py b/src/deadwax/sources/phonica/adapter.py
+index a29f1d0..a0e5a41 100644
+--- a/src/deadwax/sources/phonica/adapter.py
++++ b/src/deadwax/sources/phonica/adapter.py
+@@ -1,10 +1,16 @@
+ from collections.abc import Mapping
+-from urllib.parse import quote
++from urllib.parse import urlencode
+ 
+ from deadwax.core import Capability, Partial, Pass, RecordKey, SourceGroup
+-from deadwax.sources._base import SearchHit, SearchPageAdapter
++from deadwax.sources._base import SearchHit, SearchPageAdapter, pick_hit
+ from deadwax.sources.phonica import parse as p
+ 
++# Headers the site's own search sends; its API answers JSON as text/html.
++SEARCH_HEADERS = {
++    "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
++    "x-requested-with": "XMLHttpRequest",
++}
++
+ 
+ class PhonicaAdapter(SearchPageAdapter):
+     """Shop text, genres, label, and also-bought releases of the record's Phonica product."""
+@@ -24,12 +30,30 @@ class PhonicaAdapter(SearchPageAdapter):
+     service = p.SERVICE
+ 
+     def search_request(self, key: RecordKey) -> tuple[str, Mapping[str, str]]:
+-        """Search whose words are a path segment."""
+-        return f"{p.SITE}/search/{quote(f'{key.artist} {key.title}', safe='')}", {}
++        """Search API URL and form for the words of the record's title."""
++        term = p.search_term(key.title)
++        return p.search_url(term), p.search_form(term)
++
++    async def search(self, key: RecordKey) -> str | None:
++        """Search by title, then by artist: the site finds a phrase only within one field."""
++        requests = [self.search_request(key)]
++        if p.search_term(key.title).casefold() != key.artist.casefold():
++            requests.append((p.search_url(key.artist), p.search_form(key.artist)))
++        for url, form in requests:
++            response = await self.client.request(
++                "POST",
++                url,
++                headers=SEARCH_HEADERS,
++                body=urlencode(form).encode(),
++            )
++            hit = pick_hit(key, self.search_hits(response.content, response.url))
++            if hit is not None:
++                return hit.url
++        return None
+ 
+-    def search_hits(self, content: bytes, url: str) -> list[SearchHit]:  # noqa: ARG002 -- results carry absolute links
+-        """Releases from the search page."""
+-        return p.search_hits(content)
++    def search_hits(self, content: bytes, url: str) -> list[SearchHit]:
++        """Releases and their tracks from a search API answer."""
++        return p.search_hits(content, url)
+ 
+     def read_page(self, content: bytes, url: str, key: RecordKey | None) -> Partial:
+         """Read a product page."""
+diff --git a/src/deadwax/sources/phonica/models.py b/src/deadwax/sources/phonica/models.py
+new file mode 100644
+index 0000000..622eacc
+--- /dev/null
++++ b/src/deadwax/sources/phonica/models.py
+@@ -0,0 +1,20 @@
++from pydantic import BaseModel, ConfigDict
++
++
++class _Model(BaseModel):
++    model_config = ConfigDict(extra="ignore", frozen=True)
++
++
++class Track(_Model):
++    """One entry of a product's playlist."""
++
++    trackname: str | None = None
++
++
++class Product(_Model):
++    """One product of the search API; `slug` is its page path, such as 'product/<name>/<id>'."""
++
++    artist: str
++    album: str
++    slug: str
++    product_playlist: list[Track] = []
+diff --git a/src/deadwax/sources/phonica/parse.py b/src/deadwax/sources/phonica/parse.py
+index 9556c5c..4e27fc4 100644
+--- a/src/deadwax/sources/phonica/parse.py
++++ b/src/deadwax/sources/phonica/parse.py
+@@ -1,5 +1,9 @@
++import json
+ import re
+ from typing import NamedTuple
++from urllib.parse import quote
++
++from pydantic import ValidationError
+ 
+ from deadwax.core import (
+     CandidateLabel,
+@@ -21,9 +25,11 @@ from deadwax.core import (
+     Text,
+     TextKind,
+     normalize_text,
++    parse_title,
+ )
+ from deadwax.sources._base import SearchHit, track_on_release
+ from deadwax.sources._html import Node, attribute, parse_html, text_of
++from deadwax.sources.phonica import models
+ 
+ SOURCE = "phonica"
+ SERVICE = "phonica"
+@@ -46,7 +52,6 @@ class _Product(NamedTuple):
+     artist: str
+     title: str
+     url: str
+-    tracks: list[str]
+ 
+ 
+ def _products(nodes: list[Node]) -> list[_Product]:
+@@ -57,29 +62,59 @@ def _products(nodes: list[Node]) -> list[_Product]:
+         title = text_of(node.css_first(".archive-title"))
+         href = attribute(node.css_first("a.archive-product-link"), "href")
+         if artist and title and href:
+-            tracks = [
+-                name for track in node.css(".archive-playlist span") if (name := text_of(track))
+-            ]
+-            products.append(_Product(artist, release_title(title), href, tracks))
++            products.append(_Product(artist, release_title(title), href))
++    return products
++
++
++def _unshortened(text: str) -> str:
++    """Text without the '...' that ends names the search API shortens."""
++    return text.removesuffix("...").rstrip() or text
++
++
++def search_term(title: str) -> str:
++    """Words the site's search can find of a title: its base before any ' / ' of a split."""
++    return parse_title(title).base.split(" / ", maxsplit=1)[0].strip() or title
++
++
++def search_url(term: str) -> str:
++    """URL of the search API for one term; the site matches the term within a single field."""
++    return f"{SITE}/api/product/json_category_search/{quote(term, safe='')}/0"
++
++
++def search_form(term: str) -> dict[str, str]:
++    """Form the site's own search sends with a request."""
++    return {"id": "0", "href": f"/search/{term}/", "offset": "0"}
++
++
++def _search_products(content: bytes, url: str) -> list[models.Product]:
++    try:
++        page = json.loads(content)
++    except ValueError:
++        raise SourceError("the Phonica search answered without JSON", url=url) from None
++    products = []
++    for name, value in page.items() if isinstance(page, dict) else []:
++        if name.isdigit():
++            try:
++                products.append(models.Product.model_validate(value))
++            except ValidationError:
++                continue
+     return products
+ 
+ 
+-def search_hits(content: bytes) -> list[SearchHit]:
+-    """Releases of a search page, and each of their tracks."""
++def search_hits(content: bytes, url: str) -> list[SearchHit]:
++    """Releases of a search API answer, and each of their tracks."""
+     hits = []
+-    for product in _products(parse_html(content).css(".archive-products .product-place-holder")):
++    for product in _search_products(content, url):
++        href = f"{SITE}/{product.slug.lstrip('/')}"
++        artist = _unshortened(product.artist)
++        title = release_title(_unshortened(product.album))
+         hits.append(
+-            SearchHit(
+-                url=product.url,
+-                key=RecordKey(artist=product.artist, title=product.title, kind=EntityKind.ALBUM),
+-            ),
++            SearchHit(url=href, key=RecordKey(artist=artist, title=title, kind=EntityKind.ALBUM)),
+         )
+         hits.extend(
+-            SearchHit(
+-                url=product.url,
+-                key=RecordKey(artist=product.artist, title=track, kind=EntityKind.TRACK),
+-            )
+-            for track in product.tracks
++            SearchHit(url=href, key=RecordKey(artist=artist, title=name, kind=EntityKind.TRACK))
++            for track in product.product_playlist
++            if (name := " ".join((track.trackname or "").split()))
+         )
+     return hits
+ 
+diff --git a/tests/fixtures/phonica/pages/search_not_found.json b/tests/fixtures/phonica/pages/search_not_found.json
+new file mode 100644
+index 0000000..40457a6
+--- /dev/null
++++ b/tests/fixtures/phonica/pages/search_not_found.json
+@@ -0,0 +1,6 @@
++{
++ "pagination_links": "",
++ "href": "https://www.phonicarecords.com/search/burial-truant",
++ "archive_name": "Search results",
++ "not_found": 1
++}
+diff --git a/tests/fixtures/phonica/pages/search_truant.json b/tests/fixtures/phonica/pages/search_truant.json
+new file mode 100644
+index 0000000..5c25045
+--- /dev/null
++++ b/tests/fixtures/phonica/pages/search_truant.json
+@@ -0,0 +1,74 @@
++{
++ "0": {
++  "cover": "2a03999cc991586b4701cc8026f3697f.jpg",
++  "type": "12\"",
++  "album": "Truant",
++  "label": "COCOON",
++  "artist": "ALAN FITZPATRICK",
++  "description": "Alan Fitzpatrick is one of the men of the moment speaking of all things techno! Since his first steps into the arena in 2008 he turned into one of the most wanted producers around. His releases on labels like “Quartz\", “My Favorite Robot” and especially on “Drumcode” brought him on par...",
++  "price": "7.49",
++  "id_web": "123589",
++  "date_released": "November 30th -0001",
++  "has_stock": "0",
++  "product_playlist": [
++   {
++    "trackname": "Truant",
++    "filename": "d7513d8377361eca535dfbac5a579a1e.mp3"
++   },
++   {
++    "trackname": "Memories Of A Time Once Past But Long Forgotten",
++    "filename": "72e159744344f898755c8ff99fd99946.mp3"
++   }
++  ],
++  "slug": "product/alan-fitzpatrick-truant-cocoon/123589"
++ },
++ "1": {
++  "cover": "588c46b54ad08671ab2d9d06c170f613.jpg",
++  "type": "CD",
++  "album": "Truant / Rough Sleeper CD",
++  "label": "HYPERDUB",
++  "artist": "BURIAL",
++  "description": "Pre-order : Shipping for December 17th delivery. Please order seperately to avoid having the rest of your order held up. <br /><br /> The release is comprised of two pieces of music, with a combined duration of 25 minutes 32 seconds.",
++  "price": "4.99",
++  "id_web": "111125",
++  "date_released": null,
++  "has_stock": "0",
++  "product_playlist": [
++   {
++    "trackname": "Truant ",
++    "filename": "e52058595845110d5d09655d635dc7c2.mp3"
++   },
++   {
++    "trackname": "Rough Sleeper",
++    "filename": "59057882b2ba34f83a5562fcb9c8b5e1.mp3"
++   }
++  ],
++  "slug": "product/burial-truant-rough-sleeper-cd-hyperdub/111125"
++ },
++ "2": {
++  "cover": "98df0d2d72bc12a9d0a524696659c136.jpg",
++  "type": "12\"",
++  "album": "Truant / Rough Sleeper",
++  "label": "HYPERDUB",
++  "artist": "BURIAL",
++  "description": "<p>Burial's latest 12\" for Hyperdub, a true epic clocking in with a total of over 25minutes of music, absolutely superlative stuff!</p>",
++  "price": "5.82",
++  "id_web": "111124",
++  "date_released": "January 1st 1970",
++  "has_stock": "0",
++  "product_playlist": [
++   {
++    "trackname": "Truant ",
++    "filename": "15eaef2b23acc88787e061adc1268eb7.mp3"
++   },
++   {
++    "trackname": "Rough Sleeper",
++    "filename": "2f626644dfb2eaa02f8324a675f56bfb.mp3"
++   }
++  ],
++  "slug": "product/burial-truant-rough-sleeper-hyperdub/111124"
++ },
++ "pagination_links": "",
++ "href": "https://www.phonicarecords.com/search/truant",
++ "archive_name": "Search results"
++}
+diff --git a/tests/sources/test_phonica.py b/tests/sources/test_phonica.py
+index de0cbda..8b18960 100644
+--- a/tests/sources/test_phonica.py
++++ b/tests/sources/test_phonica.py
+@@ -1,5 +1,7 @@
++import json
+ from datetime import UTC, datetime
+ from pathlib import Path
++from urllib.parse import parse_qs, unquote
+ 
+ import httpx
+ import pytest
+@@ -27,42 +29,36 @@ from deadwax.sources._http import HttpResources
+ from deadwax.sources.phonica import PhonicaAdapter
+ from deadwax.sources.phonica import parse as p
+ 
+-# Pages saved from Firefox on 2026-11-13 and trimmed by scripts/saved_pages.py.
++# Product pages saved from Firefox on 2026-11-13 and trimmed by scripts/saved_pages.py;
++# search API answers taken from a HAR recording of the site's own search the same day.
+ PAGES = Path(__file__).resolve().parent.parent / "fixtures" / "phonica" / "pages"
+ 
+ SITE = "https://www.phonicarecords.com"
+-SEARCH = f"{SITE}/search/"
++SEARCH = f"{SITE}/api/product/json_category_search/"
+ TRUANT = f"{SITE}/product/burial-truant-rough-sleeper-hyperdub/111124"
++TRUANT_CD = f"{SITE}/product/burial-truant-rough-sleeper-cd-hyperdub/111125"
+ COLONIAL_SAVED = f"{SITE}/product/huercos-colonial-patterns-lp-software/116278"
+ COLONIAL = f"{SITE}/product/huerco-s-colonial-patterns-lp-software/116278"
+ SERVED = {TRUANT: "product_111124", COLONIAL_SAVED: "product_116278"}
++
++# Search terms answered with a saved API answer; other terms find nothing.
++SEARCHES = {"Truant": "search_truant.json"}
+ NOW = datetime(2026, 11, 13, tzinfo=UTC)
+ 
+ SUCURI = "<html><script>var sucuri_cloudproxy_js='';</script></html>"
+ 
+ 
+-def results(*items: tuple[str, str, str, list[str]]) -> str:
+-    cards = "".join(
+-        '<div class="product-place-holder">'
+-        f'<a class="archive-product-link" href="{href}"><img></a>'
+-        f'<a class="archive-artist">{artist}</a><a class="archive-product-link" href="{href}">'
+-        f'<span class="archive-title">{title}</span></a>'
+-        '<span class="archive-playlist">'
+-        + "".join(f'<span id="{n}.mp3">{track}</span>' for n, track in enumerate(tracks))
+-        + "</span></div>"
+-        for artist, title, href, tracks in items
+-    )
+-    template = (
+-        '<div class="product-place-holder"><a class="archive-artist" href=""></a>'
+-        '<span class="archive-title"></span></div>'
+-    )
+-    return f'<div class="archive-products"><div class="row">{template}{cards}</div></div>'
+-
+-
+-TRUANT_RESULTS = results(
+-    ("BURIAL", "Antidawn CD", f"{SITE}/product/burial-antidawn-cd-hyperdub/205493", ["Antidawn"]),
+-    ("BURIAL", "Truant / Rough Sleeper", TRUANT, ["Truant", "Rough Sleeper"]),
+-)
++def api(*items: tuple[str, str, str, list[str]]) -> str:
++    products = {
++        str(n): {
++            "artist": artist,
++            "album": title,
++            "slug": slug,
++            "product_playlist": [{"trackname": track} for track in tracks],
++        }
++        for n, (artist, title, slug, tracks) in enumerate(items)
++    }
++    return json.dumps({**products, "1x": {"album": "skipped"}, "9": {"album": "invalid"}})
+ 
+ 
+ def make(
+@@ -76,10 +72,18 @@ def make(
+         if status != 200:
+             return httpx.Response(status, text=SUCURI, headers={"server": "Sucuri/Cloudproxy"})
+         url = str(request.url).split("?", maxsplit=1)[0]
+-        if url.startswith(SEARCH):
+-            return httpx.Response(200, text=(pages or {}).get(SEARCH, TRUANT_RESULTS))
+         if pages is not None and url in pages:
+             return httpx.Response(200, text=pages[url])
++        if url.startswith(SEARCH):
++            term = unquote(url.removeprefix(SEARCH).removesuffix("/0"))
++            assert request.method == "POST"
++            assert parse_qs(request.content.decode()) == {
++                "id": ["0"],
++                "href": [f"/search/{term}/"],
++                "offset": ["0"],
++            }
++            answer = PAGES / SEARCHES.get(term, "search_not_found.json")
++            return httpx.Response(200, content=answer.read_bytes())
+         if (name := SERVED.get(url)) is None:
+             return httpx.Response(404)
+         return httpx.Response(200, content=(PAGES / f"{name}.html").read_bytes())
+@@ -106,15 +110,12 @@ def urls(seen: list[httpx.Request]) -> list[str]:
+ 
+ 
+ @pytest.mark.asyncio
+-async def test_release_by_search_with_text_genres_label_and_also_bought() -> None:
++async def test_release_page_with_text_genres_label_and_also_bought() -> None:
+     adapter, seen = make()
+ 
+-    partial = await looked_up(
+-        adapter,
+-        parse_query("Burial - Truant / Rough Sleeper", EntityKind.ALBUM),
+-    )
++    partial = await looked_up(adapter, parse_query(TRUANT))
+ 
+-    assert urls(seen) == [f"{SEARCH}Burial%20Truant%20%2F%20Rough%20Sleeper", TRUANT]
++    assert urls(seen) == [TRUANT]
+     candidate = partial.candidate
+     assert candidate is not None
+     assert (candidate.kind, candidate.artist, candidate.title, candidate.date, candidate.url) == (
+@@ -152,12 +153,39 @@ async def test_release_by_search_with_text_genres_label_and_also_bought() -> Non
+ 
+ 
+ @pytest.mark.asyncio
+-async def test_track_is_found_on_the_release_that_lists_it() -> None:
+-    adapter, seen = make()
++async def test_release_search_takes_the_first_edition_listed() -> None:
++    page = (
++        '<div id="page-single"><a class="single-artist">BURIAL</a>'
++        '<a class="single-title">Truant / Rough Sleeper CD</a></div>'
++    )
++    adapter, seen = make(pages={TRUANT_CD: page})
++
++    partial = await looked_up(
++        adapter,
++        parse_query("Burial - Truant / Rough Sleeper", EntityKind.ALBUM),
++    )
++
++    assert urls(seen) == [f"{SEARCH}Truant/0", TRUANT_CD]
++    assert partial.candidate is not None
++    assert partial.candidate.title == "Truant / Rough Sleeper"
++
++
++@pytest.mark.asyncio
++async def test_track_is_found_by_artist_on_the_release_that_lists_it() -> None:
++    burial = api(
++        ("BURIAL", "Antidawn CD", "product/burial-antidawn-cd-hyperdub/177938", ["Antidawn"]),
++        (
++            "BURIAL",
++            "Truant / Rough Sleeper",
++            "/product/burial-truant-rough-sleeper-hyperdub/111124",
++            ["Truant ", "Rough Sleeper"],
++        ),
++    )
++    adapter, seen = make(pages={f"{SEARCH}Burial/0": burial})
+ 
+     partial = await looked_up(adapter, parse_query("Burial - Rough Sleeper", EntityKind.TRACK))
+ 
+-    assert urls(seen) == [f"{SEARCH}Burial%20Rough%20Sleeper", TRUANT]
++    assert urls(seen) == [f"{SEARCH}Rough%20Sleeper/0", f"{SEARCH}Burial/0", TRUANT]
+     candidate = partial.candidate
+     assert candidate is not None
+     assert (candidate.kind, candidate.artist, candidate.title) == (
+@@ -181,8 +209,10 @@ async def test_another_version_is_kept_out_of_the_record() -> None:
+         '<table id="playlist"><tr><td class="trackname">Truant (Kode9 Remix)</td></tr></table>'
+         "</div>"
+     )
+-    listing = results(("BURIAL", "Truant Remixes", remixes, ["Truant (Kode9 Remix)"]))
+-    adapter, seen = make(pages={SEARCH: listing, remixes: page})
++    listing = api(
++        ("BURIAL", "Truant Remixes", "product/burial-truant-remixes/1", ["Truant (Kode9 Remix)"]),
++    )
++    adapter, seen = make(pages={f"{SEARCH}Truant/0": listing, remixes: page})
+     query = parse_query("Burial - Truant", EntityKind.TRACK)
+ 
+     partial = await looked_up(adapter, query)
+@@ -258,19 +288,45 @@ async def test_bare_page_without_canonical_url() -> None:
+ 
+ @pytest.mark.asyncio
+ async def test_track_missing_from_the_release_page() -> None:
+-    listing = results(("BURIAL", "Truant / Rough Sleeper", TRUANT, ["Kindred"]))
+-    adapter, _ = make(pages={SEARCH: listing})
++    listing = api(
++        ("BURIAL", "Kindred", "product/burial-truant-rough-sleeper-hyperdub/111124", ["Kindred"]),
++    )
++    adapter, _ = make(pages={f"{SEARCH}Kindred/0": listing})
+ 
+     with pytest.raises(NotFoundError, match="does not list the track"):
+         await looked_up(adapter, parse_query("Burial - Kindred", EntityKind.TRACK))
+ 
+ 
+ @pytest.mark.asyncio
+-async def test_no_matching_result() -> None:
+-    adapter, _ = make()
++async def test_no_matching_result_by_title_or_artist() -> None:
++    adapter, seen = make()
+ 
+     with pytest.raises(NotFoundError, match="no matching phonica"):
+-        await looked_up(adapter, parse_query("Burial - Untrue", EntityKind.ALBUM))
++        await looked_up(adapter, parse_query("Burial - Untrue (Live)", EntityKind.ALBUM))
++
++    assert urls(seen) == [f"{SEARCH}Untrue/0", f"{SEARCH}Burial/0"]
++
++
++@pytest.mark.asyncio
++async def test_a_self_titled_record_is_searched_once() -> None:
++    adapter, seen = make()
++
++    with pytest.raises(NotFoundError):
++        await looked_up(adapter, parse_query("Burial - Burial", EntityKind.ALBUM))
++
++    assert urls(seen) == [f"{SEARCH}Burial/0"]
++
++
++@pytest.mark.asyncio
++async def test_search_answer_without_json() -> None:
++    adapter, _ = make(pages={f"{SEARCH}Truant/0": "<html>maintenance</html>"})
++
++    with pytest.raises(SourceError, match="without JSON"):
++        await looked_up(adapter, parse_query("Burial - Truant", EntityKind.ALBUM))
++
++
++def test_search_answer_that_is_not_an_object() -> None:
++    assert p.search_hits(b"[]", SEARCH) == []
+ 
+ 
+ @pytest.mark.asyncio
+@@ -302,3 +358,15 @@ async def test_unreadable_page() -> None:
+ )
+ def test_release_title(printed: str, expected: str) -> None:
+     assert p.release_title(printed) == expected
++
++
++@pytest.mark.parametrize(
++    ("title", "term"),
++    [
++        ("Truant / Rough Sleeper", "Truant"),
++        ("Missing (Todd Terry Remix)", "Missing"),
++        ("Colonial Patterns", "Colonial Patterns"),
++    ],
++)
++def test_search_term(title: str, term: str) -> None:
++    assert p.search_term(title) == term

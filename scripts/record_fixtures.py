@@ -54,7 +54,6 @@ HOSTS = {
     "hardwax.com": "hardwax",
     "www.soundohm.com": "soundohm",
     "www.juno.co.uk": "juno",
-    "www.phonicarecords.com": "phonica",
 }
 
 ALL_GROUPS = tuple(SourceGroup)

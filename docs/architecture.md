@@ -46,13 +46,13 @@ From top to bottom:
 
 ```
 deadwax.sources.lookup        composition: builds adapters and runs the orchestrator
-musicbrainz | itunes | deezer | odesli | discogs | bandcamp | lastfm | wikipedia | listenbrainz | secondhandsongs | kexp | spotify | youtube | soundcloud | beatport | hardwax | soundohm | juno | phonica
+musicbrainz | itunes | deezer | odesli | discogs | bandcamp | lastfm | wikipedia | listenbrainz | secondhandsongs | kexp | spotify | youtube | soundcloud | beatport | hardwax | soundohm | juno
 deadwax.sources._base | _html adapter base class, service names of URLs, search keys | HTML and JSON-LD helpers
 deadwax.sources._http
 deadwax.sources.config
 ```
 
-Adapters are independent: they never import each other, and data found by one adapter reaches another only through `LookupContext`. A helper needed by two adapters moves down into `_base`, `_html`, or `_http`; `_base` and `_html` are independent of each other. An adapter that grows into a package gets its own layers contract with `adapter`, `parse`, `models` (`musicbrainz`, `discogs`, `bandcamp`, `lastfm`, `wikipedia`, `listenbrainz`, `secondhandsongs`, `kexp`, `spotify`, `soundcloud`, `beatport`, `hardwax`; `soundohm`, `juno`, and `phonica` without `models`).
+Adapters are independent: they never import each other, and data found by one adapter reaches another only through `LookupContext`. A helper needed by two adapters moves down into `_base`, `_html`, or `_http`; `_base` and `_html` are independent of each other. An adapter that grows into a package gets its own layers contract with `adapter`, `parse`, `models` (`musicbrainz`, `discogs`, `bandcamp`, `lastfm`, `wikipedia`, `listenbrainz`, `secondhandsongs`, `kexp`, `spotify`, `soundcloud`, `beatport`, `hardwax`; `soundohm` and `juno` without `models`).
 
 Inside `deadwax.sources._http` (contract "R8: HTTP stack modules"), from top to bottom:
 

@@ -12,7 +12,7 @@ Without `--sources`, a lookup runs the sources named by `DEADWAX_DEFAULT_SOURCES
 
 ## How a lookup runs
 
-1. **URL resolution.** For a URL query, the first ready source that recognises the URL reads it alone. Its record becomes the reference, and for a URL that does not reveal its kind it sets the kind. The order is Spotify, MusicBrainz, Odesli, iTunes, Deezer, Discogs, Bandcamp, SoundCloud, Beatport, Hard Wax, Soundohm, Juno, Phonica: Spotify reads Spotify URLs when it has credentials, MusicBrainz otherwise.
+1. **URL resolution.** For a URL query, the first ready source that recognises the URL reads it alone. Its record becomes the reference, and for a URL that does not reveal its kind it sets the kind. The order is Spotify, MusicBrainz, Odesli, iTunes, Deezer, Discogs, Bandcamp, SoundCloud, Beatport, Hard Wax, Soundohm, Juno: Spotify reads Spotify URLs when it has credentials, MusicBrainz otherwise.
 2. **Identity pass.** MusicBrainz finds the recording or release group and gives later sources its IDs and links: ISRCs, barcodes, Discogs, Wikidata, Bandcamp, and streaming URLs.
 3. **Enrichment pass.** All other sources except Odesli run concurrently, at most `concurrency` at once. Each one uses the IDs and links from the identity pass first and falls back to its own search.
 4. **Links pass.** Odesli opens the song.link page of a streaming URL found by any earlier source, such as the Apple Music link from iTunes. YouTube searches uploads of the record.
@@ -24,7 +24,7 @@ Each source runs under `adapter_timeout` (`--timeout`). Every candidate passes t
 | Tier | Sources | Role |
 |------|---------|------|
 | 1, identity and links | MusicBrainz, iTunes Search, Deezer, Odesli | Which exact recording or release this is; listening links |
-| 2, enrichment | Discogs, Bandcamp, Last.fm, Wikipedia/Wikidata, ListenBrainz, SecondHandSongs, KEXP, Spotify, SoundCloud, Beatport, Hard Wax, Soundohm, Juno, Phonica | Tags, credits, texts, relations, metrics |
+| 2, enrichment | Discogs, Bandcamp, Last.fm, Wikipedia/Wikidata, ListenBrainz, SecondHandSongs, KEXP, Spotify, SoundCloud, Beatport, Hard Wax, Soundohm, Juno | Tags, credits, texts, relations, metrics |
 | 3, links | Odesli, YouTube | Listening links |
 
 The README lists sources planned for later versions and those deadwax will not use.
@@ -159,16 +159,9 @@ The README lists sources planned for later versions and those deadwax will not u
 - **Finds the record by:** a Juno product URL in the query or from an earlier source, else a search through the matching gate. Search results list each release's tracks, so a track is found on the release that holds it; Juno's mix names ("Todd Terry club mix") are part of the track's title.
 - **Contributes:** the shop review as a `shop` text, the genre as a `genre` tag and Juno's tags as `tag` tags, label and catalog number ("unknown label" is left out), the release date, the product link; for a track, an `appears_on` relation to the release. Artists are as Juno prints them, in capitals. "People also bought" is loaded by the page's scripts and is not read.
 
-## Phonica
-
-- **Group:** `shops`; opt-in.
-- **Access:** scraped search (`/search/<words>`) and product pages of phonicarecords.com. The site answers plain requests with a Sucuri JavaScript challenge, so it needs the escalation ladder (`deadwax[stealth]` or `deadwax[browser]`); otherwise it reports `blocked`. The parser was built on pages saved from a browser.
-- **Finds the record by:** a Phonica product URL in the query or from an earlier source, else a search through the matching gate. Product cards list their tracks, so a track is found on the release that holds it.
-- **Contributes:** the staff description as a `shop` text, the shop's genre sections as `genre` tags, the label, the product link; "customers who bought this also bought" as `similar` relations; for a track, an `appears_on` relation to the release. Titles lose the format Phonica appends ("Colonial Patterns LP"); artists are as Phonica prints them, in capitals. Product pages carry no release date or catalog number.
-
 ## Escalation ladder
 
-Bandcamp, Beatport, Hard Wax, Soundohm, Juno, and Phonica pages, the song.link page, and Discogs review pages use browser-like headers, HTTP/2, and cookies. When the response is a challenge page (Cloudflare, Akamai, DataDome, PerimeterX, Fastly, Sucuri, or a captcha on 403/429/503), the client switches to a stronger transport and keeps using it for that source:
+Bandcamp, Beatport, Hard Wax, Soundohm, and Juno pages, the song.link page, and Discogs review pages use browser-like headers, HTTP/2, and cookies. When the response is a challenge page (Cloudflare, Akamai, DataDome, PerimeterX, Fastly, Sucuri, or a captcha on 403/429/503), the client switches to a stronger transport and keeps using it for that source:
 
 | Step | Requires |
 |------|----------|

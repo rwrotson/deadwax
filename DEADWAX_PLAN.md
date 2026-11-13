@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–11 done (Beatport tested on saved pages only: Cloudflare blocks every transport); Stage 12 in progress.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–12 done (Beatport tested on saved pages only: Cloudflare blocks every transport; Phonica moved to the unscheduled blocking item).
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -68,7 +68,7 @@ Scope agreed with the user on 2026-11-13 after reviewing what each planned sourc
 | Shops | Norman Records | staff reviews → `shop` texts; tags | HTML |
 | Shops | Forced Exposure | label press texts → `label`/`shop` texts | HTML |
 | Shops | Hard Wax | one-line `shop` texts; genre sections | HTML |
-| Shops | Phonica | staff `shop` texts; genres | HTML |
+| Shops | Phonica (deferred: unscheduled blocking item) | staff `shop` texts; genres | HTML, Sucuri; search API needs a browser session |
 | Shops | Soundohm | `shop` texts (often label press copy) | HTML |
 | Shops | Bleep | `shop` texts; genres; related releases → `similar` | HTML |
 | Press | AllMusic | review with rating and critic; moods and themes → `mood`/`theme` tags; styles; credits; similar albums | HTML, anti-bot |
@@ -108,7 +108,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 9 | Done | ListenBrainz, SecondHandSongs, KEXP. |
 | 10 | Done | Spotify, YouTube (links only), SoundCloud. |
 | 11 | Done (Beatport not live-verified) | Beatport (Juno Download dropped: shut down); BPM and key. |
-| 12 | In progress | Shops I: Juno, Hard Wax, Phonica, Soundohm; shop-text deduplication. |
+| 12 | Done (Juno live-verified once by the agent) | Shops I: Juno, Hard Wax, Soundohm; shop-text deduplication (Phonica moved to the unscheduled blocking item). |
 | 13 | Not started | Shops II: Boomkat, Norman Records, Forced Exposure, Bleep. |
 | 14 | Not started | Genius. |
 | 15 | Not started | Reviews I: AllMusic, Album of the Year. |
@@ -165,10 +165,11 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 ### Stage 12: shops I
 
-- [ ] Juno, Hard Wax, Phonica, Soundohm through the Stage 8 helper: `shop` texts, genres, "also bought" as `similar` where present. Hard Wax, Soundohm and Juno done; Phonica implemented on saved product pages, its search page not yet seen.
+- [x] Juno, Hard Wax, Soundohm through the Stage 8 helper: `shop` texts, genres, "also bought" as `similar` where present.
+- [x] ~~Phonica~~ Moved to "Later, unscheduled" (2026-11-13, user decision): its search API answers Apache 403 without a Sucuri browser session.
 - [x] Merge: `shop` texts that repeat one press release are deduplicated, keeping every source.
 
-**Acceptance:** the same press text from two shops appears once with both sources. **Suggested message:** `feat(sources): add Juno, Hard Wax, Phonica and Soundohm adapters`.
+**Acceptance:** the same press text from two shops appears once with both sources. **Suggested message:** `feat(sources): add Juno, Hard Wax and Soundohm adapters`.
 
 ### Stage 13: shops II
 
@@ -233,6 +234,7 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 ### Later, unscheduled: automation masking for Cloudflare-protected sources
 
 - [ ] Masking browser automation (stealth plugins, undetected-chromedriver, nodriver, Camoufox, fingerprint spoofing) so that Beatport and similar sources pass Cloudflare challenges that defeat httpx, curl_cffi, and plain Playwright.
+- [ ] Phonica (moved from Stage 12 on 2026-11-13 at the user's request): product pages answer a Sucuri JS challenge (307), and the search API (`POST /api/product/json_category_search/<words>/0`) answers Apache 403 without the session a browser gets after that challenge, with or without `Origin` and `Referer`. The adapter is kept outside the tree: the first version in commit `9af10f2`, the JSON-search version in `plans/phonica-search.patch` (apply on top of `9af10f2`'s files). Without solved access, Phonica could only read product URLs given in the query.
 
 Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. Cons: an arms race with Cloudflare's detection, breaks with its updates, heavy and fragile code, against Beatport's terms and its explicit refusal of automated clients. Coding agents do not implement this item: Claude Code declines it, and its safety classifier refused even running the existing ladder against Beatport. It is not part of any stage and is not taken as the next action.
 
@@ -306,6 +308,7 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-13 | Juno is built on Firefox view-source pages the user saved; it reads microdata (`byArtist`, `name`, `reviewBody`, `genre`), the product facts, Juno tags, and the tracklist; search results list tracks, so tracks are found on their release (helper `track_on_release` in `sources/_base.py`, shared with Hard Wax). No `similar` relations: "People also bought" is loaded by scripts. | The agent's plain requests get a Cloudflare challenge. | 12 |
 | 2026-11-13 | `scripts/beatport_pages.py` becomes `scripts/saved_pages.py --shop beatport|juno|phonica`: Chrome and Firefox view-source pages; Beatport keeps its state trimming (fixtures regenerate byte for byte); shops keep the canonical link, Open Graph tags, and the blocks the parser reads, without scripts, styles, SVG, and forms; output with session data is refused. | One tool for every source built on saved pages. | 11, 12 |
 | 2026-11-13 | Phonica is `phonicarecords.com` (`phonica.co.uk` does not exist), behind a Sucuri/CloudProxy JS challenge; built on saved pages. `sucuri_cloudproxy_js` is a challenge marker, so such a page is `blocked`, not an empty search. | Access check; user choice. | 12 |
+| 2026-11-13 | Phonica moves from Stage 12 to the unscheduled blocking item; its adapter is kept in commit `9af10f2` and `plans/phonica-search.patch`, not in the tree. | Its search API answers Apache 403 without a Sucuri browser session; product pages answer a Sucuri challenge. User decision. | 12, later |
 
 Changed:
 
@@ -499,7 +502,28 @@ Commands and outcomes:
 
 Remains for Stage 12: the user saves `https://www.phonicarecords.com/search/burial%20truant`; the agent checks the search parser against it and turns it into a fixture. Then the user's live checks (Phonica needs the escalation ladder for Sucuri), and the stage is marked Done.
 
-**Current task:** Stage 12. **Next action:** the user saves the Phonica search page for "burial truant" into `~/Downloads/source`; the agent then verifies the search parser and closes the stage.
+### 2026-11-13 — Stage 12 evidence (Phonica search)
+
+Observed (user's browser, HAR and screenshots): the search page is filled by `POST /api/product/json_category_search/<words>/0` with the form `id=0&href=/search/<words>/&offset=0`; the answer is JSON (served as text/html) with products under keys "0".."17" (`artist`, `album`, `slug`, `product_playlist`, shortened names end in "..."), or `"not_found": 1`. The search finds a phrase only within one field: "truant", "burial", "truant / rough sleeper" find results; "burial truant", "truant rough sleeper" find nothing. A typed `/search/<words>` URL is not decoded by the site. The product-card assumption of the previous entry was wrong and is replaced.
+
+Changed: `SearchPageAdapter.search` is a new overridable step (the default GET search moved there from `_page_url`); Phonica overrides it with POST requests, by title (version and anything after " / " removed) and then by artist, reading the first page only; `phonica.models` (search API products; R8 contract now adapter | parse | models); search fixtures `search_truant.json` (the HAR answer, trimmed fields) and `search_not_found.json`; docs and the evidence above updated.
+
+Commands and outcomes:
+
+- `uv run poe check`: format, lint, 28 import contracts kept, mypy strict clean, 854 passed, 99.08% branch coverage.
+- `uv run --group docs properdocs build --strict`: built without warnings.
+- Mock-tested: release search by title picks the first matching edition (the CD before the vinyl in the saved answer); a track found by the artist search after the title search finds nothing; another version kept out; no match after both searches; a self-titled record searched once; an answer without JSON; the request method and form.
+- Not live-verified: no agent request was sent to Phonica.
+
+### 2026-11-13 — Stage 12: Phonica moved out, stage closed
+
+Live (user, `--sources core,phonica --no-cache`, escalation on): runs `20261113T182921Z-ee4243` (album "Burial - Truant / Rough Sleeper") and `20261113T182947Z-405725` (track "Burial - Rough Sleeper") — Phonica `failed: HTTP 403` on the first search request, a 288-byte page that is not a challenge, so the ladder did not escalate. The user's curl: the search POST answers Apache "403 Forbidden" with and without `Origin`/`Referer`; a plain GET of a product page answers Sucuri 307 (1359 bytes).
+
+Decision (user): Phonica leaves Stage 12 and joins the unscheduled blocking item. Removed: package `phonica`, its tests and fixtures, registry entry, settings, `.env.example` lines, R4 row and R8 contract, recorder host, docs and README rows (files restored to their state before `9af10f2`). Kept: the Phonica URL rule and service name (they predate the adapter), the Sucuri challenge marker, the `#page-single` rule in `scripts/saved_pages.py`, and the new overridable `SearchPageAdapter.search` step (default behaviour unchanged). The adapter is preserved in commit `9af10f2` and `plans/phonica-search.patch`.
+
+Stage 12 closed: Hard Wax, Soundohm, Juno, and shop-text deduplication meet the acceptance; Juno's live verification is the single agent run recorded above, Hard Wax and Soundohm were live-verified, deduplication is mock-tested only.
+
+**Current task:** Stage 13 (not started). **Next action:** check access to Boomkat, Norman Records, Forced Exposure and Bleep before coding.
 
 ## Resume instructions
 

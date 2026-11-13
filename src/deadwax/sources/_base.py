@@ -284,13 +284,17 @@ class SearchPageAdapter(HttpAdapter):
             return known[0]
         if key is None:
             raise NotFoundError("neither the query nor earlier sources name the record")
+        url = await self.search(key)
+        if url is None:
+            raise NotFoundError(f"no matching {self.name} record")
+        return url
 
+    async def search(self, key: RecordKey) -> str | None:
+        """Search the source and return the page of the record, if a result matches."""
         url, params = self.search_request(key)
         response = await self.client.get(url, params=params)
         hit = pick_hit(key, self.search_hits(response.content, response.url))
-        if hit is None:
-            raise NotFoundError(f"no matching {self.name} record")
-        return urljoin(response.url, hit.url)
+        return None if hit is None else urljoin(response.url, hit.url)
 
     @abstractmethod
     def search_request(self, key: RecordKey) -> tuple[str, Mapping[str, str]]:
