@@ -54,6 +54,11 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.sources.beatport.adapter` | Search Beatport and read track and release pages |
 | `deadwax.sources.beatport.parse` | Turn Beatport page state into identity with tempo and key, tags, credits, and links |
 | `deadwax.sources.beatport.models` | Model the tracks and releases of Beatport's page state |
+| `deadwax.sources.hardwax.adapter` | Search Hard Wax's feed and read its product pages |
+| `deadwax.sources.hardwax.parse` | Turn Hard Wax feeds and pages into identity, shop texts, genres, and links |
+| `deadwax.sources.hardwax.models` | Model Hard Wax's JSON search feed |
+| `deadwax.sources.soundohm.adapter` | Search Soundohm and read its product pages |
+| `deadwax.sources.soundohm.parse` | Turn Soundohm pages into identity, shop texts, genres, and links |
 | `deadwax.logs.settings` | Define logging settings |
 | `deadwax.logs.setup` | Configure console and file logging for applications |
 | `deadwax.logs.runs` | Journal each lookup run to its own event file and an index of runs |

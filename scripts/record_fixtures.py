@@ -51,6 +51,8 @@ HOSTS = {
     "www.googleapis.com": "youtube",
     "api-v2.soundcloud.com": "soundcloud",
     "www.beatport.com": "beatport",
+    "hardwax.com": "hardwax",
+    "www.soundohm.com": "soundohm",
 }
 
 ALL_GROUPS = tuple(SourceGroup)

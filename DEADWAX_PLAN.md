@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–10 done; Stage 11 implemented (Beatport; Juno Download dropped), awaiting the user's live Beatport run.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–11 done (Beatport tested on saved pages only: Cloudflare blocks every transport); Stage 12 in progress.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -107,8 +107,8 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 8 | Done | Foundation: source groups, default source set, per-lookup concurrency cap, shared search → page helper. |
 | 9 | Done | ListenBrainz, SecondHandSongs, KEXP. |
 | 10 | Done | Spotify, YouTube (links only), SoundCloud. |
-| 11 | Implemented, awaiting live verification | Beatport (Juno Download dropped: shut down); BPM and key. |
-| 12 | Not started | Shops I: Juno, Hard Wax, Phonica, Soundohm; shop-text deduplication. |
+| 11 | Done (Beatport not live-verified) | Beatport (Juno Download dropped: shut down); BPM and key. |
+| 12 | In progress | Shops I: Juno, Hard Wax, Phonica, Soundohm; shop-text deduplication. |
 | 13 | Not started | Shops II: Boomkat, Norman Records, Forced Exposure, Bleep. |
 | 14 | Not started | Genius. |
 | 15 | Not started | Reviews I: AllMusic, Album of the Year. |
@@ -165,8 +165,8 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 ### Stage 12: shops I
 
-- [ ] Juno, Hard Wax, Phonica, Soundohm through the Stage 8 helper: `shop` texts, genres, "also bought" as `similar` where present.
-- [ ] Merge: `shop` texts that repeat one press release are deduplicated, keeping every source.
+- [ ] Juno, Hard Wax, Phonica, Soundohm through the Stage 8 helper: `shop` texts, genres, "also bought" as `similar` where present. Hard Wax and Soundohm done; Juno and Phonica wait for saved pages.
+- [x] Merge: `shop` texts that repeat one press release are deduplicated, keeping every source.
 
 **Acceptance:** the same press text from two shops appears once with both sources. **Suggested message:** `feat(sources): add Juno, Hard Wax, Phonica and Soundohm adapters`.
 
@@ -230,6 +230,12 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 **Acceptance:** all checks pass or blocked ones have precise reasons. **Suggested message:** `docs: document sources and qualify deadwax v2`.
 
+### Later, unscheduled: automation masking for Cloudflare-protected sources
+
+- [ ] Masking browser automation (stealth plugins, undetected-chromedriver, nodriver, Camoufox, fingerprint spoofing) so that Beatport and similar sources pass Cloudflare challenges that defeat httpx, curl_cffi, and plain Playwright.
+
+Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. Cons: an arms race with Cloudflare's detection, breaks with its updates, heavy and fragile code, against Beatport's terms and its explicit refusal of automated clients. Coding agents do not implement this item: Claude Code declines it, and its safety classifier refused even running the existing ladder against Beatport. It is not part of any stage and is not taken as the next action.
+
 ## Verification
 
 - `uv sync --all-groups --locked`, `uv run poe check`, `uv run --group docs properdocs build --strict`, `uv build` with wheel smoke, `uv run poe audit`.
@@ -290,7 +296,13 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-13 | Beatport reads fixed places of the page state, not a walk over it: `pageProps.track` with the `track-<id>-charts` query, `pageProps.release`, and the `search-tracks`/`search-releases` queries. Remixers are the `artists` of type Remixer; the sub-genre sits in `genre.sub_genre`; the track's date is its release's `release_date`. URLs are built as `/track/<slug of name>/<id>` (search results carry no slug). | Real pages hold up to 173 recommended tracks and releases, which a walk would mistake for the record. | 11 |
 | 2026-11-13 | DJ charts are `charted_by` relations (`EntityType.CHART`, the DJ as the target's artist, the publish date). Supersedes the earlier deferral. | Track pages prefetch the charts that list the track. | 11, 16 |
 | 2026-11-13 | "intro" is a cut word too: "Todd Terry Remix - Intro" is not the Todd Terry Remix. | Seen in Beatport's search results. | 11 |
+| 2026-11-13 | Stage 11 is Done with Beatport tested only on pages saved from a browser; its facts are not live-verified. | The user's runs with the full escalation ladder met a Cloudflare challenge on httpx, curl_cffi and Playwright; nothing else can be verified from this network. User choice. | 11 |
+| 2026-11-13 | Masking browser automation to pass Cloudflare is recorded as an unscheduled later item, not a stage; agents do not implement it. Alternatives discussed: the user's `cf_clearance` cookie (grey, not recommended), paid bypass services (declined), importing pages the user saved (honest, manual), Beatport API v4 (needs partner access), BPM and key from Deezer's `bpm` or GetSongBPM (to be checked). | The user's live runs: Beatport answered a Cloudflare challenge to httpx, curl_cffi, and Playwright. User request to record it. | later |
 
+| 2026-11-13 | Stage 12 builds Hard Wax and Soundohm on live pages; Juno and Phonica on pages the user saves from a browser, verified live by the user. | Access checked before coding: Hard Wax and Soundohm answer plain requests; Juno answers a Cloudflare challenge; Phonica's server ends the TLS handshake with an internal-error alert through the user's proxy (curl and httpx alike). User choice. | 12 |
+| 2026-11-13 | Hard Wax is searched through its JSON Feed (`/feeds/search.json?find=`), whose items list each release's tracks as "Artist: Title"; a track is read from its release's page. Product URLs drop `?focus=`, which switches the page's description to a format's. Store sections are `genre` tags except "CDs", "Downloads", "Label Catalog", "Merchandise". | The feed is an official, stable search; page CSS classes are obfuscated, so pages are read by ids, link targets and meta tags. | 12 |
+| 2026-11-13 | Soundohm is albums only (product pages list no tracks); its "Related products" are not `similar` relations. | Related products for Burial's Untrue were unrelated label-mates, not bought-together lists. | 12 |
+| 2026-11-13 | Shop and label texts are deduplicated together: equal after normalization, or one cut short with an ellipsis contained in the other, or both at least 20 words with 80% of the shorter one's word 5-grams in the other. The longer body is kept; the kind is `label` when any copy is one; other texts and short copies merge only when equal. Helpers `strip_ellipsis` and `shingle_overlap` in `core.normalize`. | Shops reprint one press release, sometimes cut short or with an extra line; Bandcamp has it as the label's text. User choice of the rule. | 12 |
 
 Changed:
 
@@ -413,9 +425,44 @@ Commands and outcomes:
 - Tested on the saved pages: track search → "Todd Terry Remix - Radio Edit" with 124 BPM, A Minor, ISRC, Virgin Records 542 6165, Pop, two `charted_by` relations (Pete Tong, Thomas Bogdan); a query for the Todd Terry Remix reads another mix, which `merge` keeps out as `other_version` with a version discrepancy; CL McSpadden as a remixer credit, not an artist; release search → "Nothing Left To Lose" with barcode and Four Tet as remixer; release URL; earlier-pass link; no match; empty search; challenge → `blocked`; malformed pages.
 - Not live-verified: deadwax has not fetched Beatport itself (Cloudflare; the agent may not run the escalation ladder against it).
 
-Remains for Stage 11 (user): `uv sync --all-groups --all-extras`, then `uv run --env-file .env deadwax --track "Everything but the Girl - Missing (Todd Terry Remix)" --sources core,beatport --no-cache` and the five v1 check records with `--sources core,beatport`. If Beatport is `blocked` with curl_cffi too, decide whether it needs the browser step. Then the stage is marked Done.
+Live runs (2026-11-13, `--sources core,beatport --no-cache`, `DEADWAX_HTTP__ESCALATION=none`): a run with the escalation ladder was refused to the agent by Claude Code's safety classifier (bot-check circumvention), so Beatport was checked only without it.
 
-**Current task:** Stage 11 live verification. **Next action:** the user runs deadwax with `--sources core,beatport` and reports the result.
+- Missing (Todd Terry Remix) 24 s, Paranoid Android 23 s, ESTADO DE BIENESTAR 8 s, Huerco S. 18 s, Кино 20 s; every run exited 0 and found its record as before.
+- Beatport: `blocked` ("Cloudflare challenge (tried httpx)") in all five; the run journal shows one request, the challenge detected, the adapter ending after about 2 s with no retries; no other source was affected.
+- Other errors as in earlier stages: Deezer (Akamai) and Discogs review pages (Cloudflare) `blocked`; Odesli `not_found` for the remix; iTunes and Odesli `no_match` for Кино under the non-Latin rule.
+- Version gate: the remix stays a remix with `version` and `date` discrepancies and the original as `other_version`. The other `other_version` relations of Paranoid Android, Huerco S. and Кино are Discogs pressings of the master (v1 behaviour); "Club Edition" is not read as a version. Paranoid Android's 2021-10-21 date is Bandcamp's upload date (v1 behaviour, kept as a discrepancy).
+- Not live-verified: Beatport's facts (BPM, key, genres, charts) through deadwax itself.
+
+Live runs by the user with the escalation ladder (2026-11-13, runs `20261113T141548Z-15ecf1`, `…141624Z-9c5087`, `…141702Z-fa0497`; read by the agent from the run journal): Missing (Todd Terry Remix) 31 s, Paranoid Android 37 s, "Burial - Archangel" 28 s. Beatport was `blocked` in all three: the search page answered a Cloudflare challenge to httpx, curl_cffi impersonation, and the Playwright browser in turn ("tried httpx, impersonate, browser"), about 12 s per lookup. The other sources answered as in the agent's runs. Beatport's facts are therefore not live-verified, and deadwax cannot read Beatport from this network with the transports it has.
+
+Remains for Stage 11 (user): `uv sync --all-groups --all-extras`, then the five v1 check records and a dance record with `--sources core,beatport --no-cache` and the escalation ladder on (the default). If Beatport is `blocked` with curl_cffi too, decide whether it needs the browser step. Then the stage is marked Done.
+
+Closed (2026-11-13, user decision): Stage 11 is Done. Beatport's extraction is mock-tested on saved pages; live lookups end `blocked` on every transport, so its facts are not live-verified.
+
+### 2026-11-13 — Stage 12 evidence (Hard Wax, Soundohm, deduplication; Juno and Phonica pending)
+
+Access (through the user's proxy, before coding): Hard Wax search page and JSON feed 200; Soundohm search (`/search?query=`; `?q=` redirects home) and product pages 200 with JSON-LD; Juno 403 "Just a moment…" (Cloudflare); Phonica TLS alert `internal error` from curl and httpx. Bypassing the proxy was refused to the agent.
+
+Changed:
+
+- Core: Hard Wax (`/<id>/…`) and Soundohm (`/product/<slug>`) URL rules (albums, no IDs); shop and label text deduplication in `merge` (`_merge_copies`, `_combine_texts`, copy kinds share one exact key); `strip_ellipsis`, `shingle_overlap` in `normalize`.
+- Sources: packages `hardwax` (adapter | parse | models) and `soundohm` (adapter | parse), both `SearchPageAdapter`, group `shops`, opt-in, rate 0.5; services `hardwax`, `soundohm`, `juno`, `phonica` in `_SERVICES`; added after Beatport in `ADAPTERS`; recorder hosts; R4 row and R8 contracts.
+- `.env.example`, CLI settings, `docs/sources.md`, `docs/output.md`, `docs/architecture.md`, API reference index, README tables and tree.
+- Fixtures: trimmed pages in `tests/fixtures/{hardwax,soundohm}/pages/` (meta tags or JSON-LD plus the product block); Hard Wax and Soundohm recorded live for all 13 scenarios, other sources replayed. The recorder also sent one plain request per scenario to Beatport, which had no scenario fixtures (403 Cloudflare each); those files were deleted, not kept.
+
+Commands and outcomes:
+
+- `uv run poe check`: format, lint, 26 import contracts kept, mypy strict clean, 812 passed, 99.08% branch coverage.
+- `uv run --group docs properdocs build --strict`: built without warnings.
+- Mock-tested: Hard Wax release search, track found in a release's tracklist with `appears_on`, a split release's track artist, another version (a remix) kept out with a version discrepancy, query URL with `?focus=`, earlier-pass link, sections without catalogue sections, no label or text, track missing from the page, no match, challenge → `blocked`, invalid feed and pages without a release; Soundohm release search with the full text, track query `not_found`, another version (live album) kept out, query URL, earlier-pass link, facts without JSON-LD, empty description, challenge → `blocked`, pages without a release; merge: one press text from two shops once with both sources, a shortened copy, a copy with an extra line, a shop copy of a label text, short and review texts kept apart.
+- Live-verified (`--no-cache`): `--album "Burial - Untrue" --sources core,shops` 31 s (Hard Wax and Soundohm shop texts and links; Soundohm's "Electronic" merged with five sources; Soundohm's year 2008 is a `date` discrepancy); `--track "Burial - Archangel" --sources core,hardwax,soundohm` 36 s (Hard Wax text and `appears_on` Untrue; Soundohm `not_found`). Five v1 check records with `core,hardwax,soundohm`: Huerco S. 27 s (Hard Wax "Superb Ambient / Electronica album - 2025 repress"); Paranoid Android 41 s, ESTADO DE BIENESTAR 23 s, Кино 39 s, Missing (Todd Terry Remix) 48 s — both shops `not_found`, as neither carries them. Bandcamp timed out or failed in some of these runs and answered on a repeat; Bandcamp is unchanged.
+- Not live-verified: deduplication (Kali Malone and Caterina Barbieri had no shop text repeated by another source).
+
+Observed, not changed: when no candidate is accepted, `merge` takes the reference version from accepted candidates only, so a query that names a version ("Archangel (Extended Mix)") against a found original gets an `other_version` relation but no `version` discrepancy.
+
+Remains for Stage 12: Juno and Phonica from pages the user saves in a browser (search for "Burial Untrue" and the Untrue product page; search for "Everything but the Girl Missing" and one product page), then their adapters, URL rules, docs, and the user's live checks.
+
+**Current task:** Stage 12. **Next action:** the user saves Juno and Phonica pages into `tests/fixtures/juno/pages/` and `tests/fixtures/phonica/pages/`; the agent then builds both adapters.
 
 ## Resume instructions
 

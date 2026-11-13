@@ -1,0 +1,10 @@
+{
+ "recorded_at": "2026-11-13T14:45:14+00:00",
+ "interactions": {
+  "GET https://hardwax.com/feeds/search.json?find=%D0%9A%D0%B8%D0%BD%D0%BE+%D0%93%D1%80%D1%83%D0%BF%D0%BF%D0%B0+%D0%BA%D1%80%D0%BE%D0%B2%D0%B8": {
+   "status": 200,
+   "content_type": "application/feed+json; charset=utf-8",
+   "body": "{\n  \"author\": {\n    \"name\": \"Hard Wax\",\n    \"url\": \"https://hardwax.com/\"\n  },\n  \"description\": \"New releases updated several times a week\",\n  \"favicon\": \"https://hardwax.com/favicon.png\",\n  \"feed_url\": \"https://hardwax.com/feeds/search.json?find=%D0%9A%D0%B8%D0%BD%D0%BE%20%D0%93%D1%80%D1%83%D0%BF%D0%BF%D0%B0%20%D0%BA%D1%80%D0%BE%D0%B2%D0%B8\",\n  \"home_page_url\": \"https://hardwax.com/?find=%D0%9A%D0%B8%D0%BD%D0%BE%20%D0%93%D1%80%D1%83%D0%BF%D0%BF%D0%B0%20%D0%BA%D1%80%D0%BE%D0%B2%D0%B8\",\n  \"icon\": \"https://hardwax.com/m/images/hardwax-icon.png\",\n  \"items\": [],\n  \"title\": \"Hard Wax\",\n  \"version\": \"https://jsonfeed.org/version/1.1\"\n}"
+  }
+ }
+}

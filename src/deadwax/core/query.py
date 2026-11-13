@@ -84,6 +84,8 @@ _DEEZER = re.compile(r"^deezer\.com$")
 _APPLE_MUSIC = re.compile(r"^music\.apple\.com$")
 _SOUNDCLOUD = re.compile(r"^soundcloud\.com$")
 _BEATPORT = re.compile(r"^beatport\.com$")
+_HARDWAX = re.compile(r"^hardwax\.com$")
+_SOUNDOHM = re.compile(r"^soundohm\.com$")
 
 # A SoundCloud track page is '/<user>/<track>', optionally with a secret-link token; the
 # names below are site sections and profile tabs, not users and tracks. Sets ('/<user>/sets/')
@@ -108,6 +110,8 @@ _URL_RULES = (
         EntityKind.ALBUM,
         IdKind.BEATPORT_RELEASE,
     ),
+    _UrlRule(_HARDWAX, re.compile(r"^/\d+/"), EntityKind.ALBUM),
+    _UrlRule(_SOUNDOHM, re.compile(r"^/product/[^/]+"), EntityKind.ALBUM),
     _UrlRule(_BANDCAMP, re.compile(r"^/album/"), EntityKind.ALBUM),
     _UrlRule(_BANDCAMP, re.compile(r"^/track/"), EntityKind.TRACK),
     _UrlRule(

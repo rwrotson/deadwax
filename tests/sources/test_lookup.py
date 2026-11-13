@@ -404,11 +404,14 @@ def test_describe_sources_marks_groups_and_the_default_set() -> None:
         SourceGroup.CATALOGUES,
         SourceGroup.RADIO,
         SourceGroup.STREAMING,
+        SourceGroup.SHOPS,
     }
     assert [info.source for info in infos if info.default] == ["musicbrainz", "deezer"]
     assert [info.source for info in describe_sources() if not info.default] == [
         "soundcloud",
         "beatport",
+        "hardwax",
+        "soundohm",
     ]
 
 
@@ -422,7 +425,7 @@ def test_describe_sources() -> None:
     assert list(sources) == [
         "spotify", "musicbrainz", "odesli", "itunes", "deezer", "discogs", "bandcamp", "lastfm",
         "wikipedia", "listenbrainz", "secondhandsongs", "kexp", "youtube", "soundcloud",
-        "beatport",
+        "beatport", "hardwax", "soundohm",
     ]  # fmt: skip
     assert sources["musicbrainz"].pass_ is Pass.IDENTITY
     assert sources["odesli"].status.ready
@@ -437,6 +440,10 @@ def test_describe_sources() -> None:
     assert sources["beatport"].status.ready
     assert sources["beatport"].group is SourceGroup.STREAMING
     assert not sources["beatport"].default
+    for name in ("hardwax", "soundohm"):
+        assert sources[name].status.ready
+        assert sources[name].group is SourceGroup.SHOPS
+        assert not sources[name].default
     for name in ("spotify", "youtube", "soundcloud"):
         assert sources[name].status.state is SourceState.MISSING_CREDENTIAL
         assert sources[name].group is SourceGroup.STREAMING

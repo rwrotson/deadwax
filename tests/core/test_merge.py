@@ -547,3 +547,87 @@ def test_extended_mix_is_not_merged_into_the_original_mix() -> None:
     assert (relation.kind, relation.note) == (RelationKind.OTHER_VERSION, "extended: Extended Mix")
     [conflict] = dossier.identity.discrepancies
     assert conflict.field == "version"
+
+
+PRESS = (
+    "This is the second full-length release on Hyperdub from the UK's mysterious and "
+    "much-acclaimed Burial. Of all the artists past and present who claim to let their "
+    "music do their talking for them, Burial is one of the elite band of whom this truly "
+    "is the case."
+)
+
+
+def copy(kind: TextKind, body: str, source: str, **fields: object) -> Text:
+    values: dict[str, object] = {
+        "kind": kind,
+        "body": body,
+        "scope": Scope.RELEASE,
+        "sources": provenance(source),
+    }
+    return Text.model_validate(values | fields)
+
+
+def merged_texts(*texts: Text) -> list[Text]:
+    partials = [partial(t.sources[0].source, candidate(), texts=[t]) for t in texts]
+    return merge(TRACK, partials, generated_at=NOW).texts
+
+
+def test_one_press_text_from_two_shops_appears_once_with_both_sources() -> None:
+    texts = merged_texts(
+        copy(TextKind.SHOP, PRESS, "soundohm", publication="Soundohm"),
+        copy(TextKind.SHOP, PRESS.replace("'", "\u2019"), "juno", publication="Juno"),
+    )
+
+    assert len(texts) == 1
+    assert texts[0].publication == "Soundohm"
+    assert [p.source for p in texts[0].sources] == ["soundohm", "juno"]
+
+
+def test_a_shortened_copy_merges_into_the_full_text() -> None:
+    texts = merged_texts(
+        copy(TextKind.SHOP, PRESS[:180] + "…", "soundohm"),
+        copy(TextKind.SHOP, PRESS, "juno", author="Staff"),
+    )
+
+    assert [(t.body, t.author) for t in texts] == [(PRESS, "Staff")]
+    assert [p.source for p in texts[0].sources] == ["soundohm", "juno"]
+
+
+def test_a_copy_with_an_extra_line_merges() -> None:
+    texts = merged_texts(
+        copy(TextKind.SHOP, PRESS + "\nTracklist: Archangel, Near Dark.", "hardwax"),
+        copy(TextKind.SHOP, "Burial returns. " + PRESS, "phonica"),
+    )
+
+    assert len(texts) == 1
+    assert texts[0].body.endswith("Near Dark.")
+    assert [p.source for p in texts[0].sources] == ["hardwax", "phonica"]
+
+
+def test_a_shop_copy_of_a_label_text_is_a_label_text() -> None:
+    texts = merged_texts(
+        copy(TextKind.SHOP, PRESS, "soundohm", publication="Soundohm"),
+        copy(TextKind.LABEL, PRESS, "bandcamp", author="Hyperdub"),
+    )
+
+    assert [(t.kind, t.author, t.publication) for t in texts] == [
+        (TextKind.LABEL, "Hyperdub", "Soundohm"),
+    ]
+
+
+def test_short_or_unrelated_texts_stay_apart() -> None:
+    texts = merged_texts(
+        copy(TextKind.SHOP, "Timeless definition of leftfield UKG, a modern classic", "hardwax"),
+        copy(TextKind.SHOP, "Timeless definition of leftfield UKG", "phonica"),
+        copy(TextKind.REVIEW, PRESS, "wikipedia"),
+        copy(TextKind.SHOP, PRESS, "soundohm"),
+        copy(TextKind.SHOP, "", "juno", publication="Juno"),
+    )
+
+    assert [(t.kind, len(t.sources)) for t in texts] == [
+        (TextKind.REVIEW, 1),
+        (TextKind.SHOP, 1),
+        (TextKind.SHOP, 1),
+        (TextKind.SHOP, 1),
+        (TextKind.SHOP, 1),
+    ]

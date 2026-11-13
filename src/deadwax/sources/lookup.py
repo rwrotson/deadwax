@@ -10,6 +10,7 @@ from deadwax.sources.beatport import BeatportAdapter
 from deadwax.sources.config import SourcesConfig
 from deadwax.sources.deezer import DeezerAdapter
 from deadwax.sources.discogs import DiscogsAdapter
+from deadwax.sources.hardwax import HardWaxAdapter
 from deadwax.sources.itunes import ItunesAdapter
 from deadwax.sources.kexp import KexpAdapter
 from deadwax.sources.lastfm import LastfmAdapter
@@ -18,6 +19,7 @@ from deadwax.sources.musicbrainz import MusicBrainzAdapter
 from deadwax.sources.odesli import OdesliAdapter
 from deadwax.sources.secondhandsongs import SecondHandSongsAdapter
 from deadwax.sources.soundcloud import SoundCloudAdapter
+from deadwax.sources.soundohm import SoundohmAdapter
 from deadwax.sources.spotify import SpotifyAdapter
 from deadwax.sources.wikipedia import WikipediaAdapter
 from deadwax.sources.youtube import YouTubeAdapter
@@ -40,6 +42,8 @@ ADAPTERS: tuple[type[HttpAdapter], ...] = (
     YouTubeAdapter,
     SoundCloudAdapter,
     BeatportAdapter,
+    HardWaxAdapter,
+    SoundohmAdapter,
 )
 
 

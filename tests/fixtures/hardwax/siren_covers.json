@@ -1,0 +1,10 @@
+{
+ "recorded_at": "2026-11-13T14:46:56+00:00",
+ "interactions": {
+  "GET https://hardwax.com/feeds/search.json?find=Tim+Buckley+Song+to+the+Siren": {
+   "status": 200,
+   "content_type": "application/feed+json; charset=utf-8",
+   "body": "{\n  \"author\": {\n    \"name\": \"Hard Wax\",\n    \"url\": \"https://hardwax.com/\"\n  },\n  \"description\": \"New releases updated several times a week\",\n  \"favicon\": \"https://hardwax.com/favicon.png\",\n  \"feed_url\": \"https://hardwax.com/feeds/search.json?find=Tim%20Buckley%20Song%20to%20the%20Siren\",\n  \"home_page_url\": \"https://hardwax.com/?find=Tim%20Buckley%20Song%20to%20the%20Siren\",\n  \"icon\": \"https://hardwax.com/m/images/hardwax-icon.png\",\n  \"items\": [],\n  \"title\": \"Hard Wax\",\n  \"version\": \"https://jsonfeed.org/version/1.1\"\n}"
+  }
+ }
+}

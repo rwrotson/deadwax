@@ -1,0 +1,25 @@
+{
+ "author": {
+  "name": "Hard Wax",
+  "url": "https://hardwax.com/"
+ },
+ "description": "New releases updated several times a week",
+ "favicon": "https://hardwax.com/favicon.png",
+ "feed_url": "https://hardwax.com/feeds/search.json?find=Burial%20Untrue",
+ "home_page_url": "https://hardwax.com/?find=Burial%20Untrue",
+ "icon": "https://hardwax.com/m/images/hardwax-icon.png",
+ "items": [
+  {
+   "content_html": "<p><strong>Hyperdub HDBCD002</strong> (Download)<br><em>Timeless definition of leftfield UKG, a modern classic</em></p><p><img src=\"https://media.hardwax.com/images/55357_01big.jpg\"></p>Tracklisting:<ol><li>Untitled</li><li>Archangel</li><li>Near Dark</li><li>Ghost Hardware</li><li>Endorphin</li><li>Etched Headplate</li><li>In McDonalds</li><li><b>Untrue</b></li><li>Shell of Light</li><li>Dog Shelter</li><li>Homeless</li><li>UK</li><li>Raver</li></ol>",
+   "date_modified": "2026-11-05T08:50:15Z",
+   "date_published": "2015-11-13T09:00:00Z",
+   "id": "https://hardwax.com/55357/?focus=download",
+   "image": "https://media.hardwax.com/images/55357_01big.jpg",
+   "summary": "Timeless definition of leftfield UKG, a modern classic",
+   "title": "Burial: Untrue",
+   "url": "https://hardwax.com/55357/burial/untrue/?focus=download"
+  }
+ ],
+ "title": "Hard Wax",
+ "version": "https://jsonfeed.org/version/1.1"
+}

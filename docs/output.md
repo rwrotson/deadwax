@@ -47,6 +47,8 @@ A `broadcast` text is a radio host's note on a play, with the host as `author` a
 
 Relations to the same target from several sources merge into one, with every source, and the merged target keeps the artist, date, URL, and IDs any of them gave. Broadcasts and mixes are also told apart by date.
 
+Shop and label texts that reprint one press release are merged into one text with every source: copies equal after normalization, a copy cut short with an ellipsis, or two copies of at least 20 words whose five-word sequences overlap by 80% or more. The longer body is kept, and the text is a `label` text when any copy is one. Shorter copies merge only when they are equal.
+
 A score without review text (a ratings template on Wikipedia, a Wikidata review score) is a `review` text with an empty `body`, a `publication`, and a `rating`.
 
 Relation kinds are directional:

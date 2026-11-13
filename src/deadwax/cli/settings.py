@@ -90,6 +90,8 @@ class Settings(BaseSettings):
     youtube: YouTubeSettings = Field(default_factory=YouTubeSettings)
     soundcloud: SoundCloudSettings = Field(default_factory=SoundCloudSettings)
     beatport: SourceSettings = Field(default_factory=SourceSettings)
+    hardwax: SourceSettings = Field(default_factory=SourceSettings)
+    soundohm: SourceSettings = Field(default_factory=SourceSettings)
 
     @classmethod
     def settings_customise_sources(

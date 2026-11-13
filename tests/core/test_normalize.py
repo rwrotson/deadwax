@@ -10,7 +10,7 @@ from deadwax.core import (
     normalize_text,
     split_featuring,
 )
-from deadwax.core.normalize import split_artists
+from deadwax.core.normalize import shingle_overlap, split_artists, strip_ellipsis
 
 
 @pytest.mark.parametrize(
@@ -119,3 +119,25 @@ def test_keys_keep_mode_and_reject_unknown_text() -> None:
     assert normalize_key("13A") is None
     assert normalize_key("H minor") is None
     assert normalize_key("") is None
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("A long story…", "A long story"),
+        ("A long story ...", "A long story"),
+        ("Wait... and see", "Wait... and see"),
+        ("Plain", "Plain"),
+    ],
+)
+def test_trailing_ellipsis_is_stripped(text: str, expected: str) -> None:
+    assert strip_ellipsis(text) == expected
+
+
+def test_shingle_overlap_counts_the_shorter_text() -> None:
+    longer = "one two three four five six seven eight"
+    shorter = "one two three four five six"
+
+    assert shingle_overlap(shorter, longer) == 1.0
+    assert shingle_overlap(longer, "nine ten eleven twelve thirteen") == 0.0
+    assert shingle_overlap("too short", longer) == 0.0

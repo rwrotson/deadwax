@@ -18,6 +18,9 @@ _ARTIST_SEPARATOR = re.compile(r"\s*(?:,|&|\+|\band\b|\bx\b|\bvs\.?|\bwith\b)\s*
 # Leading mark of a folded copyright line: phonographic (℗, (p)) or plain (©, (c), copyright).
 _COPYRIGHT_MARK = re.compile(r"^\s*(?:(?P<p>℗|\(p\))|©|\(c\)|copyright\b)\s*")
 
+# A trailing ellipsis marks a text cut short by its publisher.
+_TRAILING_ELLIPSIS = re.compile(r"\s*(?:\u2026|\.{3})\s*$")
+
 _PITCHES = {"c": 0, "d": 2, "e": 4, "f": 5, "g": 7, "a": 9, "b": 11}
 _ACCIDENTALS = {"": 0, "#": 1, "♯": 1, "b": -1, "♭": -1}
 _MINOR = frozenset({"m", "min", "minor"})
@@ -55,6 +58,24 @@ def normalize_text(text: str) -> str:
     """Build a comparison key: folded words of any script separated by single spaces."""
     folded = fold(text).replace("&", " and ")
     return " ".join("".join(char if char.isalnum() else " " for char in folded).split())
+
+
+def strip_ellipsis(text: str) -> str:
+    """Remove the ellipsis that ends a shortened text."""
+    return _TRAILING_ELLIPSIS.sub("", text)
+
+
+def shingle_overlap(first: str, second: str, size: int = 5) -> float:
+    """Share of the shorter key's word n-grams that the other key contains."""
+    shingles = [_shingles(key.split(), size) for key in (first, second)]
+    smaller = min(shingles, key=len)
+    if not smaller:
+        return 0.0
+    return len(shingles[0] & shingles[1]) / len(smaller)
+
+
+def _shingles(words: list[str], size: int) -> frozenset[tuple[str, ...]]:
+    return frozenset(tuple(words[i : i + size]) for i in range(len(words) - size + 1))
 
 
 def split_featuring(text: str) -> tuple[str, list[str]]:

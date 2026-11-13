@@ -1,0 +1,25 @@
+{
+ "author": {
+  "name": "Hard Wax",
+  "url": "https://hardwax.com/"
+ },
+ "description": "New releases updated several times a week",
+ "favicon": "https://hardwax.com/favicon.png",
+ "feed_url": "https://hardwax.com/feeds/search.json?find=Burial%20Phoneglow",
+ "home_page_url": "https://hardwax.com/?find=Burial%20Phoneglow",
+ "icon": "https://hardwax.com/m/images/hardwax-icon.png",
+ "items": [
+  {
+   "content_html": "<p><strong>Hyperdub HDB155D</strong> (Download)<br><em>Dreamy UK Garage / Pop cuts</em></p><p><img src=\"https://media.hardwax.com/images/88197_01big.jpg\"></p>Tracklisting:<ol><li><b>Burial</b>: <b>Phoneglow</b></li><li>Kode9: Eyes Go Blank</li></ol>",
+   "date_modified": "2026-03-30T14:08:57Z",
+   "date_published": "2024-06-18T08:00:00Z",
+   "id": "https://hardwax.com/88197/",
+   "image": "https://media.hardwax.com/images/88197_01big.jpg",
+   "summary": "Dreamy UK Garage / Pop cuts",
+   "title": "Burial and Kode9: Phoneglow / Eyes Go Blank",
+   "url": "https://hardwax.com/88197/burial-and-kode9/phoneglow-eyes-go-blank/"
+  }
+ ],
+ "title": "Hard Wax",
+ "version": "https://jsonfeed.org/version/1.1"
+}

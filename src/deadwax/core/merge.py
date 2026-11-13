@@ -40,6 +40,8 @@ from deadwax.core.normalize import (
     normalize_copyright,
     normalize_key,
     normalize_text,
+    shingle_overlap,
+    strip_ellipsis,
 )
 from deadwax.core.query import EntityKind, Query
 from deadwax.core.versions import parse_title
@@ -451,12 +453,78 @@ class _Facts:
     links: list[Link]
 
 
+# Shop and label texts often reprint one press release.
+_COPY_KINDS = frozenset({TextKind.SHOP, TextKind.LABEL})
+
+# Copies shorter than this many words are the same only when their bodies are equal.
+_COPY_MIN_WORDS = 20
+
+# Share of the shorter copy's five-word sequences found in the other copy.
+_COPY_OVERLAP = 0.8
+
+
 def _text_key(text: Text) -> tuple[object, ...]:
     """Texts are the same by body; scores without a body by publication, rating, and title."""
     if text.body.strip():
-        return (text.kind, normalize_text(text.body))
+        kind: object = "copy" if text.kind in _COPY_KINDS else text.kind
+        return (kind, normalize_text(text.body))
     publication = normalize_text(text.publication or "")
     return (text.kind, "", publication, text.rating, normalize_text(text.title or ""))
+
+
+def _copy_key(text: Text) -> str | None:
+    if text.kind not in _COPY_KINDS:
+        return None
+    return normalize_text(strip_ellipsis(text.body)) or None
+
+
+def _same_copy(first: str, second: str) -> bool:
+    """Tell whether two long copy keys are one text, one of them cut short or extended."""
+    shorter, longer = sorted((first, second), key=len)
+    if len(shorter.split()) < _COPY_MIN_WORDS:
+        return False
+    return f" {shorter} " in f" {longer} " or shingle_overlap(shorter, longer) >= _COPY_OVERLAP
+
+
+def _combine_texts(kept: Text, other: Text) -> Text:
+    """Keep the longer body; a label's copy names the text a label text."""
+    if kept.kind not in _COPY_KINDS or other.kind not in _COPY_KINDS:
+        return _combine(kept, other)
+    longer, shorter = (other, kept) if len(other.body) > len(kept.body) else (kept, other)
+    return longer.model_copy(
+        update={
+            "kind": TextKind.LABEL if TextKind.LABEL in {kept.kind, other.kind} else kept.kind,
+            "title": longer.title or shorter.title,
+            "author": longer.author or shorter.author,
+            "publication": longer.publication or shorter.publication,
+            "date": longer.date or shorter.date,
+            "scope": kept.scope,
+            "sources": _union(kept.sources, other.sources),
+        },
+    )
+
+
+def _merge_copies(texts: Iterable[Text]) -> list[Text]:
+    """Merge shop and label texts that repeat one press release, keeping every source."""
+    merged: list[Text] = []
+    keys: list[str | None] = []
+    for text in texts:
+        key = _copy_key(text)
+        index = next(
+            (
+                position
+                for position, known in enumerate(keys)
+                if key is not None and known is not None and _same_copy(known, key)
+            ),
+            None,
+        )
+        if index is None:
+            merged.append(text)
+            keys.append(key)
+        else:
+            merged[index] = _combine_texts(merged[index], text)
+            keys[index] = _copy_key(merged[index])
+    return merged
 
 
 def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Partial]) -> _Facts:
@@ -477,7 +545,9 @@ def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Parti
         ),
     )
 
-    texts = _dedupe((text for p in accepted for text in p.texts), _text_key)
+    texts = _merge_copies(
+        _dedupe((text for p in accepted for text in p.texts), _text_key, _combine_texts),
+    )
 
     found_relations = (relation for p in accepted for relation in p.relations)
     version_relations = (

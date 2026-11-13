@@ -117,6 +117,10 @@ def test_text_query_requires_kind() -> None:
         ("https://soundcloud.com/burial", None, {}),
         ("https://song.link/s/3a1lNhkSLSkpJE4MSHpDu9", None, {}),
         ("https://burial.bandcamp.com/", None, {}),
+        ("https://hardwax.com/55357/burial/untrue/?focus=download", EntityKind.ALBUM, {}),
+        ("https://hardwax.com/act/burial/", None, {}),
+        ("https://www.soundohm.com/product/untrue", EntityKind.ALBUM, {}),
+        ("https://www.soundohm.com/artist/burial", None, {}),
     ],
 )
 def test_url_kind_and_ids_are_recognized(

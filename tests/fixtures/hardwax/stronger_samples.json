@@ -1,0 +1,10 @@
+{
+ "recorded_at": "2026-11-13T14:47:12+00:00",
+ "interactions": {
+  "GET https://hardwax.com/feeds/search.json?find=Kanye+West+Stronger": {
+   "status": 200,
+   "content_type": "application/feed+json; charset=utf-8",
+   "body": "{\n  \"author\": {\n    \"name\": \"Hard Wax\",\n    \"url\": \"https://hardwax.com/\"\n  },\n  \"description\": \"New releases updated several times a week\",\n  \"favicon\": \"https://hardwax.com/favicon.png\",\n  \"feed_url\": \"https://hardwax.com/feeds/search.json?find=Kanye%20West%20Stronger\",\n  \"home_page_url\": \"https://hardwax.com/?find=Kanye%20West%20Stronger\",\n  \"icon\": \"https://hardwax.com/m/images/hardwax-icon.png\",\n  \"items\": [],\n  \"title\": \"Hard Wax\",\n  \"version\": \"https://jsonfeed.org/version/1.1\"\n}"
+  }
+ }
+}
