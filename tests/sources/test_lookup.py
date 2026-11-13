@@ -413,6 +413,7 @@ def test_describe_sources_marks_groups_and_the_default_set() -> None:
         "hardwax",
         "soundohm",
         "juno",
+        "phonica",
     ]
 
 
@@ -426,7 +427,7 @@ def test_describe_sources() -> None:
     assert list(sources) == [
         "spotify", "musicbrainz", "odesli", "itunes", "deezer", "discogs", "bandcamp", "lastfm",
         "wikipedia", "listenbrainz", "secondhandsongs", "kexp", "youtube", "soundcloud",
-        "beatport", "hardwax", "soundohm", "juno",
+        "beatport", "hardwax", "soundohm", "juno", "phonica",
     ]  # fmt: skip
     assert sources["musicbrainz"].pass_ is Pass.IDENTITY
     assert sources["odesli"].status.ready
@@ -441,7 +442,7 @@ def test_describe_sources() -> None:
     assert sources["beatport"].status.ready
     assert sources["beatport"].group is SourceGroup.STREAMING
     assert not sources["beatport"].default
-    for name in ("hardwax", "soundohm", "juno"):
+    for name in ("hardwax", "soundohm", "juno", "phonica"):
         assert sources[name].status.ready
         assert sources[name].group is SourceGroup.SHOPS
         assert not sources[name].default

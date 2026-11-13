@@ -18,7 +18,7 @@ KEPT_ITEMS = 12
 # Page parts each shop's parser reads; everything else is dropped.
 KEPT_BLOCKS = {
     "juno": ("#product-page-music", ".product-list"),
-    "phonica": ("main",),
+    "phonica": ("#page-single",),
 }
 
 # Markup that parsers never read and that may carry session data.

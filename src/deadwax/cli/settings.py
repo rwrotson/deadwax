@@ -93,6 +93,7 @@ class Settings(BaseSettings):
     hardwax: SourceSettings = Field(default_factory=SourceSettings)
     soundohm: SourceSettings = Field(default_factory=SourceSettings)
     juno: SourceSettings = Field(default_factory=SourceSettings)
+    phonica: SourceSettings = Field(default_factory=SourceSettings)
 
     @classmethod
     def settings_customise_sources(

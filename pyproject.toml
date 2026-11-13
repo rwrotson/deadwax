@@ -290,7 +290,7 @@ type = "layers"
 containers = ["deadwax.sources"]
 layers = [
     "lookup",
-    "musicbrainz | itunes | deezer | odesli | discogs | bandcamp | lastfm | wikipedia | listenbrainz | secondhandsongs | kexp | spotify | youtube | soundcloud | beatport | hardwax | soundohm | juno",
+    "musicbrainz | itunes | deezer | odesli | discogs | bandcamp | lastfm | wikipedia | listenbrainz | secondhandsongs | kexp | spotify | youtube | soundcloud | beatport | hardwax | soundohm | juno | phonica",
     "_base | _html",
     "_http",
     "config",
@@ -378,6 +378,12 @@ layers = ["adapter", "parse"]
 name = "R8: Juno adapter modules"
 type = "layers"
 containers = ["deadwax.sources.juno"]
+layers = ["adapter", "parse"]
+
+[[tool.importlinter.contracts]]
+name = "R8: Phonica adapter modules"
+type = "layers"
+containers = ["deadwax.sources.phonica"]
 layers = ["adapter", "parse"]
 
 [[tool.importlinter.contracts]]

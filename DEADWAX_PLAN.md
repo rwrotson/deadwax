@@ -165,7 +165,7 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 ### Stage 12: shops I
 
-- [ ] Juno, Hard Wax, Phonica, Soundohm through the Stage 8 helper: `shop` texts, genres, "also bought" as `similar` where present. Hard Wax, Soundohm and Juno done; Phonica waits for saved pages.
+- [ ] Juno, Hard Wax, Phonica, Soundohm through the Stage 8 helper: `shop` texts, genres, "also bought" as `similar` where present. Hard Wax, Soundohm and Juno done; Phonica implemented on saved product pages, its search page not yet seen.
 - [x] Merge: `shop` texts that repeat one press release are deduplicated, keeping every source.
 
 **Acceptance:** the same press text from two shops appears once with both sources. **Suggested message:** `feat(sources): add Juno, Hard Wax, Phonica and Soundohm adapters`.
@@ -481,7 +481,25 @@ Commands and outcomes:
 
 Remains for Stage 12: Phonica from saved pages (the site's search for "Burial Truant", `/product/burial-truant-rough-sleeper-hyperdub/111124`, `/product/huercos-colonial-patterns-lp-software/116278`).
 
-**Current task:** Stage 12. **Next action:** the user saves three Phonica pages (above) into a folder and names it; the agent then builds the Phonica adapter.
+### 2026-11-13 — Stage 12 evidence (Phonica)
+
+Pages: the user saved two Firefox view-source product pages (111124 Burial "Truant / Rough Sleeper", 116278 Huerco S. "Colonial Patterns LP"); both became fixtures in `tests/fixtures/phonica/pages/` (82–89 KB). The search page was not saved. The site's search is `/search/<words>` (from a link in the page); its results are assumed to use the product cards seen on product pages (`.archive-products .product-place-holder` with `.archive-artist`, `.archive-title`, `.archive-playlist`), which is not verified.
+
+Changed: package `phonica` (adapter | parse, R8 contract, R4 row), `SearchPageAdapter`, group `shops`, opt-in, rate 0.5, added after Juno in `ADAPTERS`; `scripts/saved_pages.py` keeps `#page-single` for Phonica (the page has no `main`); settings, `.env.example`, recorder host, `docs/sources.md`, `docs/architecture.md`, API reference index, README table and tree.
+
+Extracted: staff description as a `shop` text (paragraphs from `<p>` or double `<br>`), genre sections as `genre` tags, label, `og:url` as the page URL, "customers who bought this also bought" as `similar` relations (empty template cards skipped), the product link; for a track, `appears_on` from the page's playlist. A trailing format ("LP", "2LP", "2 x LP", "CD") is removed from titles; "EP" is kept. Product pages carry no date and no catalog number.
+
+Commands and outcomes:
+
+- `uv run python scripts/saved_pages.py --shop phonica … --name product_111124 --name product_116278`: two fixtures written.
+- `uv run poe check`: format, lint, 28 import contracts kept, mypy strict clean, 847 passed, 99.05% branch coverage.
+- `uv run --group docs properdocs build --strict`: built without warnings.
+- Mock-tested: release by search (synthetic result cards) with text, three genres, label and three also-bought releases; a track found through a card's track list with `appears_on`; another version (a remix) kept out with a version discrepancy; query URL with paragraphs and a format in the title; earlier-pass link; a bare page; track missing from the page; no match; Sucuri challenge → `blocked`; page without a product; title formats.
+- Not live-verified: no live run was made.
+
+Remains for Stage 12: the user saves `https://www.phonicarecords.com/search/burial%20truant`; the agent checks the search parser against it and turns it into a fixture. Then the user's live checks (Phonica needs the escalation ladder for Sucuri), and the stage is marked Done.
+
+**Current task:** Stage 12. **Next action:** the user saves the Phonica search page for "burial truant" into `~/Downloads/source`; the agent then verifies the search parser and closes the stage.
 
 ## Resume instructions
 

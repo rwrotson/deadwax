@@ -18,6 +18,7 @@ from deadwax.sources.lastfm import LastfmAdapter
 from deadwax.sources.listenbrainz import ListenBrainzAdapter
 from deadwax.sources.musicbrainz import MusicBrainzAdapter
 from deadwax.sources.odesli import OdesliAdapter
+from deadwax.sources.phonica import PhonicaAdapter
 from deadwax.sources.secondhandsongs import SecondHandSongsAdapter
 from deadwax.sources.soundcloud import SoundCloudAdapter
 from deadwax.sources.soundohm import SoundohmAdapter
@@ -46,6 +47,7 @@ ADAPTERS: tuple[type[HttpAdapter], ...] = (
     HardWaxAdapter,
     SoundohmAdapter,
     JunoAdapter,
+    PhonicaAdapter,
 )
 
 
