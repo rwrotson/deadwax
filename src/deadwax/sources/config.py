@@ -3,7 +3,14 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlsplit
 
-from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field, SecretStr
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    SecretStr,
+)
 
 DEFAULT_CONTACT = "https://github.com/rwrotson/deadwax"
 
@@ -57,9 +64,9 @@ DEFAULT_SOURCES: tuple[str, ...] = (
 
 
 class Escalation(StrEnum):
-    """Strongest transport HTML adapters may switch to when a page is blocked."""
+    """Transport available to an HTML adapter."""
 
-    NONE = "none"
+    HTTPX = "httpx"
     IMPERSONATE = "impersonate"
     BROWSER = "browser"
     PATCHRIGHT = "patchright"
@@ -85,9 +92,9 @@ class HttpSettings(_Model):
         ge=0,
         description="Longest Retry-After wait, in seconds, before giving up",
     )
-    escalation: Escalation | None = Field(
-        default=None,
-        description="Strongest transport for blocked HTML pages; unset: strongest installed",
+    escalation: tuple[Escalation, ...] = Field(
+        default=(Escalation.IMPERSONATE, Escalation.BROWSER, Escalation.NODRIVER),
+        description="Additional HTML transports allowed globally; source order is preserved",
     )
     browser_headless: bool = Field(
         default=True,
@@ -149,6 +156,10 @@ class SourceSettings(_Model):
     proxy: Proxy | None = Field(
         default=None,
         description="Proxy of this source: 'direct' or an http(s):// URL; http.proxy when unset",
+    )
+    html_transports: tuple[Escalation, ...] | None = Field(
+        default=None,
+        description="Ordered HTML transports; unset: the source's built-in order",
     )
 
 
@@ -229,6 +240,28 @@ DEFAULT_RATES: dict[str, float] = {
     "juno": 0.5,
 }
 
+DEFAULT_HTML_TRANSPORTS: tuple[Escalation, ...] = (
+    Escalation.HTTPX,
+    Escalation.IMPERSONATE,
+    Escalation.BROWSER,
+    Escalation.NODRIVER,
+)
+
+SOURCE_HTML_TRANSPORTS: dict[str, tuple[Escalation, ...]] = {
+    "beatport": (
+        Escalation.NODRIVER,
+        Escalation.BROWSER,
+        Escalation.IMPERSONATE,
+        Escalation.HTTPX,
+    ),
+    "juno": (
+        Escalation.IMPERSONATE,
+        Escalation.BROWSER,
+        Escalation.NODRIVER,
+        Escalation.HTTPX,
+    ),
+}
+
 
 class SourcesConfig(_Model):
     """Configuration of all sources and the HTTP stack."""
@@ -266,6 +299,29 @@ class SourcesConfig(_Model):
         if isinstance(settings, SourceSettings) and settings.rate is not None:
             return settings.rate
         return DEFAULT_RATES.get(source, 1.0)
+
+    def html_transports(self, source: str) -> tuple[Escalation, ...]:
+        """Return this source's ordered HTML transports after the global allowlist."""
+        settings = getattr(self, source, None)
+        selected = (
+            settings.html_transports
+            if isinstance(settings, SourceSettings) and settings.html_transports is not None
+            else SOURCE_HTML_TRANSPORTS.get(source, DEFAULT_HTML_TRANSPORTS)
+        )
+        allowed = {
+            Escalation.BROWSER if step is Escalation.PATCHRIGHT else step
+            for step in (Escalation.HTTPX, *self.http.escalation)
+        }
+        result = tuple(
+            Escalation.BROWSER if step is Escalation.PATCHRIGHT else step
+            for step in selected
+            if step in allowed or (step is Escalation.PATCHRIGHT and Escalation.BROWSER in allowed)
+        )
+        if not result or len(result) != len(set(result)):
+            raise ValueError(
+                f"{source}.html_transports must contain distinct permitted transports",
+            )
+        return result
 
     def proxy(self, source: str) -> str | None:
         """Return the proxy setting of a source: 'direct', a URL, or None for the environment."""

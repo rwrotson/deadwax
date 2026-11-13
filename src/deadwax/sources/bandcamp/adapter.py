@@ -17,9 +17,10 @@ from deadwax.core import (
     recognize_url,
 )
 from deadwax.sources._base import HttpAdapter, search_key, service_for_url
-from deadwax.sources._http import Profile
+from deadwax.sources._http import HttpClient, HttpResources, Profile
 from deadwax.sources.bandcamp import models
 from deadwax.sources.bandcamp import parse as p
+from deadwax.sources.config import SourcesConfig
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,26 @@ class BandcampAdapter(HttpAdapter):
         },
     )
     profile = Profile.BROWSER
+
+    def __init__(self, config: SourcesConfig, resources: HttpResources) -> None:
+        super().__init__(config, resources)
+        self._api_client: HttpClient | None = None
+
+    @property
+    def api_client(self) -> HttpClient:
+        """Use plain HTTP for Bandcamp's JSON endpoints."""
+        if self._api_client is None:
+            self._api_client = HttpClient(
+                self.client_spec(Profile.API), self.config, self.resources,
+            )
+        return self._api_client
+
+    async def aclose(self) -> None:
+        """Close the page and JSON clients."""
+        await super().aclose()
+        if self._api_client is not None:
+            await self._api_client.aclose()
+            self._api_client = None
 
     def resolves(self, query: Query) -> bool:
         """Album and track pages on bandcamp.com subdomains; custom domains are not recognized."""
@@ -133,7 +154,7 @@ class BandcampAdapter(HttpAdapter):
         """Ask the mobile API, which names the label; its failure costs only the label."""
         params = {"band_id": str(band_id), "tralbum_id": str(item_id), "tralbum_type": item_type}
         try:
-            response = await self.client.get(MOBILE_API, params=params)
+            response = await self.api_client.get(MOBILE_API, params=params)
             return models.MobileDetails.model_validate_json(response.content)
         except SourceError, ValueError:
             logger.debug("bandcamp mobile API gave no details for %s", item_id, exc_info=True)
@@ -150,7 +171,7 @@ class BandcampAdapter(HttpAdapter):
         }
 
         try:
-            response = await self.client.request(
+            response = await self.api_client.request(
                 "POST",
                 SEARCH_API,
                 headers={"content-type": "application/json", "accept": "application/json"},

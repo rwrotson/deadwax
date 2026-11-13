@@ -77,7 +77,7 @@ def make(
     config = SourcesConfig.model_validate(
         {
             "discogs": {"rate": 1000, "token": token},
-            "http": {"retries": 0, "escalation": "none", **http},
+            "http": {"retries": 0, "escalation": [], **http},
         },
     )
     return DiscogsAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
@@ -278,7 +278,7 @@ async def test_missing_escalation_browser_costs_only_the_reviews() -> None:
         raise ConfigurationError("Chromium for Playwright is not installed")
 
     table = routes(**{PAGE: (403, b"<title>Just a moment...</title>")})
-    adapter = make(table, escalation="browser")
+    adapter = make(table, escalation=["browser"])
     adapter.resources.escalations = {
         Escalation.IMPERSONATE: unavailable,
         Escalation.BROWSER: unavailable,
@@ -288,7 +288,7 @@ async def test_missing_escalation_browser_costs_only_the_reviews() -> None:
     partial = await adapter.lookup(ALBUM, with_ids(ALBUM, discogs_master="1"))
 
     assert partial.candidate is not None
-    assert [e.kind for e in partial.errors] == [ErrorKind.FAILED]
+    assert [e.kind for e in partial.errors] == [ErrorKind.BLOCKED]
     assert "Chromium" in partial.errors[0].reason
 
 

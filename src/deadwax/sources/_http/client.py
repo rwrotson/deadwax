@@ -91,21 +91,13 @@ def _utcnow() -> datetime:
 
 
 def escalation_steps(
-    setting: Escalation | None,
+    selected: tuple[Escalation, ...],
     installed: Callable[[str], bool] = _installed,
 ) -> list[Escalation]:
-    """Return the transports to try after plain httpx, weakest first.
-
-    Unset means every installed one; an explicit setting keeps its own step even when the
-    extra is missing, so that the missing extra is reported.
-    """
-    steps = [Escalation.IMPERSONATE, Escalation.BROWSER, Escalation.NODRIVER]
-    if setting is Escalation.PATCHRIGHT:
-        setting = Escalation.BROWSER
-    if setting is None:
-        return [step for step in steps if installed(_EXTRA_PACKAGES[step])]
-    allowed = steps[: steps.index(setting) + 1] if setting is not Escalation.NONE else []
-    return [step for step in allowed if step is setting or installed(_EXTRA_PACKAGES[step])]
+    """Return the source's transports in order, omitting missing optional packages."""
+    return [
+        step for step in selected if step is Escalation.HTTPX or installed(_EXTRA_PACKAGES[step])
+    ]
 
 
 def route(proxy: str | None) -> str:
@@ -172,8 +164,7 @@ class ClientSpec:
 class HttpClient:
     """Rate-limited, retrying, caching HTTP client of one adapter.
 
-    Browser-profile clients escalate to stronger transports when a page shows a challenge
-    and keep using the transport that worked.
+    Browser-profile clients try their configured transports when a page shows a challenge.
     """
 
     def __init__(self, spec: ClientSpec, config: SourcesConfig, resources: HttpResources) -> None:
@@ -203,14 +194,23 @@ class HttpClient:
             proxy=self._proxy,
         )
 
-        self._steps: list[Escalation] = (
-            escalation_steps(self._settings.escalation, resources.installed)
+        self._steps = (
+            escalation_steps(config.html_transports(spec.source), resources.installed)
+            if spec.profile is Profile.BROWSER
+            else [Escalation.HTTPX]
+        )
+        self._policy_signature = ",".join(self._steps)
+        self._escalated: dict[Escalation, Fetcher] = {}
+        self._level = 0
+        self._unavailable = (
+            [
+                f"{step} unavailable: install {_EXTRA_PACKAGES[step]}"
+                for step in config.html_transports(spec.source)
+                if step not in self._steps and step is not Escalation.HTTPX
+            ]
             if spec.profile is Profile.BROWSER
             else []
         )
-        self._escalated: dict[Escalation, Fetcher] = {}
-        self._level = 0
-        self._unavailable: str | None = None
 
     async def __aenter__(self) -> Self:
         return self
@@ -308,7 +308,10 @@ class HttpClient:
             blocked = cached.headers.get(_BLOCKED_HEADER)
             if blocked is None:
                 return cached
-            if cached.headers.get(_ROUTE_HEADER, _ENVIRONMENT_ROUTE) == self._route:
+            if (
+                cached.headers.get(_ROUTE_HEADER, _ENVIRONMENT_ROUTE) == self._route
+                and cached.headers.get("x-deadwax-transports") == self._policy_signature
+            ):
                 exchange.cache = "blocked"
                 raise BlockedError(f"{blocked} (cached)", url=cached.url)
             exchange.cache = "miss"
@@ -321,7 +324,11 @@ class HttpClient:
                     url=error.url,
                     status=403,
                     content=b"",
-                    headers={_BLOCKED_HEADER: str(error), _ROUTE_HEADER: self._route},
+                    headers={
+                        _BLOCKED_HEADER: str(error),
+                        _ROUTE_HEADER: self._route,
+                        "x-deadwax-transports": self._policy_signature,
+                    },
                 )
                 await cache.put(key, marker, self._config.cache.blocked_ttl)
             raise
@@ -347,9 +354,9 @@ class HttpClient:
         raise SourceError(f"HTTP {response.status}", url=response.url)
 
     def _fetcher(self, level: int) -> Fetcher:
-        if level == 0:
+        step = self._steps[level]
+        if step is Escalation.HTTPX:
             return self._plain
-        step = self._steps[level - 1]
         if step not in self._escalated:
             self._escalated[step] = self._resources.escalations[step](self._settings, self._proxy)
         return self._escalated[step]
@@ -358,7 +365,8 @@ class HttpClient:
         safe_url = redact(request.full_url, self.spec.secret_params)
         reason = ""
         tried: list[str] = []
-        for level in range(self._level, len(self._steps) + 1):
+        level = self._level
+        while level < len(self._steps):
             try:
                 fetcher = self._fetcher(level)
                 response = await self._attempt(fetcher, request, safe_url, exchange)
@@ -366,10 +374,8 @@ class HttpClient:
                 error.url = error.url or safe_url
                 raise
             except ConfigurationError as error:
-                if level == 0 or self._settings.escalation is not None:
-                    raise
                 await self._drop_step(level, error)
-                break
+                continue
             tried.append(fetcher.name)
             challenge = detect_challenge(response.status, response.headers, response.content)
             if challenge is None:
@@ -377,19 +383,17 @@ class HttpClient:
                 return response
             reason = challenge
             trace(logger, "http.challenge", url=safe_url, challenge=challenge, fetcher=fetcher.name)
-        unavailable = f"; {self._unavailable}" if self._unavailable else ""
+            level += 1
+        unavailable = f"; {'; '.join(self._unavailable)}" if self._unavailable else ""
         raise BlockedError(f"{reason} (tried {', '.join(tried)}{unavailable})", url=safe_url)
 
     async def _drop_step(self, level: int, error: ConfigurationError) -> None:
-        """End the ladder below a step that cannot run, such as a browser that is not installed.
-
-        Only an unset escalation setting means "the strongest available step"; an explicit
-        setting keeps reporting the missing step as a configuration error.
-        """
-        step = self._steps[level - 1]
+        """Skip one unavailable transport and continue with the next."""
+        step = self._steps[level]
         trace(logger, "http.step_dropped", step=step, reason=str(error))
-        self._unavailable = f"{step} unavailable: {error}"
-        del self._steps[level - 1 :]
+        self._unavailable.append(f"{step} unavailable: {error}")
+        del self._steps[level]
+        self._level = min(self._level, max(len(self._steps) - 1, 0))
         if (fetcher := self._escalated.pop(step, None)) is not None:
             await fetcher.aclose()
 

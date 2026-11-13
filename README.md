@@ -45,8 +45,8 @@ print(dossier.model_dump_json(indent=2))
 | `deadwax[logs]` | `deadwax.logs`: `LogSettings`, `setup_logging()`, and the run journal (structlog) |
 | `deadwax[cli]` | The `deadwax` command (Typer, Pydantic Settings, rich, platformdirs) and `logs` |
 | `deadwax[stealth]` | curl_cffi browser TLS impersonation for pages behind bot protection |
-| `deadwax[browser]` or `deadwax[patchright]` | Patchright Chromium fallback (`patchright install chromium`) |
-| `deadwax[nodriver]` | Nodriver Chrome fallback (install Chrome separately) |
+| `deadwax[browser]` or `deadwax[patchright]` | Patchright Chromium HTML transport (`patchright install chromium`) |
+| `deadwax[nodriver]` | Nodriver Chrome HTML transport (install Chrome separately) |
 
 ## Sources
 
@@ -98,7 +98,7 @@ Never used: Juno Download (shut down), Every Noise at Once, direct Metacritic sc
 
 ## Configuration
 
-The library takes settings as arguments and never reads the environment. The `deadwax` command loads `deadwax.cli.settings.Settings` from flags, `DEADWAX_*` environment variables, `.env`, and a TOML file (`--config`, `DEADWAX_CONFIG_FILE`, or `config.toml` in the user configuration directory), in that order of precedence; sections are nested with `__` (for example `DEADWAX_LASTFM__API_KEY=…`) or TOML tables (`[lastfm]`). The command caches responses in the user cache directory. Requests use the proxy from the environment (`HTTPS_PROXY`, `NO_PROXY`); `DEADWAX_HTTP__PROXY` or `DEADWAX_<SOURCE>__PROXY` set `direct` or another proxy, for example `DEADWAX_DEEZER__PROXY=direct` when a site refuses the proxy's address. See `.env.example` and the generated configuration page in the documentation.
+The library takes settings as arguments and never reads the environment. The `deadwax` command loads `deadwax.cli.settings.Settings` from flags, `DEADWAX_*` environment variables, `.env`, and a TOML file (`--config`, `DEADWAX_CONFIG_FILE`, or `config.toml` in the user configuration directory), in that order of precedence; sections are nested with `__` (for example `DEADWAX_LASTFM__API_KEY=…`) or TOML tables (`[lastfm]`). The command caches responses in the user cache directory. Requests use the proxy from the environment (`HTTPS_PROXY`, `NO_PROXY`); `DEADWAX_HTTP__PROXY` or `DEADWAX_<SOURCE>__PROXY` set `direct` or another proxy, for example `DEADWAX_DEEZER__PROXY=direct` when a site refuses the proxy's address. For HTML requests, each source has an ordered `html_transports` list in code, overridable by a TOML array or `DEADWAX_<SOURCE>__HTML_TRANSPORTS` JSON array. See `.env.example` and the generated configuration page in the documentation.
 
 ### Credentials
 

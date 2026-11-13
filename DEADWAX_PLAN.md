@@ -257,6 +257,14 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
 
+### 2026-11-13 — Per-source HTML transport selection (Stage 13 preparation)
+
+Decision: HTML sources choose an ordered list of transports. The built-in list is httpx, curl_cffi, Patchright, Nodriver, except Beatport (Nodriver first, provisionally) and Juno (curl_cffi first, live-verified in Stage 12). The global `http.escalation` setting now lists permitted optional transports. The former single-value cap is incompatible with this format.
+
+Changed: transport selection and missing-transport fallback in the shared HTTP client; JSON clients separate from HTML clients for Bandcamp and Hard Wax; per-source `html_transports` settings, cache policy signature, configuration examples and documentation. This does not claim a successful live Beatport or Nodriver lookup.
+
+Verification: delegated to the user in a separate environment. No check or live command was run in this session; Stage 13 remains open.
+
 | Date | Decision | Reason | Affected stage |
 | --- | --- | --- | --- |
 | 2026-11-13 | v2 source scope: all sources planned in v1 except Rough Trade, Apple Music, Traxsource, Mixcloud and BBC Sounds; YouTube for links only. | User review of what each source can give. | v2 |

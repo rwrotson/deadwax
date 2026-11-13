@@ -4,10 +4,28 @@ from pydantic import SecretStr, ValidationError
 from deadwax.sources import (
     DEFAULT_RATES,
     DiscogsSettings,
+    Escalation,
+    HttpSettings,
     LastfmSettings,
     SourcesConfig,
     SourceSettings,
 )
+
+
+def test_html_transport_defaults_and_overrides() -> None:
+    config = SourcesConfig()
+
+    assert config.html_transports("beatport")[0] is Escalation.NODRIVER
+    assert config.html_transports("juno")[0] is Escalation.IMPERSONATE
+    assert config.html_transports("soundohm")[0] is Escalation.HTTPX
+
+    custom = SourcesConfig(
+        http=HttpSettings(escalation=(Escalation.NODRIVER,)),
+        beatport=SourceSettings(
+            html_transports=(Escalation.BROWSER, Escalation.NODRIVER, Escalation.HTTPX),
+        ),
+    )
+    assert custom.html_transports("beatport") == (Escalation.NODRIVER, Escalation.HTTPX)
 
 
 def test_rates_use_source_defaults_and_overrides() -> None:

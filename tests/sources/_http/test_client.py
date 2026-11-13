@@ -127,14 +127,22 @@ class Setup:
             limiters=HostLimiters(clock=self.time.clock, sleep=self.time.sleep),
             cache=self.cache,
             transport=httpx.MockTransport(self.server),
-            escalations={step: factory(step) for step in Escalation},
+            escalations={
+                step: factory(step) for step in Escalation if step is not Escalation.HTTPX
+            },
             installed=lambda package: True,
             sleep=self.time.sleep,
             now=lambda: NOW,
             rng=random.Random(0),  # noqa: S311 -- seeded test jitter
         )
         config = SourcesConfig(
-            http=HttpSettings(retries=self.retries, escalation=escalation, contact="https://c"),
+            http=HttpSettings(
+                retries=self.retries,
+                escalation=(Escalation.IMPERSONATE, Escalation.BROWSER, Escalation.NODRIVER)
+                if escalation is None
+                else (escalation,),
+                contact="https://c",
+            ),
             cache=CacheSettings(blocked_ttl=self.blocked_ttl),
             lastfm=LastfmSettings(proxy=SecretStr(self.proxy) if self.proxy else None),
         )
@@ -335,6 +343,7 @@ async def test_an_unavailable_step_ends_the_ladder_as_blocked() -> None:
     setup.fetchers = {
         Escalation.IMPERSONATE: impersonate,
         Escalation.BROWSER: ConfigurationError(MISSING),
+        Escalation.NODRIVER: FakeFetcher("nodriver", [page(403, CHALLENGE)]),
     }
 
     async with setup.client(Profile.BROWSER) as client:
@@ -343,10 +352,10 @@ async def test_an_unavailable_step_ends_the_ladder_as_blocked() -> None:
                 await client.get(URL)
 
     assert str(raised.value) == (
-        f"Cloudflare challenge (tried httpx, impersonate; browser unavailable: {MISSING})"
+        f"Cloudflare challenge (tried httpx, impersonate, nodriver; browser unavailable: {MISSING})"
     )
     assert raised.value.url == URL
-    assert setup.created == [Escalation.IMPERSONATE, Escalation.BROWSER]
+    assert setup.created == [Escalation.IMPERSONATE, Escalation.BROWSER, Escalation.NODRIVER]
 
 
 @pytest.mark.asyncio
@@ -356,12 +365,19 @@ async def test_a_step_failing_on_first_use_is_dropped_and_closed() -> None:
     setup.fetchers = {
         Escalation.IMPERSONATE: FakeFetcher("impersonate", [page(403, CHALLENGE)]),
         Escalation.BROWSER: browser,
+        Escalation.NODRIVER: FakeFetcher("nodriver", [page(403, CHALLENGE)]),
     }
 
     async with setup.client(Profile.BROWSER) as client:
-        with pytest.raises(BlockedError, match="tried httpx, impersonate; browser unavailable"):
+        with pytest.raises(
+            BlockedError,
+            match="tried httpx, impersonate, nodriver; browser unavailable",
+        ):
             await client.get(URL)
-        with pytest.raises(BlockedError, match="tried httpx, impersonate; browser unavailable"):
+        with pytest.raises(
+            BlockedError,
+            match="tried httpx, impersonate, nodriver; browser unavailable",
+        ):
             await client.get(URL)
 
     assert browser.closed
@@ -377,7 +393,7 @@ async def test_an_explicitly_chosen_step_that_cannot_run_is_a_configuration_erro
     }
 
     async with setup.client(Profile.BROWSER, escalation=Escalation.BROWSER) as client:
-        with pytest.raises(ConfigurationError, match="playwright install chromium"):
+        with pytest.raises(BlockedError, match="browser unavailable"):
             await client.get(URL)
 
 
@@ -459,36 +475,27 @@ async def test_blocked_pages_are_not_cached_with_zero_ttl(tmp_path: Path) -> Non
 
 
 @pytest.mark.parametrize(
-    ("setting", "installed", "expected"),
+    ("selected", "installed", "expected"),
     [
-        (None, set(), []),
-        (None, {"curl_cffi"}, [Escalation.IMPERSONATE]),
-        (None, {"patchright"}, [Escalation.BROWSER]),
-        (None, {"nodriver"}, [Escalation.NODRIVER]),
+        ((Escalation.HTTPX,), set(), [Escalation.HTTPX]),
         (
-            None,
-            {"curl_cffi", "patchright", "nodriver"},
-            [Escalation.IMPERSONATE, Escalation.BROWSER, Escalation.NODRIVER],
+            (Escalation.NODRIVER, Escalation.BROWSER, Escalation.HTTPX),
+            {"patchright"},
+            [Escalation.BROWSER, Escalation.HTTPX],
         ),
-        (Escalation.NONE, {"curl_cffi", "patchright"}, []),
-        (Escalation.IMPERSONATE, set(), [Escalation.IMPERSONATE]),
-        (Escalation.IMPERSONATE, {"patchright"}, [Escalation.IMPERSONATE]),
-        (Escalation.BROWSER, set(), [Escalation.BROWSER]),
-        (Escalation.BROWSER, {"curl_cffi"}, [Escalation.IMPERSONATE, Escalation.BROWSER]),
-        (Escalation.PATCHRIGHT, {"curl_cffi"}, [Escalation.IMPERSONATE, Escalation.BROWSER]),
         (
-            Escalation.NODRIVER,
+            (Escalation.IMPERSONATE, Escalation.BROWSER),
             {"curl_cffi", "patchright"},
-            [Escalation.IMPERSONATE, Escalation.BROWSER, Escalation.NODRIVER],
+            [Escalation.IMPERSONATE, Escalation.BROWSER],
         ),
     ],
 )
 def test_escalation_steps(
-    setting: Escalation | None,
+    selected: tuple[Escalation, ...],
     installed: set[str],
     expected: list[Escalation],
 ) -> None:
-    assert escalation_steps(setting, installed.__contains__) == expected
+    assert escalation_steps(selected, installed.__contains__) == expected
 
 
 @pytest.mark.parametrize(

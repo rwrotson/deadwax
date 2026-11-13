@@ -259,6 +259,11 @@ class SearchPageAdapter(HttpAdapter):
 
     profile = Profile.BROWSER
 
+    @property
+    def search_client(self) -> HttpClient:
+        """Client used for search; sources with JSON feeds may override it."""
+        return self.client
+
     # Service name of the source's pages, as `service_for_url` gives it.
     service: str | None = None
 
@@ -292,7 +297,7 @@ class SearchPageAdapter(HttpAdapter):
     async def search(self, key: RecordKey) -> str | None:
         """Search the source and return the page of the record, if a result matches."""
         url, params = self.search_request(key)
-        response = await self.client.get(url, params=params)
+        response = await self.search_client.get(url, params=params)
         hit = pick_hit(key, self.search_hits(response.content, response.url))
         return None if hit is None else urljoin(response.url, hit.url)
 
