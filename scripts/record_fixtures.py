@@ -53,6 +53,7 @@ HOSTS = {
     "www.beatport.com": "beatport",
     "hardwax.com": "hardwax",
     "www.soundohm.com": "soundohm",
+    "www.juno.co.uk": "juno",
 }
 
 ALL_GROUPS = tuple(SourceGroup)

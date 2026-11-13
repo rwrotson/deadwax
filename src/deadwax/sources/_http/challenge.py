@@ -7,6 +7,7 @@ _CHALLENGE_MARKERS = (
     ("/cdn-cgi/challenge-platform/", "Cloudflare challenge"),
     ("captcha-delivery.com", "DataDome captcha"),
     ("/_fs-ch-", "Fastly client challenge"),
+    ("sucuri_cloudproxy_js", "Sucuri challenge"),
 )
 
 # Captcha widgets also appear on ordinary pages, so they count only on a refusal.

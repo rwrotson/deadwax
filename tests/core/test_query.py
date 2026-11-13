@@ -121,6 +121,13 @@ def test_text_query_requires_kind() -> None:
         ("https://hardwax.com/act/burial/", None, {}),
         ("https://www.soundohm.com/product/untrue", EntityKind.ALBUM, {}),
         ("https://www.soundohm.com/artist/burial", None, {}),
+        ("https://www.juno.co.uk/products/burial-untrue-vinyl/285827-01/", EntityKind.ALBUM, {}),
+        ("https://www.juno.co.uk/artists/Burial/", None, {}),
+        (
+            "https://www.phonicarecords.com/product/burial-truant-rough-sleeper-hyperdub/111124",
+            EntityKind.ALBUM,
+            {},
+        ),
     ],
 )
 def test_url_kind_and_ids_are_recognized(

@@ -207,6 +207,7 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
         "beatport": "ready",
         "hardwax": "ready",
         "soundohm": "ready",
+        "juno": "ready",
     }
     assert "DEADWAX_DISCOGS__TOKEN" in table.stdout
     assert "DEADWAX_LASTFM__API_KEY" in table.stdout

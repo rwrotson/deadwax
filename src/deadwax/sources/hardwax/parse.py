@@ -5,29 +5,22 @@ from pydantic import ValidationError
 
 from deadwax.core import (
     CandidateLabel,
-    Entity,
     EntityKind,
-    EntityType,
     Link,
     LinkTarget,
-    NotFoundError,
     Partial,
     Provenance,
     RecordCandidate,
     RecordKey,
-    Relation,
-    RelationKind,
     Scope,
     SourceError,
     Tag,
     TagKind,
     Text,
     TextKind,
-    Verdict,
-    compare,
     normalize_text,
 )
-from deadwax.sources._base import SearchHit
+from deadwax.sources._base import SearchHit, track_on_release
 from deadwax.sources._html import Document, Node, attribute, parse_html, text_of
 from deadwax.sources.hardwax import models
 
@@ -148,15 +141,6 @@ def release(content: bytes, url: str) -> Release:
     )
 
 
-def find_track(record: Release, reference: RecordKey) -> tuple[str, str] | None:
-    """Return the tracklist entry of the queried track."""
-    for artist, title in record.tracks:
-        candidate = RecordKey(artist=artist, title=title, kind=EntityKind.TRACK)
-        if compare(reference, candidate).verdict is not Verdict.NO_MATCH:
-            return artist, title
-    return None
-
-
 def page_partial(content: bytes, url: str, key: RecordKey | None) -> Partial:
     """Shop text, sections, and label of a release, for the release or one of its tracks."""
     url = page_url(url)
@@ -176,25 +160,8 @@ def page_partial(content: bytes, url: str, key: RecordKey | None) -> Partial:
     )
     relations = []
     if key is not None and key.kind is EntityKind.TRACK:
-        track = find_track(record, key)
-        if track is None:
-            raise NotFoundError("the Hard Wax release does not list the track", url=url)
-        candidate = candidate.model_copy(
-            update={"kind": EntityKind.TRACK, "artist": track[0], "title": track[1]},
-        )
-        relations.append(
-            Relation(
-                kind=RelationKind.APPEARS_ON,
-                scope=Scope.RELEASE,
-                target=Entity(
-                    type=EntityType.RELEASE,
-                    name=record.title,
-                    artist=record.artist,
-                    url=url,
-                ),
-                sources=[provenance],
-            ),
-        )
+        candidate, relation = track_on_release(candidate, record.tracks, key, provenance)
+        relations.append(relation)
     texts = [
         Text(
             kind=TextKind.SHOP,

@@ -30,7 +30,7 @@ from deadwax.sources._http import HttpResources
 from deadwax.sources.beatport import BeatportAdapter, models
 from deadwax.sources.beatport import parse as p
 
-# Pages saved from a browser on 2026-11-13 and trimmed by scripts/beatport_pages.py.
+# Pages saved from a browser on 2026-11-13 and trimmed by scripts/saved_pages.py.
 PAGES = Path(__file__).resolve().parent.parent / "fixtures" / "beatport" / "pages"
 
 SITE = "https://www.beatport.com"

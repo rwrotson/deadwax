@@ -7,15 +7,22 @@ from urllib.parse import urljoin, urlsplit
 
 from deadwax.core import (
     Capability,
+    Entity,
     EntityKind,
+    EntityType,
     LinkTarget,
     LookupContext,
     NotFoundError,
     Partial,
     Pass,
+    Provenance,
     Query,
+    RecordCandidate,
     RecordKey,
+    Relation,
+    RelationKind,
     Requirement,
+    Scope,
     SourceGroup,
     SourceState,
     SourceStatus,
@@ -134,7 +141,7 @@ _SERVICES = (
     ("junodownload.com", "junodownload"),
     ("juno.co.uk", "juno"),
     ("hardwax.com", "hardwax"),
-    ("phonica.co.uk", "phonica"),
+    ("phonicarecords.com", "phonica"),
     ("soundohm.com", "soundohm"),
     ("7digital.com", "7digital"),
 )
@@ -213,6 +220,35 @@ def pick_hit(reference: RecordKey, hits: Iterable[SearchHit]) -> SearchHit | Non
         picked=None if picked is None else picked.url,
     )
     return picked
+
+
+def track_on_release(
+    release: RecordCandidate,
+    tracks: Iterable[tuple[str, str]],
+    reference: RecordKey,
+    provenance: Provenance,
+) -> tuple[RecordCandidate, Relation]:
+    """Describe the queried track by its entry on a release page and relate it to the release."""
+    for artist, title in tracks:
+        listed = RecordKey(artist=artist, title=title, kind=EntityKind.TRACK)
+        if compare(reference, listed).verdict is not Verdict.NO_MATCH:
+            break
+    else:
+        raise NotFoundError("the release does not list the track", url=provenance.url)
+    track = release.model_copy(update={"kind": EntityKind.TRACK, "artist": artist, "title": title})
+    relation = Relation(
+        kind=RelationKind.APPEARS_ON,
+        scope=Scope.RELEASE,
+        target=Entity(
+            type=EntityType.RELEASE,
+            name=release.title,
+            artist=release.artist,
+            date=release.date,
+            url=release.url,
+        ),
+        sources=[provenance],
+    )
+    return track, relation
 
 
 class SearchPageAdapter(HttpAdapter):

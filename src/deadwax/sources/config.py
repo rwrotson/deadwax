@@ -220,6 +220,7 @@ DEFAULT_RATES: dict[str, float] = {
     "beatport": 0.5,
     "hardwax": 0.5,
     "soundohm": 0.5,
+    "juno": 0.5,
 }
 
 
@@ -251,6 +252,7 @@ class SourcesConfig(_Model):
     beatport: SourceSettings = SourceSettings()
     hardwax: SourceSettings = SourceSettings()
     soundohm: SourceSettings = SourceSettings()
+    juno: SourceSettings = SourceSettings()
 
     def rate(self, source: str) -> float:
         """Return the request rate of a source in requests per second."""

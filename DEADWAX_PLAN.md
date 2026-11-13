@@ -165,7 +165,7 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 ### Stage 12: shops I
 
-- [ ] Juno, Hard Wax, Phonica, Soundohm through the Stage 8 helper: `shop` texts, genres, "also bought" as `similar` where present. Hard Wax and Soundohm done; Juno and Phonica wait for saved pages.
+- [ ] Juno, Hard Wax, Phonica, Soundohm through the Stage 8 helper: `shop` texts, genres, "also bought" as `similar` where present. Hard Wax, Soundohm and Juno done; Phonica waits for saved pages.
 - [x] Merge: `shop` texts that repeat one press release are deduplicated, keeping every source.
 
 **Acceptance:** the same press text from two shops appears once with both sources. **Suggested message:** `feat(sources): add Juno, Hard Wax, Phonica and Soundohm adapters`.
@@ -303,6 +303,9 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-13 | Hard Wax is searched through its JSON Feed (`/feeds/search.json?find=`), whose items list each release's tracks as "Artist: Title"; a track is read from its release's page. Product URLs drop `?focus=`, which switches the page's description to a format's. Store sections are `genre` tags except "CDs", "Downloads", "Label Catalog", "Merchandise". | The feed is an official, stable search; page CSS classes are obfuscated, so pages are read by ids, link targets and meta tags. | 12 |
 | 2026-11-13 | Soundohm is albums only (product pages list no tracks); its "Related products" are not `similar` relations. | Related products for Burial's Untrue were unrelated label-mates, not bought-together lists. | 12 |
 | 2026-11-13 | Shop and label texts are deduplicated together: equal after normalization, or one cut short with an ellipsis contained in the other, or both at least 20 words with 80% of the shorter one's word 5-grams in the other. The longer body is kept; the kind is `label` when any copy is one; other texts and short copies merge only when equal. Helpers `strip_ellipsis` and `shingle_overlap` in `core.normalize`. | Shops reprint one press release, sometimes cut short or with an extra line; Bandcamp has it as the label's text. User choice of the rule. | 12 |
+| 2026-11-13 | Juno is built on Firefox view-source pages the user saved; it reads microdata (`byArtist`, `name`, `reviewBody`, `genre`), the product facts, Juno tags, and the tracklist; search results list tracks, so tracks are found on their release (helper `track_on_release` in `sources/_base.py`, shared with Hard Wax). No `similar` relations: "People also bought" is loaded by scripts. | The agent's plain requests get a Cloudflare challenge. | 12 |
+| 2026-11-13 | `scripts/beatport_pages.py` becomes `scripts/saved_pages.py --shop beatport|juno|phonica`: Chrome and Firefox view-source pages; Beatport keeps its state trimming (fixtures regenerate byte for byte); shops keep the canonical link, Open Graph tags, and the blocks the parser reads, without scripts, styles, SVG, and forms; output with session data is refused. | One tool for every source built on saved pages. | 11, 12 |
+| 2026-11-13 | Phonica is `phonicarecords.com` (`phonica.co.uk` does not exist), behind a Sucuri/CloudProxy JS challenge; built on saved pages. `sucuri_cloudproxy_js` is a challenge marker, so such a page is `blocked`, not an empty search. | Access check; user choice. | 12 |
 
 Changed:
 
@@ -462,7 +465,23 @@ Observed, not changed: when no candidate is accepted, `merge` takes the referenc
 
 Remains for Stage 12: Juno and Phonica from pages the user saves in a browser (search for "Burial Untrue" and the Untrue product page; search for "Everything but the Girl Missing" and one product page), then their adapters, URL rules, docs, and the user's live checks.
 
-**Current task:** Stage 12. **Next action:** the user saves Juno and Phonica pages into `tests/fixtures/juno/pages/` and `tests/fixtures/phonica/pages/`; the agent then builds both adapters.
+### 2026-11-13 — Stage 12 evidence (Juno)
+
+Pages: the user saved seven Firefox view-source pages (searches for "Burial Untrue" and "Everything but the Girl Missing"; products 285827-01, 1105467-01, 1105468-01, 1188113-01, 733799-01); six became fixtures in `tests/fixtures/juno/pages/` (9–115 KB). Phonica's site is `phonicarecords.com`; it answers a Sucuri JS challenge (307, `server: Sucuri/Cloudproxy`).
+
+Changed: package `juno` (adapter | parse, R8 contract, R4 row), group `shops`, opt-in, rate 0.5; `track_on_release` in `_base.py` (Hard Wax uses it too); Juno and Phonica URL rules (`/products/<slug>/<id>-<n>`, `/product/<slug>/<id>`); `phonicarecords.com` service; Sucuri challenge marker; `scripts/saved_pages.py` replaces `scripts/beatport_pages.py`; settings, `.env.example`, recorder host, docs, README.
+
+Commands and outcomes:
+
+- `uv run python scripts/saved_pages.py --shop beatport …` on the six saved Beatport pages: fixtures unchanged (`git status` clean for `tests/fixtures/beatport`).
+- `uv run poe check`: format, lint, 27 import contracts kept, mypy strict clean, 831 passed, 99.07% branch coverage.
+- `uv run --group docs properdocs build --strict`: built without warnings.
+- Mock-tested (saved pages): release search with review, label, catalog number, date and genre; a track found in a result's tracklist with `appears_on`; "Missing (Todd Terry Remix)" matches Juno's "Todd Terry club mix" (a club mix is not a cut) and is accepted by `merge` as the remix, with genre and three Juno tags; the original "Missing" is found on Amplified Heart; "unknown label" and a missing date are left out; query URL, earlier-pass link, page without canonical link; track missing from the page; no match; challenge → `blocked`; page without a product; tracklist entries with mix names and compilation artists; the Sucuri marker.
+- Live: one run by the agent, `deadwax --album "Burial - Untrue" --sources core,juno --no-cache`, was started without `DEADWAX_HTTP__ESCALATION=none`, against the plan for this stage. The run journal (`20261113T155818Z-92468f`) shows Juno's search answering httpx with a Cloudflare challenge and the escalation ladder's impersonation step reading the search and the product page; Juno contributed the review, "Deep Dubstep" and the link. No further agent runs against Juno were made. Live checks of tracks and other records remain with the user.
+
+Remains for Stage 12: Phonica from saved pages (the site's search for "Burial Truant", `/product/burial-truant-rough-sleeper-hyperdub/111124`, `/product/huercos-colonial-patterns-lp-software/116278`).
+
+**Current task:** Stage 12. **Next action:** the user saves three Phonica pages (above) into a folder and names it; the agent then builds the Phonica adapter.
 
 ## Resume instructions
 

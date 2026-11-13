@@ -76,6 +76,7 @@ Every source is described in detail in [the sources guide](https://rwrotson.gith
 | Beatport | implemented, opt-in | tempo, key, genre and sub-genre, mix name as the version, ISRC, label and catalog number, remixers, DJ charts that list the track; resolves Beatport URLs | Cloudflare: needs the `stealth` or `browser` extra, else `blocked` |
 | Hard Wax | implemented, opt-in | one-line shop text, store section as genre, label and catalog number, the release a track is on; resolves Hard Wax product pages | searched through the shop's JSON feed |
 | Soundohm | implemented, opt-in | full shop text (often the label's press release), genre, label, catalog number, year; resolves Soundohm product pages | albums only: product pages list no tracks |
+| Juno | implemented, opt-in | shop review, genre and Juno tags, label and catalog number, release date, the release a track is on; resolves Juno product pages | Cloudflare: needs the `stealth` or `browser` extra, else `blocked`; built on pages saved from a browser |
 | SoundCloud | implemented, opt-in, needs `soundcloud.client_id` | uploader descriptions, genre and tags, plays, likes and reposts, notable reposting accounts, uploads absent elsewhere (edits, bootlegs) as other versions; resolves SoundCloud URLs | no new API apps: the web client's ID changes now and then and must be replaced by hand |
 
 Names written in a non-Latin script are compared as written: a store that lists "Кино" as "Kino" is reported as `no_match`.
@@ -84,7 +85,7 @@ Names written in a non-Latin script are compared as written: a store that lists 
 
 | Group | Sources | Caveats |
 |-------|---------|---------|
-| Shops | Boomkat, Juno, Norman, Forced Exposure, Phonica, Bleep | shop copy as `shop` texts; Juno answers a Cloudflare challenge |
+| Shops | Boomkat, Norman, Forced Exposure, Phonica, Bleep | shop copy as `shop` texts; Phonica answers a Sucuri challenge |
 | Reviews and press | AllMusic, Resident Advisor (GraphQL), press reviews through one adapter with per-site rules | |
 | Catalogues and communities | Rate Your Music, Genius, Album of the Year | Rate Your Music only through a browser |
 | Radio and mixes | NTS, 1001Tracklists, WFMU | |
@@ -165,6 +166,7 @@ src/
     │   ├── beatport/        # Beatport page-state models, parsers, adapter
     │   ├── hardwax/         # Hard Wax search-feed models, page parsers, adapter
     │   ├── soundohm/        # Soundohm page parsers, adapter
+    │   ├── juno/            # Juno page parsers, adapter
     │   └── _http/           # rate limits, retries, cache, escalation transports
     └── core/                # models, matching, orchestrator, errors (Pydantic only)
 tests/                       # mirrors the package; network is disabled
