@@ -95,7 +95,7 @@ uv run pre-commit install
 uv run poe check       # format check, lint, import contracts, type check, tests with coverage
 uv run poe fmt
 uv run poe test-fast
-uv run poe test-live   # opt-in lookups of real tracks against the live sources (tests/integration)
+uv run poe test-live   # opt-in lookups of real tracks against the live sources (tests/integration), keys from .env
 uv run poe docs
 uv run poe audit
 uv build

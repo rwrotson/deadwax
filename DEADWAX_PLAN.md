@@ -317,9 +317,30 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-13 | Odesli is seeded only by streaming links of the query or the identity pass; records whose identity-pass links name no streaming service (Huerco S., the Todd Terry remix, the OK Computer Discogs URL) report `not_found`. | Odesli runs in the enrichment pass, which sees only identity-pass links. | 6 |
 | 2026-11-13 | Wikipedia prose joins text nodes without a separator, and paragraphs inside a quoted block are read once, through the block. | Live Stage 7 run: links produced spaces before punctuation (`" Paranoid Android " is`), and a wrapped pull quote appeared twice. | 6, 7 |
 | 2026-11-13 | The output schema page is generated from `Dossier.model_json_schema()` (`docs/gen_schema_page.py`); `docs/sources.md` and `docs/output.md` describe sources and the dossier. | Generated pages are never edited by hand; the README holds the tier tables. | 7 |
+| 2026-11-13 | With `http.escalation` unset, an escalation step that cannot run (the `browser` extra without Chromium) ends the ladder for that client: the page is `blocked` with the transports tried and `browser unavailable: … playwright install chromium`. An explicitly chosen step that cannot run stays a `ConfigurationError` (Discogs reviews: `failed`). Supersedes the Stage 5 "a missing escalation browser adds a `failed` error". | "Unset" is documented as the strongest available step; a missing browser binary is the user's setup, not a source failure. User choice. | 2, 5, 7 |
+| 2026-11-13 | Blocked results are cached: a marker entry (status 403, reserved header `x-deadwax-blocked` with the reason) for `cache.blocked_ttl` (default 1 day, `0` disables); a hit raises `BlockedError("… (cached)")` without a request. Supersedes "errors never cached" for blocks only. | Every cached run climbed the Discogs review ladder again (7–10 s instead of about 1 s); fewer requests to sites that refuse us. User choice. | 2, 7 |
+| 2026-11-13 | `poe test-live` loads `.env` (`envfile = { optional = [".env"] }`); the live tests pass the Last.fm key as well as the Discogs token. | Last.fm was `skipped` in every live test. User choice. | 7 |
 | 2026-11-12 | Tracks from the user's library are not fixtures but opt-in live integration tests (`tests/integration`, collected only with `--live`, `poe test-live`) that check invariants and print a report. | ~25–30 MB of fixtures otherwise; live data changes; user choice. | 5, 7 |
 
 **Current task:** Stage 7 complete; v1 qualified. **Next action:** user review and commit; later work is chosen by the user (planned sources in README).
+
+### 2026-11-13 — Stage 7 follow-up
+
+Closed the three open items of the Stage 7 qualification (decisions above):
+- `HttpClient._fetch` with `escalation` unset drops a step that raises `ConfigurationError` (`_drop_step`: the step and stronger ones are removed for the client, its fetcher closed) and raises `BlockedError` naming the transports that answered and `<step> unavailable: <reason>`. An explicit setting re-raises the error.
+- `HttpClient.request` stores a blocked marker for `cache.blocked_ttl` (new `CacheSettings` field, `.env.example`, generated configuration page) and raises `BlockedError("… (cached)")` on a hit.
+- `poe test-live` became a table task with an optional `.env`; `tests/integration/test_library.py` passes `DEADWAX_LASTFM__API_KEY`.
+- Docs: escalation and cache in `docs/sources.md`, `blocked` row in `docs/output.md`, `test-live` lines in README, Getting Started, AGENTS.md.
+- Tests: five new client tests (unavailable step at creation and at first use, explicit step, blocked cache and expiry, zero TTL); `_http/client.py` at 100% branch coverage.
+
+Checks: `uv run poe check` passed (Ruff format and lint, 18 contracts kept, mypy strict on 122 files, 549 tests, 99.23% branch coverage); `uv run --group docs properdocs build --strict` passed.
+
+Live, without Chromium:
+- Paranoid Android `--no-cache`: exit 0 in 16.4 s, Discogs `blocked … (tried httpx, impersonate; browser unavailable: Chromium for Playwright is not installed: run 'playwright install chromium')`.
+- The following cached run: 0.6 s, Deezer and Discogs `… (cached)` (a `--no-cache` run does not write, so the first cached run after it still fetches).
+- `uv run poe test-live`: 22 passed in 4 min 17 s. Last.fm contributed to every track, including three that no other source finds (Ilya Vlasenko, Jeff Buckley "Sky Blue Skin", the Basinski remix); Discogs reports `blocked`, never `failed`.
+
+Then `uv run playwright install chromium` (Chrome Headless Shell 158, 100 MiB, approved by the user): Paranoid Android and Huerco S. with `--no-cache` give Discogs `blocked … (tried httpx, impersonate, browser)`. Cloudflare refuses headless Chromium too, so the browser step is now live-verified as running, and Discogs reviews remain unavailable from this network. No commit was created.
 
 ### 2026-11-13 — Stage 7 qualification
 
@@ -346,7 +367,7 @@ Observations: Deezer answered the Akamai block every time; Discogs review pages 
 
 Live-verified across stages: MusicBrainz search and lookups, iTunes, Odesli song.link pages, Discogs API with and without token (search with token), Bandcamp pages, search endpoint and mobile API, Last.fm, Wikidata and en/ru Wikipedia, the cache, timeouts, the version gate on a remix, URL resolution (Spotify, Apple Music, Bandcamp, Discogs URLs). Mock-tested only: Deezer success paths (blocked from this network), Discogs review parsing and the browser step of the ladder (Chromium not installed), Bandcamp HTML search and the blocked-page mobile fallback, Last.fm error codes other than 6, Wikidata P444 scores, ja/de/fr section lists, retry on `Retry-After` dates, rate-limited errors.
 
-Open items for the user: install Chromium (`uv run playwright install chromium`) or treat a missing escalation browser as `skipped` so the live invariant holds; pass the Last.fm key to the live tests; consider caching refused review pages for a short time. No commit was created.
+Open items for the user: install Chromium (`uv run playwright install chromium`) or treat a missing escalation browser as `skipped` so the live invariant holds; pass the Last.fm key to the live tests; consider caching refused review pages for a short time. All three were closed in the Stage 7 follow-up below. No commit was created.
 
 ### 2026-11-13 — Stage 6 qualification
 

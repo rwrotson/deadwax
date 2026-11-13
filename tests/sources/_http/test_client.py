@@ -7,8 +7,14 @@ from pathlib import Path
 import httpx
 import pytest
 
-from deadwax.core import BlockedError, NotFoundError, RateLimitedError, SourceError
-from deadwax.sources import Escalation, HttpSettings, SourcesConfig
+from deadwax.core import (
+    BlockedError,
+    ConfigurationError,
+    NotFoundError,
+    RateLimitedError,
+    SourceError,
+)
+from deadwax.sources import CacheSettings, Escalation, HttpSettings, SourcesConfig
 from deadwax.sources._http import (
     ClientSpec,
     Fetcher,
@@ -61,14 +67,14 @@ class Server:
 @dataclass
 class FakeFetcher:
     name: str
-    answers: list[Response | SourceError]
+    answers: list[Response | SourceError | ConfigurationError]
     requests: list[Request] = field(default_factory=list)
     closed: bool = False
 
     async def fetch(self, request: Request) -> Response:
         self.requests.append(request)
         answer = self.answers.pop(0) if len(self.answers) > 1 else self.answers[0]
-        if isinstance(answer, SourceError):
+        if isinstance(answer, Exception):
             raise answer
         return answer
 
@@ -85,8 +91,10 @@ class Setup:
     server: Server
     time: FakeTime = field(default_factory=FakeTime)
     cache: ResponseCache | None = None
-    fetchers: dict[Escalation, FakeFetcher] = field(default_factory=dict)
+    fetchers: dict[Escalation, FakeFetcher | ConfigurationError] = field(default_factory=dict)
     retries: int = 2
+    blocked_ttl: float = 86400
+    created: list[Escalation] = field(default_factory=list)
 
     def client(
         self,
@@ -95,7 +103,14 @@ class Setup:
         escalation: Escalation | None = None,
     ) -> HttpClient:
         def factory(step: Escalation) -> Callable[[HttpSettings], Fetcher]:
-            return lambda settings: self.fetchers[step]
+            def create(settings: HttpSettings) -> Fetcher:
+                self.created.append(step)
+                fetcher = self.fetchers[step]
+                if isinstance(fetcher, ConfigurationError):
+                    raise fetcher
+                return fetcher
+
+            return create
 
         resources = HttpResources(
             limiters=HostLimiters(clock=self.time.clock, sleep=self.time.sleep),
@@ -109,6 +124,7 @@ class Setup:
         )
         config = SourcesConfig(
             http=HttpSettings(retries=self.retries, escalation=escalation, contact="https://c"),
+            cache=CacheSettings(blocked_ttl=self.blocked_ttl),
         )
         spec = ClientSpec("lastfm", profile, {"x-source": "test"}, secret_params)
         return HttpClient(spec, config, resources)
@@ -291,6 +307,96 @@ async def test_api_profile_never_escalates() -> None:
     async with setup.client() as client:
         with pytest.raises(BlockedError, match=r"Cloudflare challenge \(tried httpx\)"):
             await client.get(URL)
+
+
+MISSING = "Chromium for Playwright is not installed: run 'playwright install chromium'"
+
+
+@pytest.mark.asyncio
+async def test_an_unavailable_step_ends_the_ladder_as_blocked() -> None:
+    setup = Setup(Server([httpx.Response(403, content=CHALLENGE)]))
+    impersonate = FakeFetcher("impersonate", [page(403, CHALLENGE)])
+    setup.fetchers = {
+        Escalation.IMPERSONATE: impersonate,
+        Escalation.BROWSER: ConfigurationError(MISSING),
+    }
+
+    async with setup.client(Profile.BROWSER) as client:
+        for _ in range(2):
+            with pytest.raises(BlockedError) as raised:
+                await client.get(URL)
+
+    assert str(raised.value) == (
+        f"Cloudflare challenge (tried httpx, impersonate; browser unavailable: {MISSING})"
+    )
+    assert raised.value.url == URL
+    assert setup.created == [Escalation.IMPERSONATE, Escalation.BROWSER]
+
+
+@pytest.mark.asyncio
+async def test_a_step_failing_on_first_use_is_dropped_and_closed() -> None:
+    setup = Setup(Server([httpx.Response(403, content=CHALLENGE)]))
+    browser = FakeFetcher("browser", [ConfigurationError(MISSING)])
+    setup.fetchers = {
+        Escalation.IMPERSONATE: FakeFetcher("impersonate", [page(403, CHALLENGE)]),
+        Escalation.BROWSER: browser,
+    }
+
+    async with setup.client(Profile.BROWSER) as client:
+        with pytest.raises(BlockedError, match="tried httpx, impersonate; browser unavailable"):
+            await client.get(URL)
+        with pytest.raises(BlockedError, match="tried httpx, impersonate; browser unavailable"):
+            await client.get(URL)
+
+    assert browser.closed
+    assert len(browser.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_an_explicitly_chosen_step_that_cannot_run_is_a_configuration_error() -> None:
+    setup = Setup(Server([httpx.Response(403, content=CHALLENGE)]))
+    setup.fetchers = {
+        Escalation.IMPERSONATE: FakeFetcher("impersonate", [page(403, CHALLENGE)]),
+        Escalation.BROWSER: ConfigurationError(MISSING),
+    }
+
+    async with setup.client(Profile.BROWSER, escalation=Escalation.BROWSER) as client:
+        with pytest.raises(ConfigurationError, match="playwright install chromium"):
+            await client.get(URL)
+
+
+@pytest.mark.asyncio
+async def test_blocked_pages_are_cached_for_blocked_ttl(tmp_path: Path) -> None:
+    setup = Setup(Server([httpx.Response(403, headers={"cf-mitigated": "challenge"})]))
+    setup.cache = ResponseCache(tmp_path / "cache.sqlite", clock=setup.time.clock)
+
+    async with setup.client() as client:
+        with pytest.raises(BlockedError, match=r"\(tried httpx\)$"):
+            await client.get(URL)
+        with pytest.raises(BlockedError, match=r"\(tried httpx\) \(cached\)$") as cached:
+            await client.get(URL)
+        setup.time.now += 86401
+        with pytest.raises(BlockedError, match=r"\(tried httpx\)$"):
+            await client.get(URL)
+    setup.cache.close()
+
+    assert cached.value.url == URL
+    assert len(setup.server.requests) == 2
+
+
+@pytest.mark.asyncio
+async def test_blocked_pages_are_not_cached_with_zero_ttl(tmp_path: Path) -> None:
+    setup = Setup(Server([httpx.Response(403, headers={"cf-mitigated": "challenge"})]))
+    setup.cache = ResponseCache(tmp_path / "cache.sqlite")
+    setup.blocked_ttl = 0
+
+    async with setup.client() as client:
+        for _ in range(2):
+            with pytest.raises(BlockedError, match=r"\(tried httpx\)$"):
+                await client.get(URL)
+    setup.cache.close()
+
+    assert len(setup.server.requests) == 2
 
 
 @pytest.mark.parametrize(

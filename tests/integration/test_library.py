@@ -8,6 +8,7 @@ from deadwax import (
     Dossier,
     EntityKind,
     ErrorKind,
+    LastfmSettings,
     SourcesConfig,
     lookup,
     parse_query,
@@ -15,8 +16,10 @@ from deadwax import (
 )
 from deadwax.core import RecordKey, Verdict, compare
 
-# Read at import: the autouse fixture removes DEADWAX_* variables before each test.
+# Read at import (`poe test-live` loads .env): the autouse fixture removes DEADWAX_* variables
+# before each test.
 DISCOGS_TOKEN = os.environ.get("DEADWAX_DISCOGS__TOKEN")
+LASTFM_KEY = os.environ.get("DEADWAX_LASTFM__API_KEY")
 
 # Tracks from a personal library as "Artist - Title" from their tags. Tracks of compilations
 # tagged "Various Artists" use the artist from the title, and an untagged file its name.
@@ -51,9 +54,10 @@ LIBRARY: dict[str, str] = {
 
 
 def live_config() -> SourcesConfig:
-    """Default settings, with the Discogs token from the environment if set."""
+    """Default settings, with the Discogs token and the Last.fm key from the environment."""
     token = SecretStr(DISCOGS_TOKEN) if DISCOGS_TOKEN else None
-    return SourcesConfig(discogs=DiscogsSettings(token=token))
+    key = SecretStr(LASTFM_KEY) if LASTFM_KEY else None
+    return SourcesConfig(discogs=DiscogsSettings(token=token), lastfm=LastfmSettings(api_key=key))
 
 
 def summary(name: str, dossier: Dossier) -> str:

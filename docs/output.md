@@ -63,7 +63,7 @@ Relation kinds are directional:
 | `skipped` | A required setting or extra is missing, or nothing earlier in the lookup gave the source a way in |
 | `failed` | Unexpected response or exception (logged with its traceback) |
 | `timeout` | The source exceeded `adapter_timeout` (`--timeout`) |
-| `blocked` | Bot protection refused the page after the escalation ladder |
+| `blocked` | Bot protection refused the page after the escalation ladder; `(cached)` when the refusal is remembered from an earlier run |
 | `rate_limited` | The source kept answering 429 beyond `http.max_retry_wait` |
 | `not_found` | The source has no such record |
 | `no_match` | The source found something, but not this record |

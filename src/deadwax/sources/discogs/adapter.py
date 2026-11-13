@@ -305,7 +305,8 @@ class DiscogsAdapter(HttpAdapter):
             ]
         except NotFoundError:
             return [], []
-        # A missing escalation browser raises ConfigurationError; it costs only the reviews.
+        # An explicitly chosen escalation step that cannot run raises ConfigurationError;
+        # it costs only the reviews.
         except (SourceError, ConfigurationError) as error:
             reason = f"reviews: {error}"
             return [], [

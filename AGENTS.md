@@ -29,7 +29,7 @@ uv run poe lint-imports # import-linter layer contracts
 uv run poe typecheck    # mypy (strict: src, tests, docs)
 uv run poe test         # pytest (parallel, 95% branch coverage enforced)
 uv run poe test-fast    # pytest without coverage, parallel, random order
-uv run poe test-live    # opt-in live lookups in tests/integration (network, sequential)
+uv run poe test-live    # opt-in live lookups in tests/integration (network, sequential, keys from .env)
 uv run poe docs         # properdocs serve
 uv run poe audit        # pip-audit over locked dependencies
 

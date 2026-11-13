@@ -11,7 +11,13 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
 
-from deadwax.core import BlockedError, NotFoundError, RateLimitedError, SourceError
+from deadwax.core import (
+    BlockedError,
+    ConfigurationError,
+    NotFoundError,
+    RateLimitedError,
+    SourceError,
+)
 from deadwax.sources._http.browser import BrowserFetcher
 from deadwax.sources._http.cache import ResponseCache, cache_key
 from deadwax.sources._http.challenge import detect_challenge
@@ -28,6 +34,9 @@ logger = logging.getLogger(__name__)
 type FetcherFactory = Callable[[HttpSettings], Fetcher]
 
 _NOT_FOUND = 404
+
+# Header of the cache entry that remembers a page refused by bot protection.
+_BLOCKED_HEADER = "x-deadwax-blocked"
 _TOO_MANY_REQUESTS = 429
 
 # Extras that provide each escalation step.
@@ -145,6 +154,7 @@ class HttpClient:
         )
         self._escalated: dict[Escalation, Fetcher] = {}
         self._level = 0
+        self._unavailable: str | None = None
 
     async def __aenter__(self) -> Self:
         return self
@@ -199,9 +209,22 @@ class HttpClient:
         key = cache_key(self.spec.source, request, self.spec.secret_params)
         if cache is not None and (cached := await cache.get(key)) is not None:
             logger.debug("%s cache hit %s", self.spec.source, cached.url)
+            if (blocked := cached.headers.get(_BLOCKED_HEADER)) is not None:
+                raise BlockedError(f"{blocked} (cached)", url=cached.url)
             return self._check(cached)
 
-        response = await self._fetch(request)
+        try:
+            response = await self._fetch(request)
+        except BlockedError as error:
+            if cache is not None and error.url is not None:
+                marker = Response(
+                    url=error.url,
+                    status=403,
+                    content=b"",
+                    headers={_BLOCKED_HEADER: str(error)},
+                )
+                await cache.put(key, marker, self._config.cache.blocked_ttl)
+            raise
         response = Response(
             url=redact(response.url, self.spec.secret_params),
             status=response.status,
@@ -236,20 +259,39 @@ class HttpClient:
         reason = ""
         tried: list[str] = []
         for level in range(self._level, len(self._steps) + 1):
-            fetcher = self._fetcher(level)
-            tried.append(fetcher.name)
             try:
+                fetcher = self._fetcher(level)
                 response = await self._attempt(fetcher, request, safe_url)
             except SourceError as error:
                 error.url = error.url or safe_url
                 raise
+            except ConfigurationError as error:
+                if level == 0 or self._settings.escalation is not None:
+                    raise
+                await self._drop_step(level, error)
+                break
+            tried.append(fetcher.name)
             challenge = detect_challenge(response.status, response.headers, response.content)
             if challenge is None:
                 self._level = level
                 return response
             reason = challenge
             logger.debug("%s: %s via %s", self.spec.source, challenge, fetcher.name)
-        raise BlockedError(f"{reason} (tried {', '.join(tried)})", url=safe_url)
+        unavailable = f"; {self._unavailable}" if self._unavailable else ""
+        raise BlockedError(f"{reason} (tried {', '.join(tried)}{unavailable})", url=safe_url)
+
+    async def _drop_step(self, level: int, error: ConfigurationError) -> None:
+        """End the ladder below a step that cannot run, such as a browser that is not installed.
+
+        Only an unset escalation setting means "the strongest available step"; an explicit
+        setting keeps reporting the missing step as a configuration error.
+        """
+        step = self._steps[level - 1]
+        logger.debug("%s: %s step unavailable: %s", self.spec.source, step, error)
+        self._unavailable = f"{step} unavailable: {error}"
+        del self._steps[level - 1 :]
+        if (fetcher := self._escalated.pop(step, None)) is not None:
+            await fetcher.aclose()
 
     def _should_retry(self, response: Response) -> bool:
         if response.status not in RETRY_STATUSES:

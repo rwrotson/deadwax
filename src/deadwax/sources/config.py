@@ -62,6 +62,11 @@ class CacheSettings(_Model):
         ge=0,
         description="Seconds a 'not found' response stays fresh",
     )
+    blocked_ttl: float = Field(
+        default=86400,
+        ge=0,
+        description="Seconds a page refused by bot protection is not requested again",
+    )
 
 
 class SourceSettings(_Model):

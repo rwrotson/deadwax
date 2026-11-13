@@ -86,6 +86,8 @@ Bandcamp pages, the song.link page, and Discogs review pages use browser-like he
 | curl_cffi with Chrome TLS impersonation | `deadwax[stealth]` |
 | Playwright Chromium | `deadwax[browser]` and `playwright install chromium` |
 
-`DEADWAX_HTTP__ESCALATION=none|impersonate|browser` caps the ladder. By default it goes up to the strongest installed step. API sources never escalate.
+`DEADWAX_HTTP__ESCALATION=none|impersonate|browser` caps the ladder. By default it goes up to the strongest available step: when a step cannot run (the `browser` extra is installed but Chromium is not), the ladder ends below it and the page is reported as `blocked` with the reason and the install hint. A step chosen explicitly that cannot run is a configuration error. API sources never escalate.
+
+A refused page is remembered in the cache for `cache.blocked_ttl` (default one day) and reported as `blocked … (cached)` without a request. After installing an escalation step, run once with `--no-cache`.
 
 All sources share per-host rate limits with jitter, bounded retries with backoff that honours `Retry-After`, a response size cap, and the response cache (`--no-cache` bypasses it).
