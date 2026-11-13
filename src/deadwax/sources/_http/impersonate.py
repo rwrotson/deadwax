@@ -9,6 +9,7 @@ from deadwax.sources._http.messages import (
     lower_headers,
 )
 from deadwax.sources._http.profiles import CHROME, BrowserIdentity
+from deadwax.sources.config import DIRECT
 
 if TYPE_CHECKING:
     from curl_cffi.requests import AsyncSession
@@ -28,6 +29,7 @@ class ImpersonateFetcher:
         timeout: float,
         max_bytes: int,
         identity: BrowserIdentity = CHROME,
+        proxy: str | None = None,
     ) -> None:
         try:
             from curl_cffi.requests import AsyncSession  # noqa: PLC0415 -- optional extra (R7)
@@ -38,6 +40,8 @@ class ImpersonateFetcher:
             impersonate=identity.impersonate,
             timeout=timeout,
             allow_redirects=True,
+            proxy=proxy if proxy != DIRECT else None,
+            trust_env=proxy is None,
         )
 
     async def fetch(self, request: Request) -> Response:

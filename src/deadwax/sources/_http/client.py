@@ -27,28 +27,41 @@ from deadwax.sources._http.plain import HttpxFetcher
 from deadwax.sources._http.profiles import CHROME, Profile, api_headers, browser_headers
 from deadwax.sources._http.ratelimit import HostLimiters, Sleep
 from deadwax.sources._http.retry import RETRY_STATUSES, RetryPolicy
-from deadwax.sources.config import Escalation, HttpSettings, SourcesConfig
+from deadwax.sources.config import DIRECT, Escalation, HttpSettings, SourcesConfig
 
 logger = logging.getLogger(__name__)
 
-type FetcherFactory = Callable[[HttpSettings], Fetcher]
+type FetcherFactory = Callable[[HttpSettings, str | None], Fetcher]
 
 _NOT_FOUND = 404
 
 # Header of the cache entry that remembers a page refused by bot protection.
 _BLOCKED_HEADER = "x-deadwax-blocked"
+
+# Header of that entry naming the route the page was refused on; a block on another
+# route, such as before switching a source to 'direct', does not apply.
+_ROUTE_HEADER = "x-deadwax-route"
+_ENVIRONMENT_ROUTE = "environment"
 _TOO_MANY_REQUESTS = 429
 
 # Extras that provide each escalation step.
 _EXTRA_PACKAGES = {Escalation.IMPERSONATE: "curl_cffi", Escalation.BROWSER: "playwright"}
 
 
-def _impersonate(settings: HttpSettings) -> Fetcher:
-    return ImpersonateFetcher(timeout=settings.timeout, max_bytes=settings.max_response_bytes)
+def _impersonate(settings: HttpSettings, proxy: str | None) -> Fetcher:
+    return ImpersonateFetcher(
+        timeout=settings.timeout,
+        max_bytes=settings.max_response_bytes,
+        proxy=proxy,
+    )
 
 
-def _browser(settings: HttpSettings) -> Fetcher:
-    return BrowserFetcher(timeout=settings.timeout, max_bytes=settings.max_response_bytes)
+def _browser(settings: HttpSettings, proxy: str | None) -> Fetcher:
+    return BrowserFetcher(
+        timeout=settings.timeout,
+        max_bytes=settings.max_response_bytes,
+        proxy=proxy,
+    )
 
 
 def _installed(package: str) -> bool:
@@ -73,6 +86,16 @@ def escalation_steps(
         return [step for step in steps if installed(_EXTRA_PACKAGES[step])]
     allowed = steps[: steps.index(setting) + 1] if setting is not Escalation.NONE else []
     return [step for step in allowed if step is setting or installed(_EXTRA_PACKAGES[step])]
+
+
+def route(proxy: str | None) -> str:
+    """Name the way requests leave for a proxy setting, without credentials."""
+    if proxy is None:
+        return _ENVIRONMENT_ROUTE
+    if proxy == DIRECT:
+        return DIRECT
+    parts = urlsplit(proxy)
+    return f"{parts.scheme}://{parts.netloc.rpartition('@')[2]}"
 
 
 def redact(url: str, secret_params: Collection[str]) -> str:
@@ -128,6 +151,8 @@ class HttpClient:
         self._config = config
         self._settings = config.http
         self._resources = resources
+        self._proxy = config.proxy(spec.source)
+        self._route = route(self._proxy)
 
         self._policy = RetryPolicy(
             retries=self._settings.retries,
@@ -145,6 +170,7 @@ class HttpClient:
             timeout=self._settings.timeout,
             max_bytes=self._settings.max_response_bytes,
             transport=resources.transport,
+            proxy=self._proxy,
         )
 
         self._steps: list[Escalation] = (
@@ -209,9 +235,11 @@ class HttpClient:
         key = cache_key(self.spec.source, request, self.spec.secret_params)
         if cache is not None and (cached := await cache.get(key)) is not None:
             logger.debug("%s cache hit %s", self.spec.source, cached.url)
-            if (blocked := cached.headers.get(_BLOCKED_HEADER)) is not None:
+            blocked = cached.headers.get(_BLOCKED_HEADER)
+            if blocked is None:
+                return self._check(cached)
+            if cached.headers.get(_ROUTE_HEADER, _ENVIRONMENT_ROUTE) == self._route:
                 raise BlockedError(f"{blocked} (cached)", url=cached.url)
-            return self._check(cached)
 
         try:
             response = await self._fetch(request)
@@ -221,7 +249,7 @@ class HttpClient:
                     url=error.url,
                     status=403,
                     content=b"",
-                    headers={_BLOCKED_HEADER: str(error)},
+                    headers={_BLOCKED_HEADER: str(error), _ROUTE_HEADER: self._route},
                 )
                 await cache.put(key, marker, self._config.cache.blocked_ttl)
             raise
@@ -251,7 +279,7 @@ class HttpClient:
             return self._plain
         step = self._steps[level - 1]
         if step not in self._escalated:
-            self._escalated[step] = self._resources.escalations[step](self._settings)
+            self._escalated[step] = self._resources.escalations[step](self._settings, self._proxy)
         return self._escalated[step]
 
     async def _fetch(self, request: Request) -> Response:

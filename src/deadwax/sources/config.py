@@ -1,13 +1,38 @@
 from enum import StrEnum
 from pathlib import Path
+from typing import Annotated
+from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, SecretStr
 
 DEFAULT_CONTACT = "https://github.com/rwrotson/deadwax"
+
+# Proxy setting that connects without a proxy, ignoring the environment.
+DIRECT = "direct"
+
+_PROXY_SCHEMES = frozenset({"http", "https"})
 
 
 class _Model(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+def _check_proxy(value: SecretStr) -> SecretStr:
+    proxy = value.get_secret_value()
+    if proxy == DIRECT:
+        return value
+    try:
+        parts = urlsplit(proxy)
+        valid = parts.scheme in _PROXY_SCHEMES and bool(parts.hostname) and parts.port is not None
+    except ValueError:
+        valid = False
+    if not valid:
+        raise ValueError("expected 'direct' or an http:// or https:// proxy URL with a port")
+    return value
+
+
+# Secret because a proxy URL may carry a user name and password.
+type Proxy = Annotated[SecretStr, AfterValidator(_check_proxy)]
 
 
 class Escalation(StrEnum):
@@ -45,6 +70,13 @@ class HttpSettings(_Model):
         default=10_000_000,
         gt=0,
         description="Responses larger than this are rejected",
+    )
+    proxy: Proxy | None = Field(
+        default=None,
+        description=(
+            "Proxy of every source: 'direct' for none, or an http(s):// URL; "
+            "unset: HTTP(S)_PROXY, ALL_PROXY and NO_PROXY from the environment"
+        ),
     )
 
 
@@ -86,6 +118,10 @@ class SourceSettings(_Model):
     user_agent: str | None = Field(
         default=None,
         description="User-Agent of this source's requests; the source default when unset",
+    )
+    proxy: Proxy | None = Field(
+        default=None,
+        description="Proxy of this source: 'direct' or an http(s):// URL; http.proxy when unset",
     )
 
 
@@ -139,6 +175,13 @@ class SourcesConfig(_Model):
         if isinstance(settings, SourceSettings) and settings.rate is not None:
             return settings.rate
         return DEFAULT_RATES.get(source, 1.0)
+
+    def proxy(self, source: str) -> str | None:
+        """Return the proxy setting of a source: 'direct', a URL, or None for the environment."""
+        settings = getattr(self, source, None)
+        if isinstance(settings, SourceSettings) and settings.proxy is not None:
+            return settings.proxy.get_secret_value()
+        return self.http.proxy.get_secret_value() if self.http.proxy is not None else None
 
     def ttl(self, source: str) -> float:
         """Return the cache lifetime of a source's responses."""

@@ -1,4 +1,5 @@
-from pydantic import SecretStr
+import pytest
+from pydantic import SecretStr, ValidationError
 
 from deadwax.sources import (
     DEFAULT_RATES,
@@ -35,3 +36,29 @@ def test_credentials_are_hidden() -> None:
     assert "k3y" not in config.model_dump_json()
     assert config.discogs.token is not None
     assert config.discogs.token.get_secret_value() == "t0ken"
+
+
+def test_proxy_of_a_source_overrides_the_shared_one() -> None:
+    config = SourcesConfig.model_validate(
+        {"http": {"proxy": "http://proxy.example:8080"}, "deezer": {"proxy": "direct"}},
+    )
+
+    assert config.proxy("deezer") == "direct"
+    assert config.proxy("discogs") == "http://proxy.example:8080"
+    assert SourcesConfig().proxy("deezer") is None
+
+
+def test_proxy_credentials_are_hidden() -> None:
+    config = SourcesConfig.model_validate({"http": {"proxy": "http://u:s3cret@proxy:8080"}})
+
+    assert "s3cret" not in repr(config)
+    assert "s3cret" not in config.model_dump_json()
+
+
+@pytest.mark.parametrize(
+    "proxy",
+    ["none", "socks5://proxy:1080", "http://proxy", "http://:8080", "http://proxy:port"],
+)
+def test_invalid_proxies_are_rejected(proxy: str) -> None:
+    with pytest.raises(ValidationError, match="'direct' or an http"):
+        SourcesConfig.model_validate({"http": {"proxy": proxy}})

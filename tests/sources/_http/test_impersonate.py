@@ -73,7 +73,13 @@ async def test_impersonated_request(sessions: list[FakeSession]) -> None:
     await fetcher.aclose()
 
     [session] = sessions
-    assert session.kwargs == {"impersonate": "chrome", "timeout": 5, "allow_redirects": True}
+    assert session.kwargs == {
+        "impersonate": "chrome",
+        "timeout": 5,
+        "allow_redirects": True,
+        "proxy": None,
+        "trust_env": True,
+    }
     assert session.calls == [
         (
             "GET",
@@ -97,10 +103,19 @@ async def test_failures_and_size_limit(sessions: list[FakeSession]) -> None:
 
 
 def test_client_factory_uses_http_settings(sessions: list[FakeSession]) -> None:
-    fetcher = client_module._impersonate(HttpSettings(timeout=9))
+    fetcher = client_module._impersonate(HttpSettings(timeout=9), "http://proxy.example:8080")
 
     assert fetcher.name == "impersonate"
     assert sessions[0].kwargs["timeout"] == 9
+    assert sessions[0].kwargs["proxy"] == "http://proxy.example:8080"
+    assert sessions[0].kwargs["trust_env"] is False
+
+
+def test_direct_ignores_the_environment_proxy(sessions: list[FakeSession]) -> None:
+    ImpersonateFetcher(timeout=5, max_bytes=3, proxy="direct")
+
+    assert sessions[0].kwargs["proxy"] is None
+    assert sessions[0].kwargs["trust_env"] is False
 
 
 def test_missing_extra_is_named(monkeypatch: pytest.MonkeyPatch) -> None:

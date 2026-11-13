@@ -6,6 +6,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+from pydantic import SecretStr
 
 from deadwax.core import (
     BlockedError,
@@ -14,7 +15,13 @@ from deadwax.core import (
     RateLimitedError,
     SourceError,
 )
-from deadwax.sources import CacheSettings, Escalation, HttpSettings, SourcesConfig
+from deadwax.sources import (
+    CacheSettings,
+    Escalation,
+    HttpSettings,
+    LastfmSettings,
+    SourcesConfig,
+)
 from deadwax.sources._http import (
     ClientSpec,
     Fetcher,
@@ -28,6 +35,7 @@ from deadwax.sources._http import (
     TransportError,
     escalation_steps,
     redact,
+    route,
 )
 from deadwax.sources._http import client as client_module
 
@@ -94,7 +102,9 @@ class Setup:
     fetchers: dict[Escalation, FakeFetcher | ConfigurationError] = field(default_factory=dict)
     retries: int = 2
     blocked_ttl: float = 86400
+    proxy: str | None = None
     created: list[Escalation] = field(default_factory=list)
+    proxies: list[str | None] = field(default_factory=list)
 
     def client(
         self,
@@ -102,9 +112,10 @@ class Setup:
         secret_params: frozenset[str] = frozenset(),
         escalation: Escalation | None = None,
     ) -> HttpClient:
-        def factory(step: Escalation) -> Callable[[HttpSettings], Fetcher]:
-            def create(settings: HttpSettings) -> Fetcher:
+        def factory(step: Escalation) -> Callable[[HttpSettings, str | None], Fetcher]:
+            def create(settings: HttpSettings, proxy: str | None) -> Fetcher:
                 self.created.append(step)
+                self.proxies.append(proxy)
                 fetcher = self.fetchers[step]
                 if isinstance(fetcher, ConfigurationError):
                     raise fetcher
@@ -125,6 +136,7 @@ class Setup:
         config = SourcesConfig(
             http=HttpSettings(retries=self.retries, escalation=escalation, contact="https://c"),
             cache=CacheSettings(blocked_ttl=self.blocked_ttl),
+            lastfm=LastfmSettings(proxy=SecretStr(self.proxy) if self.proxy else None),
         )
         spec = ClientSpec("lastfm", profile, {"x-source": "test"}, secret_params)
         return HttpClient(spec, config, resources)
@@ -382,6 +394,49 @@ async def test_blocked_pages_are_cached_for_blocked_ttl(tmp_path: Path) -> None:
 
     assert cached.value.url == URL
     assert len(setup.server.requests) == 2
+
+
+@pytest.mark.asyncio
+async def test_a_block_on_another_route_is_not_reused(tmp_path: Path) -> None:
+    setup = Setup(Server([httpx.Response(403, headers={"cf-mitigated": "challenge"})]))
+    setup.cache = ResponseCache(tmp_path / "cache.sqlite", clock=setup.time.clock)
+
+    async with setup.client() as client:
+        with pytest.raises(BlockedError, match=r"\(tried httpx\)$"):
+            await client.get(URL)
+    setup.proxy = "direct"
+    async with setup.client() as client:
+        with pytest.raises(BlockedError, match=r"\(tried httpx\)$"):
+            await client.get(URL)
+        with pytest.raises(BlockedError, match=r"\(cached\)$"):
+            await client.get(URL)
+    setup.cache.close()
+
+    assert len(setup.server.requests) == 2
+
+
+@pytest.mark.asyncio
+async def test_escalation_steps_use_the_source_proxy() -> None:
+    setup = Setup(Server([httpx.Response(403, content=CHALLENGE)]))
+    setup.fetchers = {Escalation.IMPERSONATE: FakeFetcher("impersonate", [page()])}
+    setup.proxy = "http://user:secret@proxy.example:8080"
+
+    async with setup.client(Profile.BROWSER, escalation=Escalation.IMPERSONATE) as client:
+        await client.get(URL)
+
+    assert setup.proxies == ["http://user:secret@proxy.example:8080"]
+
+
+@pytest.mark.parametrize(
+    ("proxy", "expected"),
+    [
+        (None, "environment"),
+        ("direct", "direct"),
+        ("http://user:secret@proxy.example:8080", "http://proxy.example:8080"),
+    ],
+)
+def test_route_names_the_proxy_without_credentials(proxy: str | None, expected: str) -> None:
+    assert route(proxy) == expected
 
 
 @pytest.mark.asyncio

@@ -95,3 +95,18 @@ async def test_httpx_fetcher_limits_size_and_wraps_transport_errors() -> None:
     with pytest.raises(TransportError, match="ConnectError: refused"):
         await fetcher.fetch(Request("GET", "https://x/fail"))
     await fetcher.aclose()
+
+
+@pytest.mark.asyncio
+async def test_httpx_fetcher_uses_a_proxy_url_or_none() -> None:
+    proxied = HttpxFetcher(headers={}, timeout=1, max_bytes=3, proxy="http://proxy.example:8080")
+    direct = HttpxFetcher(headers={}, timeout=1, max_bytes=3, proxy="direct")
+    environment = HttpxFetcher(headers={}, timeout=1, max_bytes=3)
+
+    assert not proxied._client.trust_env
+    assert any(proxied._client._mounts.values())
+    assert not direct._client.trust_env
+    assert not any(direct._client._mounts.values())
+    assert environment._client.trust_env
+    for fetcher in (proxied, direct, environment):
+        await fetcher.aclose()

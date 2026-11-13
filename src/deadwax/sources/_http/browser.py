@@ -1,5 +1,6 @@
 import contextlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+from urllib.parse import unquote, urlsplit, urlunsplit
 
 from deadwax.core import ConfigurationError, SourceError
 from deadwax.sources._http.messages import (
@@ -9,6 +10,7 @@ from deadwax.sources._http.messages import (
     TransportError,
 )
 from deadwax.sources._http.profiles import CHROME, BrowserIdentity
+from deadwax.sources.config import DIRECT
 
 if TYPE_CHECKING:
     from playwright.async_api import Browser, BrowserContext, Playwright
@@ -24,6 +26,21 @@ MISSING_BROWSER = "Chromium for Playwright is not installed: run 'playwright ins
 _SETTLE_MS = 5000.0
 
 
+def launch_proxy(proxy: str | None) -> dict[str, Any]:
+    """Chromium launch options for a proxy setting; Chromium ignores proxy variables."""
+    if proxy is None:
+        return {}
+    if proxy == DIRECT:
+        return {"args": ["--no-proxy-server"]}
+    parts = urlsplit(proxy)
+    server = urlunsplit(parts._replace(netloc=parts.netloc.rpartition("@")[2]))
+    options = {"server": server}
+    if parts.username is not None:
+        options["username"] = unquote(parts.username)
+        options["password"] = unquote(parts.password or "")
+    return {"proxy": options}
+
+
 class BrowserFetcher:
     """Headless Chromium that loads pages the way a visitor's browser does."""
 
@@ -35,6 +52,7 @@ class BrowserFetcher:
         timeout: float,
         max_bytes: int,
         identity: BrowserIdentity = CHROME,
+        proxy: str | None = None,
     ) -> None:
         try:
             import playwright.async_api  # noqa: F401, PLC0415 -- optional extra (R7)
@@ -43,6 +61,7 @@ class BrowserFetcher:
         self._timeout_ms = timeout * 1000
         self._max_bytes = max_bytes
         self._identity = identity
+        self._proxy = proxy
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
@@ -53,7 +72,10 @@ class BrowserFetcher:
         if self._context is None:
             self._playwright = await async_playwright().start()
             try:
-                self._browser = await self._playwright.chromium.launch(headless=True)
+                self._browser = await self._playwright.chromium.launch(
+                    headless=True,
+                    **launch_proxy(self._proxy),
+                )
             except Error as error:
                 await self.aclose()
                 raise ConfigurationError(MISSING_BROWSER) from error

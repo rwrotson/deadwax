@@ -1,6 +1,6 @@
 # Sources
 
-`deadwax sources` lists every source with its pass, what it contributes, and whether it can run. Each source has the settings `enabled`, `rate` (requests per second), `ttl` (cache lifetime), and `user_agent`, set as `DEADWAX_<SOURCE>__<SETTING>` or in a `[<source>]` TOML table; see [Configuration](configuration.md).
+`deadwax sources` lists every source with its pass, what it contributes, and whether it can run. Each source has the settings `enabled`, `rate` (requests per second), `ttl` (cache lifetime), `user_agent`, and `proxy`, set as `DEADWAX_<SOURCE>__<SETTING>` or in a `[<source>]` TOML table; see [Configuration](configuration.md).
 
 ## How a lookup runs
 
@@ -40,7 +40,7 @@ The README lists sources planned for later versions and those deadwax will not u
 - **Access:** `api.deezer.com`, keyless.
 - **Finds the record by:** ISRC (track) or barcode (album) from the identity pass, else a search; it resolves Deezer URLs.
 - **Contributes:** Deezer links and previews, ISRC, barcode, label, and genres.
-- **Limits:** Akamai refuses some networks with an "Access Denied" page. This is reported as `blocked`.
+- **Limits:** Akamai refuses some networks with an "Access Denied" page. This is reported as `blocked`. Behind a refused proxy, see [Proxies](#proxies).
 
 ## Odesli (song.link)
 
@@ -90,5 +90,13 @@ Bandcamp pages, the song.link page, and Discogs review pages use browser-like he
 `DEADWAX_HTTP__ESCALATION=none|impersonate|browser` caps the ladder. By default it goes up to the strongest available step: when a step cannot run (the `browser` extra is installed but Chromium is not), the ladder ends below it and the page is reported as `blocked` with the reason and the install hint. A step chosen explicitly that cannot run is a configuration error. API sources never escalate.
 
 A refused page is remembered in the cache for `cache.blocked_ttl` (default one day) and reported as `blocked … (cached)` without a request. After installing an escalation step, run once with `--no-cache`.
+
+## Proxies
+
+By default every transport except Chromium uses the proxy from `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`, and `NO_PROXY` in the process environment. `.env` does not set these variables: deadwax reads it into its own settings only.
+
+`DEADWAX_HTTP__PROXY` sets the proxy of every source, and `DEADWAX_<SOURCE>__PROXY` overrides it for one source. The value is `direct` (no proxy, the environment ignored) or an `http://` or `https://` proxy URL with a port, optionally with `user:password@`. The setting applies to httpx, curl_cffi, and Chromium. Bot protection sometimes refuses a proxy's exit address, for example Akamai for Deezer or Cloudflare for Discogs review pages. In that case, `DEADWAX_DEEZER__PROXY=direct` sends that source's requests past the proxy.
+
+A page refused on one route does not count as refused on another: changing a source's proxy ignores its cached `blocked` entries.
 
 All sources share per-host rate limits with jitter, bounded retries with backoff that honours `Retry-After`, a response size cap, and the response cache (`--no-cache` bypasses it).

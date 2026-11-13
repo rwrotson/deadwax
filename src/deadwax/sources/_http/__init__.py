@@ -1,6 +1,6 @@
 """HTTP clients, rate limits, retries, caching and escalation transports for adapters."""
 
-from .browser import BrowserFetcher
+from .browser import BrowserFetcher, launch_proxy
 from .cache import ResponseCache, cache_key, open_cache
 from .challenge import detect_challenge
 from .client import (
@@ -10,6 +10,7 @@ from .client import (
     HttpResources,
     escalation_steps,
     redact,
+    route,
 )
 from .impersonate import ImpersonateFetcher
 from .messages import Fetcher, Request, Response, ResponseTooLargeError, TransportError
@@ -54,7 +55,9 @@ __all__ = [
     "cache_key",
     "detect_challenge",
     "escalation_steps",
+    "launch_proxy",
     "open_cache",
     "parse_retry_after",
     "redact",
+    "route",
 ]

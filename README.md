@@ -82,7 +82,7 @@ Never used: Every Noise at Once, direct Metacritic scraping (Metacritic scores c
 
 ## Configuration
 
-The library takes settings as arguments and never reads the environment. The `deadwax` command loads `deadwax.cli.settings.Settings` from flags, `DEADWAX_*` environment variables, `.env`, and a TOML file (`--config`, `DEADWAX_CONFIG_FILE`, or `config.toml` in the user configuration directory), in that order of precedence; sections are nested with `__` (for example `DEADWAX_LASTFM__API_KEY=…`) or TOML tables (`[lastfm]`). The command caches responses in the user cache directory. See `.env.example` and the generated configuration page in the documentation.
+The library takes settings as arguments and never reads the environment. The `deadwax` command loads `deadwax.cli.settings.Settings` from flags, `DEADWAX_*` environment variables, `.env`, and a TOML file (`--config`, `DEADWAX_CONFIG_FILE`, or `config.toml` in the user configuration directory), in that order of precedence; sections are nested with `__` (for example `DEADWAX_LASTFM__API_KEY=…`) or TOML tables (`[lastfm]`). The command caches responses in the user cache directory. Requests use the proxy from the environment (`HTTPS_PROXY`, `NO_PROXY`); `DEADWAX_HTTP__PROXY` or `DEADWAX_<SOURCE>__PROXY` set `direct` or another proxy, for example `DEADWAX_DEEZER__PROXY=direct` when a site refuses the proxy's address. See `.env.example` and the generated configuration page in the documentation.
 
 ## Development
 

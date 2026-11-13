@@ -9,6 +9,7 @@ from deadwax.sources._http.messages import (
     TransportError,
     lower_headers,
 )
+from deadwax.sources.config import DIRECT
 
 
 class HttpxFetcher:
@@ -23,6 +24,7 @@ class HttpxFetcher:
         timeout: float,
         max_bytes: int,
         transport: httpx.AsyncBaseTransport | None = None,
+        proxy: str | None = None,
     ) -> None:
         self._max_bytes = max_bytes
         self._client = httpx.AsyncClient(
@@ -31,6 +33,9 @@ class HttpxFetcher:
             follow_redirects=True,
             http2=transport is None,
             transport=transport,
+            # A given transport, such as a test's, is used as is.
+            proxy=proxy if proxy != DIRECT and transport is None else None,
+            trust_env=proxy is None,
         )
 
     async def fetch(self, request: Request) -> Response:

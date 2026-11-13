@@ -13,6 +13,7 @@ from deadwax.sources._http import (
     Request,
     ResponseTooLargeError,
     TransportError,
+    launch_proxy,
 )
 from deadwax.sources._http import client as client_module
 
@@ -30,6 +31,7 @@ class Scenario:
     launch_fails: bool = False
     goto_fails: bool = False
     never_idle: bool = False
+    launches: list[dict[str, object]] = field(default_factory=list)
     contexts: list[dict[str, object]] = field(default_factory=list)
     pages: list[FakePage] = field(default_factory=list)
     closed: list[str] = field(default_factory=list)
@@ -118,7 +120,8 @@ class FakeBrowser:
 class FakeChromium:
     scenario: Scenario
 
-    async def launch(self, *, headless: bool) -> FakeBrowser:
+    async def launch(self, **options: object) -> FakeBrowser:
+        self.scenario.launches.append(options)
         if self.scenario.launch_fails:
             raise FakeError("Executable doesn't exist")
         return FakeBrowser(self.scenario)
@@ -205,7 +208,7 @@ async def test_navigation_errors_and_size_limit(scenario: Scenario) -> None:
 @pytest.mark.asyncio
 async def test_missing_chromium_is_a_configuration_error(scenario: Scenario) -> None:
     scenario.launch_fails = True
-    fetcher = client_module._browser(HttpSettings())
+    fetcher = client_module._browser(HttpSettings(), None)
 
     with pytest.raises(ConfigurationError, match="playwright install chromium"):
         await fetcher.fetch(PAGE)
@@ -218,3 +221,31 @@ def test_missing_extra_is_named(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(ConfigurationError, match=r"deadwax\[browser\]"):
         BrowserFetcher(timeout=5, max_bytes=5)
+
+
+@pytest.mark.asyncio
+async def test_chromium_is_launched_with_the_proxy(scenario: Scenario) -> None:
+    fetcher = client_module._browser(HttpSettings(), "http://proxy.example:8080")
+
+    await fetcher.fetch(PAGE)
+    await fetcher.aclose()
+
+    assert scenario.launches == [
+        {"headless": True, "proxy": {"server": "http://proxy.example:8080"}},
+    ]
+
+
+@pytest.mark.parametrize(
+    ("proxy", "expected"),
+    [
+        (None, {}),
+        ("direct", {"args": ["--no-proxy-server"]}),
+        ("http://proxy.example:8080", {"proxy": {"server": "http://proxy.example:8080"}}),
+        (
+            "https://us%40r:p%3Ass@[::1]:3128",
+            {"proxy": {"server": "https://[::1]:3128", "username": "us@r", "password": "p:ss"}},
+        ),
+    ],
+)
+def test_launch_proxy(proxy: str | None, expected: dict[str, object]) -> None:
+    assert launch_proxy(proxy) == expected

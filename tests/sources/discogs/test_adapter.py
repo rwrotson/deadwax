@@ -274,7 +274,7 @@ async def test_review_page_failures_keep_the_api_facts(
 
 @pytest.mark.asyncio
 async def test_missing_escalation_browser_costs_only_the_reviews() -> None:
-    def unavailable(_: HttpSettings) -> Fetcher:
+    def unavailable(_: HttpSettings, __: str | None) -> Fetcher:
         raise ConfigurationError("Chromium for Playwright is not installed")
 
     table = routes(**{PAGE: (403, b"<title>Just a moment...</title>")})
