@@ -1,5 +1,5 @@
 {
- "recorded_at": "2026-11-13T01:46:56+00:00",
+ "recorded_at": "2026-11-13T02:10:30+00:00",
  "interactions": {
   "GET https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&ids=Q2018005&props=labels%7Cclaims%7Csitelinks": {
    "status": 200,

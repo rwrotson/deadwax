@@ -266,6 +266,7 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-13 | KEXP reads the latest 25 plays by recording MBID, else by artist and title; albums always by artist and album title. | The API ignores `release_group_id` and returns the station's latest plays (verified live; the matching gate dropped them). | 9 |
 | 2026-11-13 | ListenBrainz, SecondHandSongs and KEXP are JSON APIs, so they build on `HttpAdapter`, not `SearchPageAdapter`. | The helper is for HTML search and page sources. | 9 |
 | 2026-11-13 | Cover and sample check records: `--track "Tim Buckley - Song to the Siren"` (covers) and `--track "Kanye West - Stronger"` (samples). | User choice. | 9–19 |
+| 2026-11-13 | A marker or MusicBrainz comment "explicit" (or "explicit version") means the original; "clean" stays an edit. | "Explicit" names the uncensored album version; as an edit it made MusicBrainz reject the canonical recording of "Kanye West - Stronger". | 9 |
 | 2026-11-13 | `SearchPageAdapter` order: query URL of its service, a page of its service from earlier passes, then search. `pick_hit` takes the first `MATCH`, else the first `other_version` hit, which the merge turns into a relation and a version discrepancy; `NO_MATCH` hits are never read. | Another version's page still informs identity, and the merge gate already handles it. | 8, 12–19 |
 
 ### 2026-11-13 — Stage 8 evidence
@@ -310,7 +311,13 @@ Found, not fixed (outside the stage): MusicBrainz picks an obscure recording of 
 
 Remains: nothing for Stage 9.
 
-**Current task:** Stage 10 (Spotify, YouTube, SoundCloud). **Next action:** user review of Stage 9 and a decision on the "explicit" version bug; at the start of Stage 10, verify each source's access notes.
+### 2026-11-13 — fix: "explicit" is the original version
+
+Changed: `core.versions` classifies "explicit" and "explicit version" as `original` (it was `edit`); tests for "(Explicit)", "[Clean]", and the MusicBrainz comment "explicit"; `stronger_samples` re-recorded live for every source; a replayed test for it.
+
+Commands and outcomes: `uv run poe check` passed (625 tests, 99.16% branch coverage); no other scenario changed. Live-verified: `deadwax --track "Kanye West - Stronger" --no-cache` resolves to recording `8009d470…` (2007-08-13), with `samples` Daft Punk "Harder, Better, Faster, Stronger", mash-ups as `sampled_by`, and ListenBrainz counts. iTunes reports `not_found` for the Apple Music ID MusicBrainz gives (`1445288542`); not investigated.
+
+**Current task:** Stage 10 (Spotify, YouTube, SoundCloud). **Next action:** at the start of Stage 10, verify each source's access notes.
 
 ## Resume instructions
 

@@ -6,15 +6,19 @@ from deadwax.core.normalize import split_featuring
 from deadwax.core.query import DASHES
 
 # Whole-marker forms checked first, because 'Original Mix' or 'Radio Edit' also contain keywords.
+# An explicit version is the uncensored original; a clean one is the censored edit.
 _EXACT_RULES: tuple[tuple[VersionKind, re.Pattern[str]], ...] = (
     (
         VersionKind.ORIGINAL,
-        re.compile(r"^(?:original|album)(?: mix| version)?$", re.IGNORECASE),
+        re.compile(
+            r"^(?:(?:original|album)(?: mix| version)?|explicit(?: version)?)$",
+            re.IGNORECASE,
+        ),
     ),
     (
         VersionKind.EDIT,
         re.compile(
-            r"^(?:(?:radio|single|extended|short|clean|explicit)(?: edit| mix| version)?|edit)$",
+            r"^(?:(?:radio|single|extended|short|clean)(?: edit| mix| version)?|edit)$",
             re.IGNORECASE,
         ),
     ),

@@ -412,3 +412,19 @@ async def test_radio_plays_and_host_comments(replay: Replay, config: SourcesConf
     assert comments
     assert any(len(t.sources) > 1 for t in comments)
     assert [e for e in dossier.errors if e.kind is ErrorKind.FAILED] == []
+
+
+@pytest.mark.asyncio
+async def test_explicit_recording_is_the_original(replay: Replay, config: SourcesConfig) -> None:
+    query = parse_query("Kanye West - Stronger", EntityKind.TRACK)
+
+    dossier = await lookup(query, config, exclude=["lastfm"], transport=replay("stronger_samples"))
+
+    assert ids(dossier)[IdKind.MUSICBRAINZ_RECORDING].startswith("8009d470")
+    assert dossier.identity.version.kind is VersionKind.ORIGINAL
+    samples = [r.target for r in dossier.relations if r.kind is RelationKind.SAMPLES]
+    assert ("Daft Punk", "Harder, Better, Faster, Stronger") in {
+        (t.artist, t.name) for t in samples
+    }
+    assert RelationKind.SAMPLED_BY in relation_kinds(dossier)
+    assert dossier.metrics

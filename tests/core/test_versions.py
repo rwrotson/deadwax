@@ -24,6 +24,8 @@ from deadwax.core import VersionKind, classify_marker, parse_title
         ("Song (Mono)", "Song", VersionKind.ALTERNATE, "Mono"),
         ("Untrue (Deluxe Edition)", "Untrue", VersionKind.REISSUE, "Deluxe Edition"),
         ("Song (Album Version)", "Song", VersionKind.ORIGINAL, "Album Version"),
+        ("Stronger (Explicit)", "Stronger", VersionKind.ORIGINAL, "Explicit"),
+        ("Stronger [Clean]", "Stronger", VersionKind.EDIT, "Clean"),
         ("Something (Part 1)", "Something (Part 1)", VersionKind.ORIGINAL, None),
         ("Act 1 - Prologue", "Act 1 - Prologue", VersionKind.ORIGINAL, None),
         ("Группа крови", "Группа крови", VersionKind.ORIGINAL, None),
