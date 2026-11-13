@@ -78,6 +78,7 @@ class RelationKind(StrEnum):
     REMIXED_BY = "remixed_by"
     SAMPLES = "samples"
     SAMPLED_BY = "sampled_by"
+    REPOSTED_BY = "reposted_by"
     SIMILAR = "similar"
     OTHER_VERSION = "other_version"
 
@@ -87,6 +88,11 @@ class MetricKind(StrEnum):
 
     LISTENS = "listens"
     LISTENERS = "listeners"
+    LIKES = "likes"
+    REPOSTS = "reposts"
+
+    # Score a service computes from its own plays, such as Spotify's 0-100 popularity.
+    POPULARITY = "popularity"
 
 
 class EntityType(StrEnum):
@@ -188,6 +194,10 @@ class Identity(_Model):
     labels: list[LabelRef] = []
     isrcs: list[Sourced[str]] = []
     upcs: list[Sourced[str]] = []
+    copyrights: list[Sourced[str]] = Field(
+        default=[],
+        description="Copyright (©) and phonographic copyright (℗) lines",
+    )
     external_ids: list[ExternalId] = []
     discrepancies: list[Discrepancy] = []
 
@@ -300,6 +310,7 @@ class RecordCandidate(_Model):
     labels: list[CandidateLabel] = []
     isrcs: list[str] = []
     upcs: list[str] = []
+    copyrights: list[str] = []
     ids: dict[IdKind, str] = {}
     url: str | None = None
 

@@ -16,10 +16,15 @@ from deadwax.sources.listenbrainz import ListenBrainzAdapter
 from deadwax.sources.musicbrainz import MusicBrainzAdapter
 from deadwax.sources.odesli import OdesliAdapter
 from deadwax.sources.secondhandsongs import SecondHandSongsAdapter
+from deadwax.sources.soundcloud import SoundCloudAdapter
+from deadwax.sources.spotify import SpotifyAdapter
 from deadwax.sources.wikipedia import WikipediaAdapter
+from deadwax.sources.youtube import YouTubeAdapter
 
-# Order matters: the first ready adapter that resolves a URL query reads it first.
+# Order matters: the first ready adapter that resolves a URL query reads it first. Spotify
+# reads its own URLs when it has credentials; without them MusicBrainz maps them.
 ADAPTERS: tuple[type[HttpAdapter], ...] = (
+    SpotifyAdapter,
     MusicBrainzAdapter,
     OdesliAdapter,
     ItunesAdapter,
@@ -31,6 +36,8 @@ ADAPTERS: tuple[type[HttpAdapter], ...] = (
     ListenBrainzAdapter,
     SecondHandSongsAdapter,
     KexpAdapter,
+    YouTubeAdapter,
+    SoundCloudAdapter,
 )
 
 

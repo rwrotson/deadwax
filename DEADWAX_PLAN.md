@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–9 done; Stage 10 next.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–10 done; Stage 11 next.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -106,7 +106,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | --- | --- | --- |
 | 8 | Done | Foundation: source groups, default source set, per-lookup concurrency cap, shared search → page helper. |
 | 9 | Done | ListenBrainz, SecondHandSongs, KEXP. |
-| 10 | Not started | Spotify, YouTube (links only), SoundCloud. |
+| 10 | Done | Spotify, YouTube (links only), SoundCloud. |
 | 11 | Not started | Beatport, Juno Download; BPM and key. |
 | 12 | Not started | Shops I: Juno, Hard Wax, Phonica, Soundohm; shop-text deduplication. |
 | 13 | Not started | Shops II: Boomkat, Norman Records, Forced Exposure, Bleep. |
@@ -148,9 +148,9 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 ### Stage 10: Spotify, YouTube, SoundCloud
 
-- [ ] Spotify with client credentials: links, popularity, label, copyrights, ISRC; resolves Spotify URLs.
-- [ ] YouTube with a Data API key: links only (official uploads first), no facts.
-- [ ] SoundCloud through the web client: uploader descriptions, tags, counts, reposters as relations; resolves SoundCloud URLs.
+- [x] Spotify with client credentials: links, popularity, label, copyrights, ISRC; resolves Spotify URLs.
+- [x] YouTube with a Data API key: links only (official uploads first), no facts.
+- [x] SoundCloud with a user-supplied client ID: uploader descriptions, tags, counts, reposters as relations; resolves SoundCloud URLs.
 
 **Acceptance:** missing credentials give `skipped`; YouTube contributes nothing but links. **Suggested message:** `feat(sources): add Spotify, YouTube and SoundCloud adapters`.
 
@@ -268,6 +268,15 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-13 | Cover and sample check records: `--track "Tim Buckley - Song to the Siren"` (covers) and `--track "Kanye West - Stronger"` (samples). | User choice. | 9–19 |
 | 2026-11-13 | A marker or MusicBrainz comment "explicit" (or "explicit version") means the original; "clean" stays an edit. | "Explicit" names the uncensored album version; as an edit it made MusicBrainz reject the canonical recording of "Kanye West - Stronger". | 9 |
 | 2026-11-13 | `SearchPageAdapter` order: query URL of its service, a page of its service from earlier passes, then search. `pick_hit` takes the first `MATCH`, else the first `other_version` hit, which the merge turns into a relation and a version discrepancy; `NO_MATCH` hits are never read. | Another version's page still informs identity, and the merge gate already handles it. | 8, 12–19 |
+| 2026-11-13 | SoundCloud reads a user-supplied `soundcloud.client_id` (secret query parameter); without it the source is `skipped`. deadwax never extracts the web client's ID from soundcloud.com's JavaScript. A refused request is `failed` and asks whether the ID is stale. SoundCloud stays opt-in. | SoundCloud registers no new API apps; extracting the ID is unofficial access. The web client's ID changes now and then, so the user replaces it by hand. User choice. | 10 |
+| 2026-11-13 | Copyright lines are identity values: `RecordCandidate.copyrights` → `Identity.copyrights` (`Sourced[str]`), merged by `normalize_copyright` (℗ and © kept apart; `(P)`, `℗`, `Copyright` written alike). Spotify gives its type as ℗/©, SoundCloud `p_line`/`c_line`. | Spotify and SoundCloud both give them; they help tell releases and reissues apart. | 10 |
+| 2026-11-13 | `MetricKind` gains `popularity` (Spotify, scale 100), `likes` and `reposts` (SoundCloud); SoundCloud plays are `listens`. `RelationKind.REPOSTED_BY` (target an artist entity) holds SoundCloud reposters. The uploader's description is a `label` text with the uploader as author. | Counts stay per source (Stage 9 decision); reposts are vouching, not similarity. | 10 |
+| 2026-11-13 | YouTube is a links-pass source whose partial carries links only, no candidate: uploads are filtered in the adapter by the matching gate (Topic channel names the artist; others need "Artist - Title"; only `MATCH`), at most three, Topic channel first, then a channel named like the artist or its VEVO channel. | The product contract: YouTube contributes nothing but links, and a links-only partial bypasses the merge gate. | 10 |
+| 2026-11-13 | `SpotifyAdapter` comes first in `ADAPTERS`, so it resolves Spotify URLs when ready; without credentials MusicBrainz still does. Its token comes from a second client with the same rate limits and no response cache, once per adapter; it is not refreshed. | A token lives an hour, an adapter one lookup; a cached token would outlive itself. A `store` flag on `HttpClient.request` was tried and dropped (argument limit). | 10 |
+| 2026-11-13 | A "<Name> Edit" marker (a DJ's edit, such as "Kode9 Edit") is not detected as a version; only exact edit forms are. Left to Stage 11's mix-name work. | Found while testing SoundCloud edits; Stage 11 owns version detection of mix names. | 11 |
+| 2026-11-13 | SoundCloud reposters become relations only when verified or with at least 1,000 followers, from the first 50; search hits are ordered official first (distributor metadata, then an uploader named like the artist); the candidate's date is the upload's `release_date` only. | Live: of 20 reposters of "Paranoid Android" one had over 1,000 followers; re-uploads won the search and their upload dates became date discrepancies. | 10 |
+| 2026-11-13 | YouTube treats "(Full Album …)" and a bare "(1997)" as upload notes. | Search with `type=playlist` never returns Topic channels' album playlists, only listeners' "full album" ones (live, "OK Computer"). | 10 |
+| 2026-11-13 | Every credential setting has instructions in README's "Credentials" section (rule in AGENTS.md). | User request. | all |
 
 ### 2026-11-13 — Stage 8 evidence
 
@@ -325,7 +334,42 @@ Decision: every CLI call, and any library run that opts in, leaves a structured 
 - `deadwax.logs.run_journal()` is public and opt-in; `lookup()` never writes files. Concurrent journals in one process write separate files: one router handler dispatches by a run-id context variable. While a journal is open the `deadwax` logger is at DEBUG and does not propagate; a forwarding handler passes the application's handlers only the records at the level they had before.
 - `deadwax.logs` now imports public names from `deadwax`. Import-linter counts the deferred `deadwax → deadwax.sources` import as a dependency, so R1 and the logs R6 contract ignore that one edge; `tests/test_package.py` checks that importing `deadwax.logs` loads neither `deadwax.sources` nor httpx.
 
-**Current task:** Stage 10 (Spotify, YouTube, SoundCloud). **Next action:** at the start of Stage 10, verify each source's access notes.
+### 2026-11-13 — Stage 10 evidence (in progress)
+
+Exploration: no recorded scenario has a YouTube or SoundCloud link. Odesli pages list both platforms with empty URLs, and MusicBrainz has no such URL relations for them. A read-only probe of soundcloud.com's scripts was refused by the agent's safety check; that led to the client ID decision.
+
+Changed:
+
+- Core: `MetricKind.POPULARITY|LIKES|REPOSTS`, `RelationKind.REPOSTED_BY`, `IdKind.SOUNDCLOUD`, `copyrights` on candidate and identity with `normalize_copyright` (exported), a SoundCloud track URL rule (sets leave the kind to the resolver), copyright lines in Markdown and pretty output.
+- Sources: `SpotifySettings`, `YouTubeSettings`, `SoundCloudSettings` (exported from `deadwax`); rates 2, 1, 1; `DEFAULT_SOURCES` adds `spotify`, `youtube`; package `spotify` and `soundcloud` (R8 contracts), module `youtube`; R4 row; adapter order.
+- `.env.example`, CLI settings, `docs/sources.md`, `docs/output.md`, `docs/architecture.md`, API reference index, README tables and tree; `scripts/record_fixtures.py` hosts, `client_id` as a secret parameter, recorded Spotify tokens replaced by a stand-in, stand-in credentials for replayed sources that have fixtures.
+
+Commands and outcomes so far:
+
+- `uv run poe check`: format, lint, 23 import contracts kept, mypy strict clean; 715 passed, 1 failed (`test_mainstream_track`: Spotify and YouTube are now in the default set and `skipped` without fixtures), 99.02% branch coverage.
+- `uv run --group docs properdocs build --strict`: built without warnings.
+- Mock-tested (hand-made responses): Spotify search, Spotify URL, link from an earlier pass, ISRC and UPC lookups, album search, other version → `other_version` + version discrepancy through `merge`, not found, refused credentials, token never cached, missing credentials `skipped`; YouTube ranking, links-only partial, other versions dropped, album playlists for a URL query, refused search with the key redacted, missing key; SoundCloud search, set URL, playlist and user pages refused, link from an earlier pass, bootleg → `other_version`, not found, refused client ID with the ID redacted, missing ID; copyright merge, normalization and rendering; SoundCloud URL rules.
+- Not yet live-verified: no Spotify, YouTube, or SoundCloud credentials in `.env`.
+
+Live access check (2026-11-13, keys added by the user): a Spotify development-mode app gets no `popularity`, `preview_url`, or album `label`, and search allows at most `limit=10` (`20` is "400 Invalid limit"); ISRC, UPC, dates, and copyrights come. YouTube search works with the key; SoundCloud `resolve`, `search/tracks`, `search/albums`, and reposters work with the client ID, and users carry `followers_count` and `verified`. The docs were corrected to what Spotify actually gives.
+
+Then changed: SoundCloud reposter filter, official-first ranking and release-date-only dates; YouTube full-album notes; `soundcloud_url` scenario; the recorder runs every group (`include=ALL_GROUPS`) so opt-in sources get fixtures; `fast_config` stand-in credentials; replayed tests for Spotify resolving its URLs (and MusicBrainz without credentials), YouTube links, the SoundCloud URL; live tests read the new credentials and add SoundCloud; README "Credentials" section and its rule in AGENTS.md.
+
+Fixtures: Spotify, YouTube, and SoundCloud recorded live for all 13 scenarios; Odesli re-recorded for `huerco_s`, `missing_remix`, `bandcamp_url`, `discogs_url`, `siren_covers` (its seed is now Spotify's link); `soundcloud_url` recorded live for every source. Spotify tokens are stored as a stand-in; a scan found no credential value in any fixture.
+
+Commands and outcomes:
+
+- `uv run poe check`: format, lint, 23 import contracts kept, mypy strict clean, 720 passed, 99.09% branch coverage.
+- `uv run --group docs properdocs build --strict`: built without warnings.
+- `uv run poe test-live`: 21 passed, 1 failed (`jason_gibbs_starlings`: MusicBrainz answered HTTP 503, the known busy server); no new source `failed` in any of the 22 lookups (9 min 36 s).
+- Mock-tested: the paths listed above; no blocked case, as none of the three answered a challenge.
+- Live-verified (`--no-cache`): with `--sources core,catalogues,radio,streaming` Paranoid Android 31 s (Spotify and SoundCloud ISRC and ℗/© lines merged, Topic and official YouTube uploads, SoundCloud counts), ESTADO DE BIENESTAR 9 s (all three `not_found`), Huerco S. 28 s (Spotify album, two YouTube album playlists, SoundCloud `not_found`), Кино 31 s (Spotify `no_match` for "Kino, Viktor Tsoi" under the standing non-Latin rule; SoundCloud found), Todd Terry remix 33 s (Spotify compilation track, official SoundCloud club mix, three YouTube uploads), Burial "Archangel" 34 s. Default set without `--sources`: Paranoid Android 31 s, "Burial - Untrue" 30 s, Archangel 32 s, only Deezer and Discogs `blocked` as before.
+
+Observed, not changed: Burial has no official SoundCloud upload, so a listener's re-upload is the record's match and its counts are that upload's (they carry its URL). Spotify's strict `track:"…" artist:"…"` search finds nothing for several library tracks; a plain search found nothing better. Discogs `other_version` relations list `discogs` once per merged release in `sources` (v1 behaviour, outside the stage).
+
+Remains: nothing for Stage 10.
+
+**Current task:** Stage 11 (Beatport, Juno Download; BPM and key). **Next action:** at the start of Stage 11, verify each source's access notes; include "<Name> Edit" markers in the mix-name work.
 
 ## Resume instructions
 

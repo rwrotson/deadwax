@@ -44,6 +44,13 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.sources.kexp.adapter` | Read plays of a record on KEXP with programs, hosts, and comments |
 | `deadwax.sources.kexp.parse` | Turn KEXP plays into broadcast relations and host texts |
 | `deadwax.sources.kexp.models` | Model KEXP API responses |
+| `deadwax.sources.spotify.adapter` | Read tracks and albums from the Spotify Web API (client credentials) |
+| `deadwax.sources.spotify.parse` | Turn Spotify responses into identity, metrics, and links |
+| `deadwax.sources.spotify.models` | Model Spotify Web API responses |
+| `deadwax.sources.youtube` | Find links to uploads of a record on YouTube (API key) |
+| `deadwax.sources.soundcloud.adapter` | Read uploads and their reposters from SoundCloud (client ID) |
+| `deadwax.sources.soundcloud.parse` | Turn SoundCloud uploads into identity, tags, texts, metrics, relations, and links |
+| `deadwax.sources.soundcloud.models` | Model SoundCloud API responses |
 | `deadwax.logs.settings` | Define logging settings |
 | `deadwax.logs.setup` | Configure console and file logging for applications |
 | `deadwax.logs.runs` | Journal each lookup run to its own event file and an index of runs |

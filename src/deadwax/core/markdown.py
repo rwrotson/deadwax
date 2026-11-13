@@ -51,6 +51,9 @@ def _identity(identity: Identity) -> list[str]:
     lines += [f"- **ISRC:** {isrc.value} ({_sources(isrc.sources)})" for isrc in identity.isrcs]
     lines += [f"- **UPC:** {upc.value} ({_sources(upc.sources)})" for upc in identity.upcs]
     lines += [
+        f"- **Copyright:** {line.value} ({_sources(line.sources)})" for line in identity.copyrights
+    ]
+    lines += [
         f"- **{item.kind}:** {item.value} ({_sources(item.sources)})"
         for item in identity.external_ids
     ]

@@ -1,0 +1,15 @@
+{
+ "recorded_at": "2026-11-13T13:03:02+00:00",
+ "interactions": {
+  "POST https://accounts.spotify.com/api/token #c349b29ae2fc682a": {
+   "status": 200,
+   "content_type": "application/json",
+   "body": "{\"access_token\": \"test-token\", \"token_type\": \"Bearer\", \"expires_in\": 3600}"
+  },
+  "GET https://api.spotify.com/v1/search?limit=10&q=track%3A%22No+Such+Song+At+All%22+artist%3A%22Zzqx+Nonexistent+Artist%22&type=track": {
+   "status": 200,
+   "content_type": "application/json; charset=utf-8",
+   "body": "{\"tracks\":{\"href\":\"https://api.spotify.com/v1/search?offset=0&limit=10&query=track%3A%22No%20Such%20Song%20At%20All%22%20artist%3A%22Zzqx%20Nonexistent%20Artist%22&type=track\",\"limit\":10,\"next\":null,\"offset\":0,\"previous\":null,\"total\":0,\"items\":[]}}"
+  }
+ }
+}

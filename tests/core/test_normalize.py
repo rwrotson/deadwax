@@ -5,6 +5,7 @@ from deadwax.core import (
     normalize_artist,
     normalize_barcode,
     normalize_code,
+    normalize_copyright,
     normalize_text,
     split_featuring,
 )
@@ -81,3 +82,12 @@ def test_codes_and_barcodes() -> None:
     assert normalize_code("gb-aaa 07 00001") == "GBAAA0700001"
     assert normalize_code("HDBCD001") == normalize_code("hdbcd 001")
     assert normalize_barcode("5 055300 315829") == normalize_barcode("05055300315829")
+
+
+def test_copyright_lines() -> None:
+    assert normalize_copyright("℗ 2007 Hyperdub Ltd.") == normalize_copyright(
+        "(P) 2007 hyperdub ltd",
+    )
+    assert normalize_copyright("© 2007 Hyperdub") == normalize_copyright("Copyright 2007 Hyperdub")
+    assert normalize_copyright("℗ 2007 Hyperdub") != normalize_copyright("© 2007 Hyperdub")
+    assert normalize_copyright("2007 Hyperdub") == "|2007 hyperdub"

@@ -1,0 +1,10 @@
+{
+ "recorded_at": "2026-11-13T13:14:58+00:00",
+ "interactions": {
+  "GET https://api-v2.soundcloud.com/search/albums?limit=20&q=Huerco+S.+For+Those+Of+You+Who+Have+Never+%28And+Also+Those+Who+Have%29": {
+   "status": 200,
+   "content_type": "application/json; charset=utf-8",
+   "body": "{\"collection\":[],\"total_results\":0,\"query_urn\":\"soundcloud:search:29f0b8696a124aa68739f0042b3de73b\"}"
+  }
+ }
+}

@@ -17,7 +17,8 @@ Every fact has `sources`: a list of `Provenance(source, url)`, where `source` is
 | `version` | `kind` (`original`, `remix`, `live`, `demo`, `cover`, `instrumental`, `acoustic`, `edit`, `alternate`, `reissue`, `remaster`) and `detail`, the marker it came from (`Todd Terry Remix`) |
 | `labels` | Label name and catalog number, with sources |
 | `isrcs`, `upcs` | Sourced codes |
-| `external_ids` | IDs in other namespaces: MusicBrainz, Discogs, Wikidata, Bandcamp, Spotify, Apple Music, Deezer |
+| `copyrights` | Sourced ℗ (phonographic) and © lines; the same line written with `(P)`, `℗`, or `Copyright` merges into one |
+| `external_ids` | IDs in other namespaces: MusicBrainz, Discogs, Wikidata, Bandcamp, Spotify, Apple Music, Deezer, SoundCloud |
 | `discrepancies` | Fields on which sources disagree, each with every value and its sources |
 
 Candidates are compared with the query text, or for a URL query with the URL's own page. Among accepted candidates, the value given by the most sources becomes the identity, and every disagreement on artist, title, version, date, or an ID is kept in `discrepancies` instead of being resolved silently.
@@ -36,10 +37,10 @@ Facts have a `scope`: `recording`, `work`, `release`, `release_group`, `artist`,
 | `credits` | `role`, `name`, `detail` (instruments or tracks the credit covers) |
 | `texts` | `kind` (`review`, `editorial`, `label`, `shop`, `wiki`, `user`, `broadcast`), `body`, `title`, `author`, `publication`, `date`, `rating` (`value`, `scale`, `text`), `language` |
 | `relations` | `kind`, `target` (`type`, `name`, `artist`, `date`, `url`, `ids`), `note` |
-| `metrics` | `kind` (`listens`, `listeners`), `value`, `scale` (highest possible value, when bounded) |
+| `metrics` | `kind` (`listens`, `listeners`, `likes`, `reposts`, `popularity`), `value`, `scale` (highest possible value, when bounded) |
 | `links` | `service`, `url`, `target` (`track`, `album`, `artist`, `label`, `other`), `preview_url` |
 
-A `broadcast` text is a radio host's note on a play, with the host as `author` and the station and program as `publication`. Metrics are counts one source reports; they are never combined across sources.
+A `broadcast` text is a radio host's note on a play, with the host as `author` and the station and program as `publication`. Metrics are counts or scores one source reports, such as Spotify's `popularity` on a scale of 100; they are never combined across sources. A `label` text is also what the uploader of a SoundCloud upload wrote about it, with the uploader as `author`.
 
 Relations to the same target from several sources merge into one, with every source, and the merged target keeps the artist, date, URL, and IDs any of them gave. Broadcasts and mixes are also told apart by date.
 
@@ -56,6 +57,7 @@ Relation kinds are directional:
 | `cover_of`, `covered_by` | The original it covers; covers of it |
 | `remix_of`, `remixed_by` | The original it remixes; remixes of it |
 | `samples`, `sampled_by` | What it samples; what samples it |
+| `reposted_by` | Accounts that reposted the upload (SoundCloud) |
 | `similar` | Similar records or artists according to a source |
 | `other_version` | Another version of the same work, kept apart from the identity |
 

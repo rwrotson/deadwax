@@ -86,6 +86,7 @@ def _identity_rows(dossier: Dossier) -> list[tuple[str, str, Text]]:
         rows.append(("label", name, _sources(ref.sources)))
     rows += [("ISRC", *_sourced(isrc)) for isrc in identity.isrcs]
     rows += [("UPC", *_sourced(upc)) for upc in identity.upcs]
+    rows += [("copyright", *_sourced(line)) for line in identity.copyrights]
     rows += [(e.kind.value, e.value, _sources(e.sources)) for e in identity.external_ids]
     return rows
 

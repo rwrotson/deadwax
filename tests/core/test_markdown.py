@@ -42,6 +42,7 @@ def untrue_dossier() -> str:
         labels=[CandidateLabel(name="Hyperdub", catalog_number="HDBCD002")],
         isrcs=["GBAAA0700001"],
         upcs=["5055300315829"],
+        copyrights=["℗ 2007 Hyperdub"],
         ids={IdKind.DISCOGS_MASTER: "89497"},
         url=SOURCE[0].url,
     )
@@ -189,6 +190,7 @@ def test_markdown_sections_and_sources() -> None:
     assert "**discogs_master:** 89497" in text
     assert "**ISRC:** GBAAA0700001" in text
     assert "**UPC:** 5055300315829" in text
+    assert "**Copyright:** ℗ 2007 Hyperdub" in text
     assert text.endswith("\n")
 
 

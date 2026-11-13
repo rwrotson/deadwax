@@ -6,16 +6,16 @@
 
 Every source belongs to one group: `core` (the v1 sources), `shops`, `press`, `catalogues`, `radio`, `streaming`, or `samples`. `--sources` and `--exclude` take source and group names, comma-separated; `--sources shops --exclude boomkat` runs every shop except Boomkat. An unknown name is a usage error that lists the known sources and groups.
 
-Without `--sources`, a lookup runs the sources named by `DEADWAX_DEFAULT_SOURCES`, which also takes source and group names; the default is `core,listenbrainz,secondhandsongs,kexp`. Sources with official or open APIs join the default set as they are added; sources that scrape shop, press, radio, and sample pages run only when named. `DEADWAX_<SOURCE>__ENABLED=false` turns a source off even when it is named.
+Without `--sources`, a lookup runs the sources named by `DEADWAX_DEFAULT_SOURCES`, which also takes source and group names; the default is `core,listenbrainz,secondhandsongs,kexp,spotify,youtube`. Sources with official or open APIs join the default set as they are added; sources that scrape shop, press, radio, and sample pages run only when named. `DEADWAX_<SOURCE>__ENABLED=false` turns a source off even when it is named.
 
 `DEADWAX_CONCURRENCY` (default 8) caps how many sources of one lookup run at once. A source's `adapter_timeout` starts when it begins running, not while it waits for a slot.
 
 ## How a lookup runs
 
-1. **URL resolution.** For a URL query, the first ready source that recognises the URL reads it alone. Its record becomes the reference, and for a URL that does not reveal its kind it sets the kind. The order is MusicBrainz, Odesli, iTunes, Deezer, Discogs, Bandcamp.
+1. **URL resolution.** For a URL query, the first ready source that recognises the URL reads it alone. Its record becomes the reference, and for a URL that does not reveal its kind it sets the kind. The order is Spotify, MusicBrainz, Odesli, iTunes, Deezer, Discogs, Bandcamp, SoundCloud: Spotify reads Spotify URLs when it has credentials, MusicBrainz otherwise.
 2. **Identity pass.** MusicBrainz finds the recording or release group and gives later sources its IDs and links: ISRCs, barcodes, Discogs, Wikidata, Bandcamp, and streaming URLs.
 3. **Enrichment pass.** All other sources except Odesli run concurrently, at most `concurrency` at once. Each one uses the IDs and links from the identity pass first and falls back to its own search.
-4. **Links pass.** Odesli opens the song.link page of a streaming URL found by any earlier source, such as the Apple Music link from iTunes.
+4. **Links pass.** Odesli opens the song.link page of a streaming URL found by any earlier source, such as the Apple Music link from iTunes. YouTube searches uploads of the record.
 
 Each source runs under `adapter_timeout` (`--timeout`). Every candidate passes the version-aware matching gate described in [Output](output.md).
 
@@ -24,7 +24,8 @@ Each source runs under `adapter_timeout` (`--timeout`). Every candidate passes t
 | Tier | Sources | Role |
 |------|---------|------|
 | 1, identity and links | MusicBrainz, iTunes Search, Deezer, Odesli | Which exact recording or release this is; listening links |
-| 2, enrichment | Discogs, Bandcamp, Last.fm, Wikipedia/Wikidata, ListenBrainz, SecondHandSongs, KEXP | Tags, credits, texts, relations, metrics |
+| 2, enrichment | Discogs, Bandcamp, Last.fm, Wikipedia/Wikidata, ListenBrainz, SecondHandSongs, KEXP, Spotify, SoundCloud | Tags, credits, texts, relations, metrics |
+| 3, links | Odesli, YouTube | Listening links |
 
 The README lists sources planned for later versions and those deadwax will not use.
 
@@ -107,6 +108,28 @@ The README lists sources planned for later versions and those deadwax will not u
 - **Access:** KEXP API v2, keyless.
 - **Finds the record by:** the MusicBrainz recording ID, else artist and title (the API ignores release group IDs, so albums are found by artist and album title); plays of other records or versions are dropped by the matching gate.
 - **Contributes:** the latest 25 plays as `broadcast` relations (program, date, hosts, playlist page); host comments as `broadcast` texts, split at dashed separator lines, with a repeated comment merged into one text.
+
+## Spotify
+
+- **Group:** `streaming`; in the default set.
+- **Access:** Web API with the client credentials of a Spotify app (`DEADWAX_SPOTIFY__CLIENT_ID`, `DEADWAX_SPOTIFY__CLIENT_SECRET`); without both the source is `skipped`. The access token is fetched once per lookup and never written to the cache.
+- **Finds the record by:** a Spotify URL in the query or from an earlier source; an ISRC or barcode from the identity pass; or a search of at most 10 results through the matching gate.
+- **Contributes:** artist, title, release date, ISRC or barcode, ℗ and © lines of the album, the Spotify ID; track, album and artist links. Audio features are never used. Label, popularity (0–100, a metric), and previews are read when Spotify gives them, but it leaves them out for apps in development mode (checked 2026-11-13); such a field stays empty. Search returns at most 10 results.
+
+## YouTube
+
+- **Group:** `streaming`; in the default set.
+- **Access:** Data API v3 with a key (`DEADWAX_YOUTUBE__API_KEY`); without it the source is `skipped`. A search costs 100 of the 10,000 daily quota units, about 100 lookups a day; a refused search names the quota or the key.
+- **Pass:** links.
+- **Finds the record by:** a search of music videos (playlists for an album). An upload counts only when the matching gate says it is the record: a Topic channel ("<artist> - Topic") names the artist, other uploads need an "Artist - Title" title; live takes, covers, and other versions are dropped.
+- **Contributes:** links only, at most three: the Topic channel first, then a channel named like the artist (or its VEVO channel), then others. No candidate, tags, texts, or metrics.
+
+## SoundCloud
+
+- **Group:** `streaming`; opt-in.
+- **Access:** the `api-v2.soundcloud.com` API with a client ID (`DEADWAX_SOUNDCLOUD__CLIENT_ID`); without it the source is `skipped`. SoundCloud registers no new API apps, and the ID of its web client changes now and then: a refused request reports `failed` and asks whether the ID is stale. deadwax never extracts an ID from the site.
+- **Finds the record by:** a SoundCloud URL in the query or from an earlier source, else a track or album search through the matching gate. A set that is a listener's playlist rather than an album or EP is not a record.
+- **Contributes:** artist (the distributor's, else an "Artist - Title" title, else the uploader), title, date, ISRC or barcode, ℗ and © lines; the uploader's description as a `label` text; genre and tags; plays, likes, and reposts as metrics; notable reposting accounts as `reposted_by` relations; the upload's link and the uploader's page (`artist` when the uploader is the artist). Edits and bootlegs that only SoundCloud has become `other_version` relations through the matching gate. Of the first 50 reposting accounts, only verified ones or those with at least 1,000 followers become relations; the others are mostly listeners.
 
 ## Escalation ladder
 

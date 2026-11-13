@@ -42,6 +42,7 @@ def dossier() -> Dossier:
                 ],
                 "isrcs": [{"value": "GBAHT9500001", "sources": mb}],
                 "upcs": [{"value": "0075678723421", "sources": mb}],
+                "copyrights": [{"value": "℗ 1995 Blanco y Negro", "sources": mb}],
                 "external_ids": [{"kind": "wikidata", "value": "Q3859219", "sources": mb}],
                 "discrepancies": [
                     {

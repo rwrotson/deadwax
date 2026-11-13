@@ -9,8 +9,11 @@ from .config import (
     HttpSettings,
     LastfmSettings,
     SecondHandSongsSettings,
+    SoundCloudSettings,
     SourcesConfig,
     SourceSettings,
+    SpotifySettings,
+    YouTubeSettings,
 )
 from .lookup import build_adapters, describe_sources, lookup
 
@@ -23,8 +26,11 @@ __all__ = [
     "HttpSettings",
     "LastfmSettings",
     "SecondHandSongsSettings",
+    "SoundCloudSettings",
     "SourceSettings",
     "SourcesConfig",
+    "SpotifySettings",
+    "YouTubeSettings",
     "build_adapters",
     "describe_sources",
     "lookup",

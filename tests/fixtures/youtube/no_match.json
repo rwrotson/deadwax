@@ -1,0 +1,10 @@
+{
+ "recorded_at": "2026-11-13T13:03:02+00:00",
+ "interactions": {
+  "GET https://www.googleapis.com/youtube/v3/search?maxResults=10&part=snippet&q=Zzqx+Nonexistent+Artist+No+Such+Song+At+All&type=video&videoCategoryId=10": {
+   "status": 200,
+   "content_type": "application/json; charset=UTF-8",
+   "body": "{\n  \"kind\": \"youtube#searchListResponse\",\n  \"etag\": \"DCv8u79rz_Z5yPVlSxf2awnPWTQ\",\n  \"regionCode\": \"DE\",\n  \"pageInfo\": {\n    \"totalResults\": 0,\n    \"resultsPerPage\": 0\n  },\n  \"items\": []\n}\n"
+  }
+ }
+}

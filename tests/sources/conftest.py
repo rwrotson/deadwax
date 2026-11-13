@@ -10,13 +10,13 @@ import pytest
 from deadwax.sources import SourcesConfig
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
-SECRET_PARAMS = frozenset({"key", "api_key", "token"})
+SECRET_PARAMS = frozenset({"key", "api_key", "token", "client_id"})
 
 # Fast limits so replayed lookups do not wait between requests.
 FAST = {"rate": 1000}
 SOURCES = (
     "musicbrainz", "itunes", "deezer", "odesli", "discogs", "bandcamp", "lastfm", "wikipedia",
-    "listenbrainz", "secondhandsongs", "kexp",
+    "listenbrainz", "secondhandsongs", "kexp", "spotify", "youtube", "soundcloud",
 )  # fmt: skip
 
 
@@ -71,6 +71,9 @@ def fast_config(**changes: object) -> SourcesConfig:
     """
     fields: dict[str, object] = {name: dict(FAST) for name in SOURCES}
     fields["lastfm"] = {**FAST, "api_key": "test-key"}
+    fields["spotify"] = {**FAST, "client_id": "test-id", "client_secret": "test-secret"}
+    fields["youtube"] = {**FAST, "api_key": "test-key"}
+    fields["soundcloud"] = {**FAST, "client_id": "test-id"}
     fields["http"] = {"escalation": "none"}
     return SourcesConfig.model_validate(fields | changes)
 

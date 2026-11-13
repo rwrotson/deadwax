@@ -236,6 +236,7 @@ def test_labels_codes_and_kind_are_combined() -> None:
                 kind=EntityKind.ALBUM,
                 labels=[CandidateLabel(name="Hyperdub", catalog_number="HDBCD002")],
                 upcs=["5055300315829"],
+                copyrights=["℗ 2007 Hyperdub"],
             ),
         ),
         partial(
@@ -248,6 +249,7 @@ def test_labels_codes_and_kind_are_combined() -> None:
                     CandidateLabel(name="Hyperdub", catalog_number="HDBLP002"),
                 ],
                 upcs=["05055300315829"],
+                copyrights=["(P) 2007 Hyperdub", "© 2007 Hyperdub"],
             ),
         ),
     ]
@@ -261,6 +263,10 @@ def test_labels_codes_and_kind_are_combined() -> None:
     ]
     [upc] = dossier.identity.upcs
     assert (upc.value, len(upc.sources)) == ("5055300315829", 2)
+    assert [(line.value, len(line.sources)) for line in dossier.identity.copyrights] == [
+        ("℗ 2007 Hyperdub", 2),
+        ("© 2007 Hyperdub", 1),
+    ]
 
 
 def test_facts_are_deduplicated_and_ordered_by_scope() -> None:

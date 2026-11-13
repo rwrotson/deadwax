@@ -9,7 +9,10 @@ from deadwax import (
     EntityKind,
     ErrorKind,
     LastfmSettings,
+    SoundCloudSettings,
     SourcesConfig,
+    SpotifySettings,
+    YouTubeSettings,
     lookup,
     parse_query,
     parse_title,
@@ -20,6 +23,10 @@ from deadwax.core import RecordKey, Verdict, compare
 # before each test.
 DISCOGS_TOKEN = os.environ.get("DEADWAX_DISCOGS__TOKEN")
 LASTFM_KEY = os.environ.get("DEADWAX_LASTFM__API_KEY")
+SPOTIFY_ID = os.environ.get("DEADWAX_SPOTIFY__CLIENT_ID")
+SPOTIFY_SECRET = os.environ.get("DEADWAX_SPOTIFY__CLIENT_SECRET")
+YOUTUBE_KEY = os.environ.get("DEADWAX_YOUTUBE__API_KEY")
+SOUNDCLOUD_ID = os.environ.get("DEADWAX_SOUNDCLOUD__CLIENT_ID")
 
 # Tracks from a personal library as "Artist - Title" from their tags. Tracks of compilations
 # tagged "Various Artists" use the artist from the title, and an untagged file its name.
@@ -53,11 +60,22 @@ LIBRARY: dict[str, str] = {
 }
 
 
+def _secret(value: str | None) -> SecretStr | None:
+    return SecretStr(value) if value else None
+
+
 def live_config() -> SourcesConfig:
-    """Default settings, with the Discogs token and the Last.fm key from the environment."""
-    token = SecretStr(DISCOGS_TOKEN) if DISCOGS_TOKEN else None
-    key = SecretStr(LASTFM_KEY) if LASTFM_KEY else None
-    return SourcesConfig(discogs=DiscogsSettings(token=token), lastfm=LastfmSettings(api_key=key))
+    """Default settings, with every source's credential from the environment."""
+    return SourcesConfig(
+        discogs=DiscogsSettings(token=_secret(DISCOGS_TOKEN)),
+        lastfm=LastfmSettings(api_key=_secret(LASTFM_KEY)),
+        spotify=SpotifySettings(
+            client_id=_secret(SPOTIFY_ID),
+            client_secret=_secret(SPOTIFY_SECRET),
+        ),
+        youtube=YouTubeSettings(api_key=_secret(YOUTUBE_KEY)),
+        soundcloud=SoundCloudSettings(client_id=_secret(SOUNDCLOUD_ID)),
+    )
 
 
 def summary(name: str, dossier: Dossier) -> str:
@@ -88,7 +106,8 @@ async def test_library_track(
 ) -> None:
     query = parse_query(text, EntityKind.TRACK)
 
-    dossier = await lookup(query, live_config())
+    config = live_config()
+    dossier = await lookup(query, config, include=[*config.default_sources, "soundcloud"])
 
     live_report.append(summary(request.node.callspec.id, dossier))
     assert [e for e in dossier.errors if e.kind is ErrorKind.FAILED] == []

@@ -35,6 +35,7 @@ class IdKind(StrEnum):
     SPOTIFY = "spotify"
     APPLE_MUSIC = "apple_music"
     DEEZER = "deezer"
+    SOUNDCLOUD = "soundcloud"
 
 
 class Query(BaseModel):
@@ -79,8 +80,19 @@ _DISCOGS = re.compile(r"^discogs\.com$")
 _SPOTIFY = re.compile(r"^open\.spotify\.com$")
 _DEEZER = re.compile(r"^deezer\.com$")
 _APPLE_MUSIC = re.compile(r"^music\.apple\.com$")
+_SOUNDCLOUD = re.compile(r"^soundcloud\.com$")
+
+# A SoundCloud track page is '/<user>/<track>', optionally with a secret-link token; the
+# names below are site sections and profile tabs, not users and tracks. Sets ('/<user>/sets/')
+# are albums or playlists, which only the resolver can tell apart.
+_SOUNDCLOUD_TRACK = re.compile(
+    r"^/(?!(?:discover|search|charts|stream|you|upload|pages|settings|messages|notifications|"
+    r"people|tags|terms-of-use)/)[^/]+/(?!(?:sets|likes|tracks|albums|reposts|followers|"
+    r"following|popular-tracks|comments|spotlight)(?:/|$))[^/]+(?:/s-\w+)?/?$",
+)
 
 _URL_RULES = (
+    _UrlRule(_SOUNDCLOUD, _SOUNDCLOUD_TRACK, EntityKind.TRACK),
     _UrlRule(_BANDCAMP, re.compile(r"^/album/"), EntityKind.ALBUM),
     _UrlRule(_BANDCAMP, re.compile(r"^/track/"), EntityKind.TRACK),
     _UrlRule(

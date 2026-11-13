@@ -190,6 +190,7 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
     assert table.exit_code == as_json.exit_code == 0
     statuses = {row["source"]: row["status"]["state"] for row in json.loads(as_json.stdout)}
     assert statuses == {
+        "spotify": "missing_credential",
         "musicbrainz": "ready",
         "odesli": "ready",
         "itunes": "disabled",
@@ -201,6 +202,8 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
         "listenbrainz": "ready",
         "secondhandsongs": "ready",
         "kexp": "ready",
+        "youtube": "missing_credential",
+        "soundcloud": "missing_credential",
     }
     assert "DEADWAX_DISCOGS__TOKEN" in table.stdout
     assert "DEADWAX_LASTFM__API_KEY" in table.stdout
@@ -208,6 +211,8 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
         ("core", True),
         ("catalogues", True),
         ("radio", True),
+        ("streaming", True),
+        ("streaming", False),
     }
 
 

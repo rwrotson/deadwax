@@ -79,7 +79,7 @@ def test_default_sources_accept_a_comma_separated_string(
 
 def test_default_set_and_concurrency() -> None:
     assert (SourcesConfig().default_sources, SourcesConfig().concurrency) == (
-        ("core", "listenbrainz", "secondhandsongs", "kexp"),
+        ("core", "listenbrainz", "secondhandsongs", "kexp", "spotify", "youtube"),
         8,
     )
     with pytest.raises(ValidationError):

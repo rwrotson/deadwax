@@ -46,7 +46,14 @@ def _split_names(value: object) -> object:
 type SourceNames = Annotated[tuple[str, ...], BeforeValidator(_split_names)]
 
 # Sources a lookup runs when no source list is given.
-DEFAULT_SOURCES: tuple[str, ...] = ("core", "listenbrainz", "secondhandsongs", "kexp")
+DEFAULT_SOURCES: tuple[str, ...] = (
+    "core",
+    "listenbrainz",
+    "secondhandsongs",
+    "kexp",
+    "spotify",
+    "youtube",
+)
 
 
 class Escalation(StrEnum):
@@ -163,9 +170,38 @@ class SecondHandSongsSettings(SourceSettings):
     )
 
 
+class SpotifySettings(SourceSettings):
+    """Settings of the Spotify source."""
+
+    client_id: SecretStr | None = Field(
+        default=None,
+        description="Client ID of a Spotify app; needed with the client secret",
+    )
+    client_secret: SecretStr | None = Field(
+        default=None,
+        description="Client secret of a Spotify app; needed with the client ID",
+    )
+
+
+class YouTubeSettings(SourceSettings):
+    """Settings of the YouTube source."""
+
+    api_key: SecretStr | None = Field(default=None, description="YouTube Data API key")
+
+
+class SoundCloudSettings(SourceSettings):
+    """Settings of the SoundCloud source."""
+
+    client_id: SecretStr | None = Field(
+        default=None,
+        description="Client ID of SoundCloud's API; the web client's ID changes now and then",
+    )
+
+
 # Requests per second each source allows: MusicBrainz 1/s, iTunes Search about 20/min,
 # Deezer 50 per 5 s, Discogs 60/min with a token, SecondHandSongs 10-20/min without a key;
-# scraped pages are fetched slowly on purpose.
+# YouTube search costs 100 of 10,000 daily quota units; scraped pages are fetched slowly on
+# purpose.
 DEFAULT_RATES: dict[str, float] = {
     "musicbrainz": 1.0,
     "itunes": 0.3,
@@ -178,6 +214,9 @@ DEFAULT_RATES: dict[str, float] = {
     "listenbrainz": 2.0,
     "secondhandsongs": 0.25,
     "kexp": 2.0,
+    "spotify": 2.0,
+    "youtube": 1.0,
+    "soundcloud": 1.0,
 }
 
 
@@ -203,6 +242,9 @@ class SourcesConfig(_Model):
     listenbrainz: SourceSettings = SourceSettings()
     secondhandsongs: SecondHandSongsSettings = SecondHandSongsSettings()
     kexp: SourceSettings = SourceSettings()
+    spotify: SpotifySettings = SpotifySettings()
+    youtube: YouTubeSettings = YouTubeSettings()
+    soundcloud: SoundCloudSettings = SoundCloudSettings()
 
     def rate(self, source: str) -> float:
         """Return the request rate of a source in requests per second."""

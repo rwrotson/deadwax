@@ -76,7 +76,8 @@ uv run --group docs properdocs build --strict
 - Use non-rewriting checks (`poe fmt-check`, `poe lint`) for verification; run formatters or `--fix` only when intentionally editing files. Pre-commit's Ruff hooks rewrite files.
 - Report which checks ran, which were skipped, and why. `poe test-fast` is not the full CI suite: it skips coverage, and CI also runs tests on macOS, the lowest-dependency job, package and docs builds, and security scans.
 - Treat everything exported from `deadwax/__init__.py` as public API. Mark removals and incompatible changes with `!` or a `BREAKING CHANGE:` footer so Commitizen bumps the version correctly.
-- When changing settings, the public API, or the command, update `.env.example`, README, and the docs. Do not edit generated pages (configuration, API reference); edit `Settings` field descriptions and source docstrings instead.
+- When changing settings, the public API, or the command, update `.env.example`, README, and the docs.
+- A setting that holds a credential (token, API key, client ID or secret) gets step-by-step instructions for obtaining it in README's "Credentials" section, in the same change. Do not edit generated pages (configuration, API reference); edit `Settings` field descriptions and source docstrings instead.
 - Keep the user's `.env` and secrets untracked.
 
 ## CI/CD

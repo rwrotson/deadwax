@@ -19,13 +19,17 @@ from deadwax import (
     HttpSettings,
     LastfmSettings,
     Query,
+    SoundCloudSettings,
+    SourceGroup,
     SourcesConfig,
+    SpotifySettings,
+    YouTubeSettings,
     parse_query,
 )
 from deadwax.sources import lookup
 
 FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
-SECRET_PARAMS = frozenset({"key", "api_key", "token"})
+SECRET_PARAMS = frozenset({"key", "api_key", "token", "client_id"})
 HOSTS = {
     "musicbrainz.org": "musicbrainz",
     "itunes.apple.com": "itunes",
@@ -42,7 +46,19 @@ HOSTS = {
     "critiquebrainz.org": "listenbrainz",
     "api.secondhandsongs.com": "secondhandsongs",
     "api.kexp.org": "kexp",
+    "api.spotify.com": "spotify",
+    "accounts.spotify.com": "spotify",
+    "www.googleapis.com": "youtube",
+    "api-v2.soundcloud.com": "soundcloud",
 }
+
+ALL_GROUPS = tuple(SourceGroup)
+
+# Recorded in place of a real Spotify access token.
+STAND_IN_GRANT = '{"access_token": "test-token", "token_type": "Bearer", "expires_in": 3600}'
+
+# Stands in for a credential of a source that is replayed: its requests must still be made.
+REPLAY_CREDENTIAL = "replay"
 
 # Sources recorded live by default; the others replay their existing fixtures when present.
 LIVE_DEFAULT = ("bandcamp", "discogs")
@@ -70,6 +86,7 @@ SCENARIOS: dict[str, Query] = {
     "siren_covers": parse_query("Tim Buckley - Song to the Siren", EntityKind.TRACK),
     "stronger_samples": parse_query("Kanye West - Stronger", EntityKind.TRACK),
     "reckoner": parse_query("Radiohead - Reckoner", EntityKind.TRACK),
+    "soundcloud_url": parse_query("https://soundcloud.com/radiohead/paranoid-android"),
 }
 
 
@@ -153,6 +170,8 @@ class RecordingTransport(httpx.AsyncBaseTransport):
             "content_type": response.headers.get("content-type", ""),
             "body": body.decode("utf-8", "replace"),
         }
+        if request.url.host == "accounts.spotify.com" and response.is_success:
+            entry["body"] = STAND_IN_GRANT
         if "location" in response.headers:
             entry["location"] = response.headers["location"]
         self.recorded.setdefault(source, {})[key] = entry
@@ -164,11 +183,24 @@ class RecordingTransport(httpx.AsyncBaseTransport):
         await self.inner.aclose()
 
 
-def config(live: frozenset[str]) -> SourcesConfig:
-    """Default settings with the Discogs token and the Last.fm key from the environment.
+def credential(source: str, variable: str, scenario: str, live: frozenset[str]) -> SecretStr | None:
+    """A credential from the environment for a source recorded live.
 
-    They are read from DEADWAX_DISCOGS__TOKEN and DEADWAX_LASTFM__API_KEY, and only for a
-    source recorded live: a replayed source must make the requests its fixtures hold.
+    A replayed source gets a stand-in when it has fixtures, so that it makes their requests,
+    and none otherwise, so that it is skipped instead of sending a stand-in to the network.
+    """
+    if source in live:
+        value = os.environ.get(variable)
+        return SecretStr(value) if value else None
+    return SecretStr(REPLAY_CREDENTIAL) if load(scenario, source) is not None else None
+
+
+def config(scenario: str, live: frozenset[str]) -> SourcesConfig:
+    """Default settings with the credentials of the sources recorded live from the environment.
+
+    The Discogs token and the Last.fm key are read from DEADWAX_DISCOGS__TOKEN and
+    DEADWAX_LASTFM__API_KEY, and only for a source recorded live: a replayed source must make
+    the requests its fixtures hold.
 
     Escalation is off because only plain httpx responses pass through the recording
     transport, and the timeout is long because Discogs allows 25 requests a minute without
@@ -181,6 +213,16 @@ def config(live: frozenset[str]) -> SourcesConfig:
         adapter_timeout=180,
         discogs=DiscogsSettings(token=SecretStr(token) if token else None),
         lastfm=LastfmSettings(api_key=SecretStr(lastfm_key) if lastfm_key else None),
+        spotify=SpotifySettings(
+            client_id=credential("spotify", "DEADWAX_SPOTIFY__CLIENT_ID", scenario, live),
+            client_secret=credential("spotify", "DEADWAX_SPOTIFY__CLIENT_SECRET", scenario, live),
+        ),
+        youtube=YouTubeSettings(
+            api_key=credential("youtube", "DEADWAX_YOUTUBE__API_KEY", scenario, live),
+        ),
+        soundcloud=SoundCloudSettings(
+            client_id=credential("soundcloud", "DEADWAX_SOUNDCLOUD__CLIENT_ID", scenario, live),
+        ),
     )
 
 
@@ -188,7 +230,8 @@ async def record(name: str, query: Query, live: frozenset[str]) -> Dossier:
     """Run one lookup and write the fixtures of the sources recorded live."""
     transport = RecordingTransport(name, live)
     try:
-        dossier = await lookup(query, config(live), transport=transport)
+        # Every source runs, opt-in ones too, so that each has fixtures for every scenario.
+        dossier = await lookup(query, config(name, live), include=ALL_GROUPS, transport=transport)
     finally:
         await transport.aclose()
 

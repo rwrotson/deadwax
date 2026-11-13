@@ -37,6 +37,7 @@ from deadwax.core.normalize import (
     normalize_artist,
     normalize_barcode,
     normalize_code,
+    normalize_copyright,
     normalize_text,
 )
 from deadwax.core.query import EntityKind, Query
@@ -317,6 +318,7 @@ def build_identity(
         labels=_labels(matched),
         isrcs=_codes(matched, lambda c: c.isrcs, normalize_code),
         upcs=_codes(matched, lambda c: c.upcs, normalize_barcode),
+        copyrights=_codes(matched, lambda c: c.copyrights, normalize_copyright),
         external_ids=external_ids,
         discrepancies=[conflict for conflict in conflicts if conflict is not None],
     )

@@ -15,6 +15,9 @@ _FEATURING_BRACKETED = re.compile(rf"\s*[\(\[]{_FEATURING}\s+([^()\[\]]+)[\)\]]"
 _FEATURING_TRAILING = re.compile(rf"\s+{_FEATURING}\s+(.+)$", re.IGNORECASE)
 _ARTIST_SEPARATOR = re.compile(r"\s*(?:,|&|\+|\band\b|\bx\b|\bvs\.?|\bwith\b)\s*")
 
+# Leading mark of a folded copyright line: phonographic (℗, (p)) or plain (©, (c), copyright).
+_COPYRIGHT_MARK = re.compile(r"^\s*(?:(?P<p>℗|\(p\))|©|\(c\)|copyright\b)\s*")
+
 
 def _strip_latin_marks(text: str) -> str:
     """Drop diacritics from Latin letters only, so Cyrillic й or Japanese ガ stay intact."""
@@ -72,3 +75,12 @@ def normalize_code(code: str) -> str:
 def normalize_barcode(code: str) -> str:
     """Normalize a UPC or EAN so that the 12- and 13-digit forms compare equal."""
     return "".join(char for char in code if char.isdigit()).lstrip("0")
+
+
+def normalize_copyright(line: str) -> str:
+    """Build a copyright line key that tells ℗ from © and ignores how the mark is written."""
+    folded = fold(line)
+    mark = _COPYRIGHT_MARK.match(folded)
+    kind = "" if mark is None else "p" if mark["p"] else "c"
+    rest = folded[mark.end() :] if mark is not None else folded
+    return f"{kind}|{normalize_text(rest)}"

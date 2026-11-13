@@ -1,0 +1,10 @@
+{
+ "recorded_at": "2026-11-13T13:14:42+00:00",
+ "interactions": {
+  "GET https://api-v2.soundcloud.com/search/tracks?limit=20&q=Zzqx+Nonexistent+Artist+No+Such+Song+At+All": {
+   "status": 200,
+   "content_type": "application/json; charset=utf-8",
+   "body": "{\"collection\":[],\"total_results\":0,\"query_urn\":\"soundcloud:search:c540a74b550847219c3d27d2c44c4a15\"}"
+  }
+ }
+}

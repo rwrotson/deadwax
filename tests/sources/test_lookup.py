@@ -11,6 +11,7 @@ from deadwax import (
     ErrorKind,
     IdKind,
     LinkTarget,
+    MetricKind,
     Pass,
     Query,
     Rating,
@@ -19,6 +20,7 @@ from deadwax import (
     SourceGroup,
     SourcesConfig,
     SourceState,
+    SpotifySettings,
     TextKind,
     VersionKind,
     describe_sources,
@@ -74,6 +76,7 @@ async def test_mainstream_track(replay: Replay, config: SourcesConfig) -> None:
         "wikipedia",
         "secondhandsongs",
         "kexp",
+        "spotify",
     }
     assert identity.version.kind is VersionKind.ORIGINAL
     assert identity.date is not None
@@ -236,6 +239,54 @@ async def test_streaming_urls_resolve_to_the_same_recording(
 
 
 @pytest.mark.asyncio
+async def test_spotify_resolves_its_urls_when_it_has_credentials(
+    replay: Replay,
+    config: SourcesConfig,
+) -> None:
+    query = parse_query("https://open.spotify.com/track/6LgJvl0Xdtc73RJ1mmpotq")
+    without = config.model_copy(update={"spotify": SpotifySettings(rate=1000)})
+
+    with_spotify = await replayed(query, "spotify_url", replay, config)
+    without_spotify = await replayed(query, "spotify_url", replay, without)
+
+    for dossier, resolver in ((with_spotify, "spotify"), (without_spotify, "musicbrainz")):
+        assert dossier.identity.title is not None
+        assert dossier.identity.title.sources[0].source == resolver
+        assert ids(dossier)[IdKind.MUSICBRAINZ_RECORDING] == ORIGINAL_RECORDING
+    assert errors(without_spotify)["spotify"] is ErrorKind.SKIPPED
+    copyrights = {line.value for line in with_spotify.identity.copyrights}
+    assert copyrights == {"© 1997 XL Recordings Ltd", "℗ 1997 XL Recordings Ltd"}
+
+
+@pytest.mark.asyncio
+async def test_youtube_links_official_uploads(replay: Replay, config: SourcesConfig) -> None:
+    dossier = await replayed(PARANOID_ANDROID, "paranoid_android", replay, config)
+
+    youtube = [link for link in dossier.links if link.service == "youtube"]
+    assert 0 < len(youtube) <= 3
+    assert {link.sources[0].source for link in youtube} == {"youtube"}
+    assert dossier.identity.title is not None
+    assert "youtube" not in {s.source for s in dossier.identity.title.sources}
+
+
+@pytest.mark.asyncio
+async def test_soundcloud_url_resolves_first(replay: Replay, config: SourcesConfig) -> None:
+    query = parse_query("https://soundcloud.com/radiohead/paranoid-android")
+
+    include = [*config.default_sources, "soundcloud"]
+    dossier = await lookup(query, config, include=include, transport=replay("soundcloud_url"))
+
+    assert [e for e in dossier.errors if e.kind is ErrorKind.FAILED] == []
+    assert dossier.identity.kind is EntityKind.TRACK
+    assert dossier.identity.title is not None
+    assert dossier.identity.title.sources[0].source == "soundcloud"
+    assert ids(dossier)[IdKind.SOUNDCLOUD] == "265069358"
+    assert ids(dossier)[IdKind.MUSICBRAINZ_RECORDING] == ORIGINAL_RECORDING
+    kinds = {metric.kind for metric in dossier.metrics if metric.sources[0].source == "soundcloud"}
+    assert {MetricKind.LISTENS, MetricKind.LIKES, MetricKind.REPOSTS} <= kinds
+
+
+@pytest.mark.asyncio
 async def test_unknown_record_has_no_identity(replay: Replay, config: SourcesConfig) -> None:
     query = parse_query("Zzqx Nonexistent Artist - No Such Song At All", EntityKind.TRACK)
 
@@ -268,6 +319,7 @@ async def test_selection_and_cache(replay: Replay, config: SourcesConfig, tmp_pa
             "wikipedia",
             "catalogues",
             "radio",
+            "streaming",
         ],
         transport=replay("no_match"),
     )
@@ -351,9 +403,10 @@ def test_describe_sources_marks_groups_and_the_default_set() -> None:
         SourceGroup.CORE,
         SourceGroup.CATALOGUES,
         SourceGroup.RADIO,
+        SourceGroup.STREAMING,
     }
     assert [info.source for info in infos if info.default] == ["musicbrainz", "deezer"]
-    assert all(info.default for info in describe_sources())
+    assert [info.source for info in describe_sources() if not info.default] == ["soundcloud"]
 
 
 def test_no_source_is_named_like_a_group() -> None:
@@ -364,8 +417,8 @@ def test_describe_sources() -> None:
     sources = {info.source: info for info in describe_sources()}
 
     assert list(sources) == [
-        "musicbrainz", "odesli", "itunes", "deezer", "discogs", "bandcamp", "lastfm", "wikipedia",
-        "listenbrainz", "secondhandsongs", "kexp",
+        "spotify", "musicbrainz", "odesli", "itunes", "deezer", "discogs", "bandcamp", "lastfm",
+        "wikipedia", "listenbrainz", "secondhandsongs", "kexp", "youtube", "soundcloud",
     ]  # fmt: skip
     assert sources["musicbrainz"].pass_ is Pass.IDENTITY
     assert sources["odesli"].status.ready
@@ -377,6 +430,13 @@ def test_describe_sources() -> None:
     assert sources["lastfm"].status.state is SourceState.MISSING_CREDENTIAL
     assert [r.setting for r in sources["lastfm"].requires] == ["lastfm.api_key"]
     assert sources["wikipedia"].status.ready
+    for name in ("spotify", "youtube", "soundcloud"):
+        assert sources[name].status.state is SourceState.MISSING_CREDENTIAL
+        assert sources[name].group is SourceGroup.STREAMING
+    assert [r.setting for r in sources["spotify"].requires] == [
+        "spotify.client_id",
+        "spotify.client_secret",
+    ]
 
 
 @pytest.mark.asyncio

@@ -22,8 +22,11 @@ from deadwax import (
     HttpSettings,
     LastfmSettings,
     SecondHandSongsSettings,
+    SoundCloudSettings,
     SourcesConfig,
     SourceSettings,
+    SpotifySettings,
+    YouTubeSettings,
 )
 from deadwax.logs import LogSettings, RunLogSettings
 
@@ -83,6 +86,9 @@ class Settings(BaseSettings):
     listenbrainz: SourceSettings = Field(default_factory=SourceSettings)
     secondhandsongs: SecondHandSongsSettings = Field(default_factory=SecondHandSongsSettings)
     kexp: SourceSettings = Field(default_factory=SourceSettings)
+    spotify: SpotifySettings = Field(default_factory=SpotifySettings)
+    youtube: YouTubeSettings = Field(default_factory=YouTubeSettings)
+    soundcloud: SoundCloudSettings = Field(default_factory=SoundCloudSettings)
 
     @classmethod
     def settings_customise_sources(
