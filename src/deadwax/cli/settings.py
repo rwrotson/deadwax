@@ -89,6 +89,8 @@ class Settings(BaseSettings):
     spotify: SpotifySettings = Field(default_factory=SpotifySettings)
     youtube: YouTubeSettings = Field(default_factory=YouTubeSettings)
     soundcloud: SoundCloudSettings = Field(default_factory=SoundCloudSettings)
+    beatport: SourceSettings = Field(default_factory=SourceSettings)
+    junodownload: SourceSettings = Field(default_factory=SourceSettings)
 
     @classmethod
     def settings_customise_sources(

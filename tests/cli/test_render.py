@@ -41,6 +41,8 @@ def test_pretty_dossier_shows_every_section_with_sources(dossier: Dossier) -> No
         assert f"\n{section}\n" in text
     assert "remix (Todd Terry remix)" in text
     assert "Blanco y Negro, NEG84CD" in text
+    assert "124.5" in text
+    assert "A Minor" in text
     assert "℗ 1995 Blanco y Negro" in text
     assert "sources disagree on date: 1995 (musicbrainz) ≠ 1994 (itunes)" in text
     assert "recording genres: house — musicbrainz" in text

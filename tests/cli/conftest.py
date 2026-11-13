@@ -36,6 +36,8 @@ def dossier() -> Dossier:
                 "title": {"value": "Missing", "sources": mb},
                 "version": {"kind": "remix", "detail": "Todd Terry remix"},
                 "date": {"value": "1995", "sources": mb},
+                "bpm": {"value": 124.5, "sources": mb},
+                "key": {"value": "A Minor", "sources": mb},
                 "labels": [
                     {"name": "Blanco y Negro", "catalog_number": "NEG84CD", "sources": mb},
                     {"name": "Atlantic", "sources": mb},

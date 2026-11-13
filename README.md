@@ -73,6 +73,8 @@ Every source is described in detail in [the sources guide](https://rwrotson.gith
 | KEXP | implemented | the latest 25 plays as broadcasts with programs and hosts, host comments | |
 | Spotify | implemented, needs `spotify.client_id` and `spotify.client_secret` | links, ISRC or barcode, ℗ and © lines; label, popularity, and previews when Spotify gives them; resolves Spotify URLs | `skipped` without credentials; development-mode apps get no label, popularity, or previews; no audio features |
 | YouTube | implemented, needs `youtube.api_key` | links to uploads of the record only, official channels first | about 100 lookups a day on the free quota |
+| Beatport | implemented, opt-in | tempo, key, genre and sub-genre, mix name as the version, ISRC, label and catalog number, remixers; resolves Beatport URLs | Cloudflare: needs the `stealth` or `browser` extra, else `blocked`; not yet verified live |
+| Juno Download | implemented, opt-in | tempo, genres, label and catalog number, release date; resolves product URLs | refuses some regions (use `junodownload.proxy`); not yet verified live |
 | SoundCloud | implemented, opt-in, needs `soundcloud.client_id` | uploader descriptions, genre and tags, plays, likes and reposts, notable reposting accounts, uploads absent elsewhere (edits, bootlegs) as other versions; resolves SoundCloud URLs | no new API apps: the web client's ID changes now and then and must be replaced by hand |
 
 Names written in a non-Latin script are compared as written: a store that lists "Кино" as "Kino" is reported as `no_match`.
@@ -85,7 +87,6 @@ Names written in a non-Latin script are compared as written: a store that lists 
 | Reviews and press | AllMusic, Resident Advisor (GraphQL), press reviews through one adapter with per-site rules | |
 | Catalogues and communities | Rate Your Music, Genius, Album of the Year | Rate Your Music only through a browser |
 | Radio and mixes | NTS, 1001Tracklists, WFMU | |
-| Download stores | Beatport, Juno Download | BPM and key |
 | Samples | WhoSampled | needs a separate decision on its terms of service |
 
 Never used: Every Noise at Once, direct Metacritic scraping (Metacritic scores come from Wikipedia), Spotify audio features.
@@ -160,6 +161,8 @@ src/
     │   ├── kexp/            # KEXP models, parsers, adapter
     │   ├── spotify/         # Spotify Web API models, parsers, adapter
     │   ├── soundcloud/      # SoundCloud models, parsers, adapter
+    │   ├── beatport/        # Beatport page-state models, parsers, adapter
+    │   ├── junodownload/    # Juno Download page models, parsers, adapter
     │   └── _http/           # rate limits, retries, cache, escalation transports
     └── core/                # models, matching, orchestrator, errors (Pydantic only)
 tests/                       # mirrors the package; network is disabled

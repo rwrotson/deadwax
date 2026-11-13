@@ -38,6 +38,7 @@ from deadwax.core.normalize import (
     normalize_barcode,
     normalize_code,
     normalize_copyright,
+    normalize_key,
     normalize_text,
 )
 from deadwax.core.query import EntityKind, Query
@@ -184,6 +185,23 @@ def _consensus(
     return winner, Discrepancy(field=name, values=options) if len(options) > 1 else None
 
 
+def _format_bpm(bpm: float) -> str:
+    return f"{bpm:g}"
+
+
+def _bpm(
+    matched: list[tuple[RecordCandidate, Provenance]],
+) -> tuple[Sourced[float] | None, Discrepancy | None]:
+    """Tempos agree when they round to the same whole beat."""
+    agreed, conflict = _consensus(
+        "bpm",
+        ((_format_bpm(c.bpm), str(round(c.bpm)), p) for c, p in matched if c.bpm is not None),
+    )
+    if agreed is None:
+        return None, conflict
+    return Sourced(value=float(agreed.value), sources=agreed.sources), conflict
+
+
 def _version_label(version: VersionInfo) -> str:
     return str(version.kind) if version.detail is None else f"{version.kind}: {version.detail}"
 
@@ -303,10 +321,24 @@ def build_identity(
         _most_precise,
     )
 
+    bpm, bpm_conflict = _bpm(matched)
+    key, key_conflict = _consensus(
+        "key",
+        ((c.key, normalize_key(c.key) or normalize_text(c.key), p) for c, p in matched if c.key),
+    )
+
     version = _version([candidate for candidate, _ in matched])
     version_conflict = _version_discrepancy(version, title, other_versions)
     external_ids, id_conflicts = _external_ids(matched)
-    conflicts = [artist_conflict, title_conflict, version_conflict, date_conflict, *id_conflicts]
+    conflicts = [
+        artist_conflict,
+        title_conflict,
+        version_conflict,
+        date_conflict,
+        bpm_conflict,
+        key_conflict,
+        *id_conflicts,
+    ]
     kinds = [candidate.kind for candidate, _ in matched if candidate.kind is not None]
 
     return Identity(
@@ -315,6 +347,8 @@ def build_identity(
         title=title,
         version=version,
         date=date,
+        bpm=bpm,
+        key=key,
         labels=_labels(matched),
         isrcs=_codes(matched, lambda c: c.isrcs, normalize_code),
         upcs=_codes(matched, lambda c: c.upcs, normalize_barcode),

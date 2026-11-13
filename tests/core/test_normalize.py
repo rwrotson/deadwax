@@ -6,6 +6,7 @@ from deadwax.core import (
     normalize_barcode,
     normalize_code,
     normalize_copyright,
+    normalize_key,
     normalize_text,
     split_featuring,
 )
@@ -91,3 +92,30 @@ def test_copyright_lines() -> None:
     assert normalize_copyright("© 2007 Hyperdub") == normalize_copyright("Copyright 2007 Hyperdub")
     assert normalize_copyright("℗ 2007 Hyperdub") != normalize_copyright("© 2007 Hyperdub")
     assert normalize_copyright("2007 Hyperdub") == "|2007 hyperdub"
+
+
+@pytest.mark.parametrize(
+    ("left", "right"),
+    [
+        ("A Minor", "Am"),
+        ("A min", "8A"),
+        ("8A", "1m"),
+        ("C Major", "8B"),
+        ("C", "1d"),
+        ("F# Major", "G♭ Major"),
+        ("Ebm", "D#  minor"),
+        ("Bb min", "3A"),
+        ("E major", "12B"),
+    ],
+)
+def test_keys_compare_across_notations(left: str, right: str) -> None:
+    assert normalize_key(left) is not None
+    assert normalize_key(left) == normalize_key(right)
+
+
+def test_keys_keep_mode_and_reject_unknown_text() -> None:
+    assert normalize_key("A Minor") == "9|minor"
+    assert normalize_key("A Major") != normalize_key("A Minor")
+    assert normalize_key("13A") is None
+    assert normalize_key("H minor") is None
+    assert normalize_key("") is None

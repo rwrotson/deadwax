@@ -63,6 +63,7 @@ from .normalize import (
     normalize_barcode,
     normalize_code,
     normalize_copyright,
+    normalize_key,
     normalize_text,
     split_featuring,
 )
@@ -140,6 +141,7 @@ __all__ = [
     "normalize_barcode",
     "normalize_code",
     "normalize_copyright",
+    "normalize_key",
     "normalize_text",
     "parse_query",
     "parse_title",

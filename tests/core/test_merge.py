@@ -492,3 +492,58 @@ def test_metrics_stay_per_source() -> None:
         ("lastfm", 20, Scope.RECORDING),
         ("lastfm", 99, Scope.ARTIST),
     ]
+
+
+def test_bpm_and_key_agree_or_disagree_across_sources() -> None:
+    partials = [
+        partial("beatport", candidate(bpm=124, key="A Minor")),
+        partial("junodownload", candidate(bpm=124.2, key="8A")),
+        partial("other", candidate(bpm=125, key="Am")),
+    ]
+
+    identity = merge(TRACK, partials, generated_at=NOW).identity
+
+    assert identity.bpm is not None
+    assert (identity.bpm.value, len(identity.bpm.sources)) == (124.0, 2)
+    assert identity.key is not None
+    assert (identity.key.value, len(identity.key.sources)) == ("A Minor", 3)
+    [bpm_conflict] = [d for d in identity.discrepancies if d.field == "bpm"]
+    assert [(v.value, [p.source for p in v.sources]) for v in bpm_conflict.values] == [
+        ("124", ["beatport", "junodownload"]),
+        ("125", ["other"]),
+    ]
+
+
+def test_unknown_key_notation_is_kept_as_text() -> None:
+    partials = [partial("a", candidate(key="Dorian")), partial("b", candidate(key="E Minor"))]
+
+    identity = merge(TRACK, partials, generated_at=NOW).identity
+
+    assert identity.key is not None
+    assert [d.field for d in identity.discrepancies] == ["key"]
+    assert identity.bpm is None
+
+
+def test_extended_mix_is_not_merged_into_the_original_mix() -> None:
+    query = parse_query("Artist - Track (Original Mix)", EntityKind.TRACK)
+    original = RecordCandidate(artist="Artist", title="Track", bpm=124)
+    extended = RecordCandidate(
+        artist="Artist",
+        title="Track (Extended Mix)",
+        bpm=124,
+        url="https://www.beatport.com/track/track/2",
+    )
+    partials = [
+        partial("musicbrainz", original),
+        partial("beatport", extended, tags=[tag("Deep House", "beatport")]),
+    ]
+
+    dossier = merge(query, partials, generated_at=NOW)
+
+    assert dossier.identity.title is not None
+    assert [source.source for source in dossier.identity.title.sources] == ["musicbrainz"]
+    assert dossier.tags == []
+    [relation] = dossier.relations
+    assert (relation.kind, relation.note) == (RelationKind.OTHER_VERSION, "extended: Extended Mix")
+    [conflict] = dossier.identity.discrepancies
+    assert conflict.field == "version"

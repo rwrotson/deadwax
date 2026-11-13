@@ -41,6 +41,9 @@ def _identity(identity: Identity) -> list[str]:
         detail = f" ({identity.version.detail})" if identity.version.detail else ""
         lines.append(f"- **Version:** {identity.version.kind}{detail}")
     lines += _sourced("Date", identity.date)
+    if identity.bpm is not None:
+        lines.append(f"- **BPM:** {identity.bpm.value:g} ({_sources(identity.bpm.sources)})")
+    lines += _sourced("Key", identity.key)
 
     lines += [
         f"- **Label:** {label.name}"

@@ -51,6 +51,25 @@ def test_remix_query_against_candidates(candidate: RecordKey, verdict: Verdict) 
     assert compare(reference, candidate).verdict is verdict
 
 
+@pytest.mark.parametrize(
+    ("reference", "candidate", "verdict"),
+    [
+        ("Track (Original Mix)", "Track", Verdict.MATCH),
+        ("Track (Extended Mix)", "Track (Club Mix)", Verdict.MATCH),
+        ("Track (Original Mix)", "Track (Extended Mix)", Verdict.OTHER_VERSION),
+        ("Track (Radio Edit)", "Track (Extended Mix)", Verdict.OTHER_VERSION),
+        ("Track (Dub)", "Track (Original Mix)", Verdict.OTHER_VERSION),
+        ("Track (Kode9 Edit)", "Track (Theo Parrish Edit)", Verdict.OTHER_VERSION),
+        ("Track (Kode9 Edit)", "Track (Kode9 Re-Edit)", Verdict.MATCH),
+        ("Track (Todd Terry Remix)", "Track (Todd Terry Extended Remix)", Verdict.OTHER_VERSION),
+        ("Track (Todd Terry Remix)", "Track (Todd Terry Dub)", Verdict.OTHER_VERSION),
+        ("Track (Todd Terry Remix)", "Track (Todd Terry Club Mix)", Verdict.MATCH),
+    ],
+)
+def test_mix_names_tell_versions_apart(reference: str, candidate: str, verdict: Verdict) -> None:
+    assert compare(track("Artist", reference), track("Artist", candidate)).verdict is verdict
+
+
 def test_explicit_candidate_version_overrides_title() -> None:
     reference = track("Radiohead", "Paranoid Android")
     live = track("Radiohead", "Paranoid Android", VersionInfo(kind=VersionKind.LIVE))

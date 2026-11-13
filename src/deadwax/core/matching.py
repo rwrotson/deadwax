@@ -19,6 +19,9 @@ COLLABORATION_SCORE = 0.9
 _DETAILED_KINDS = frozenset({VersionKind.REMIX, VersionKind.LIVE})
 _DETAIL_THRESHOLD = 0.6
 
+# Words that make one remixer's version another cut of it, such as 'Extended Remix'.
+_CUTS = frozenset({"extended", "radio", "dub", "instrumental"})
+
 logger = logging.getLogger(__name__)
 
 
@@ -100,8 +103,10 @@ def same_version(left: VersionInfo, right: VersionInfo) -> bool:
         return False
     if left.kind not in _DETAILED_KINDS or left.detail is None or right.detail is None:
         return True
-    detail_score = key_similarity(normalize_text(left.detail), normalize_text(right.detail))
-    return detail_score >= _DETAIL_THRESHOLD
+    left_detail, right_detail = normalize_text(left.detail), normalize_text(right.detail)
+    if _CUTS.intersection(left_detail.split()) != _CUTS.intersection(right_detail.split()):
+        return False
+    return key_similarity(left_detail, right_detail) >= _DETAIL_THRESHOLD
 
 
 def compare(reference: RecordKey, candidate: RecordKey) -> Match:

@@ -31,6 +31,13 @@ class VersionKind(StrEnum):
     INSTRUMENTAL = "instrumental"
     ACOUSTIC = "acoustic"
     EDIT = "edit"
+
+    # Longer DJ-oriented mix such as 'Extended Mix' or 'Club Mix'.
+    EXTENDED = "extended"
+
+    # The artist's own dub version; a dub by someone else is a remix.
+    DUB = "dub"
+
     ALTERNATE = "alternate"
     REISSUE = "reissue"
     REMASTER = "remaster"
@@ -191,6 +198,8 @@ class Identity(_Model):
     title: Sourced[str] | None = None
     version: VersionInfo = VersionInfo()
     date: Sourced[str] | None = Field(default=None, description="ISO date, possibly partial")
+    bpm: Sourced[float] | None = Field(default=None, description="Tempo in beats per minute")
+    key: Sourced[str] | None = Field(default=None, description="Musical key as a source gives it")
     labels: list[LabelRef] = []
     isrcs: list[Sourced[str]] = []
     upcs: list[Sourced[str]] = []
@@ -307,6 +316,8 @@ class RecordCandidate(_Model):
         description="Explicit version; derived from the title when unset",
     )
     date: str | None = None
+    bpm: float | None = Field(default=None, gt=0, description="Tempo in beats per minute")
+    key: str | None = Field(default=None, description="Musical key, such as 'A Minor' or '8A'")
     labels: list[CandidateLabel] = []
     isrcs: list[str] = []
     upcs: list[str] = []

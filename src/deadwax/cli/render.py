@@ -80,6 +80,10 @@ def _identity_rows(dossier: Dossier) -> list[tuple[str, str, Text]]:
     rows.append(("version", version, Text()))
     if identity.date is not None:
         rows.append(("date", *_sourced(identity.date)))
+    if identity.bpm is not None:
+        rows.append(("BPM", f"{identity.bpm.value:g}", _sources(identity.bpm.sources)))
+    if identity.key is not None:
+        rows.append(("key", *_sourced(identity.key)))
 
     for ref in identity.labels:
         name = f"{ref.name}, {ref.catalog_number}" if ref.catalog_number else ref.name

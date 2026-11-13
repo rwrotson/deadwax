@@ -43,6 +43,8 @@ def untrue_dossier() -> str:
         isrcs=["GBAAA0700001"],
         upcs=["5055300315829"],
         copyrights=["℗ 2007 Hyperdub"],
+        bpm=138,
+        key="F Minor",
         ids={IdKind.DISCOGS_MASTER: "89497"},
         url=SOURCE[0].url,
     )
@@ -161,6 +163,8 @@ def test_markdown_sections_and_sources() -> None:
     ):
         assert f"\n{heading}\n" in text
     assert "- **Version:** reissue (Deluxe)" in text
+    assert "- **BPM:** 138 ([bandcamp](https://burial.bandcamp.com/album/untrue))" in text
+    assert "- **Key:** F Minor ([bandcamp](https://burial.bandcamp.com/album/untrue))" in text
     assert (
         "- **Label:** Hyperdub, HDBCD002 ([bandcamp](https://burial.bandcamp.com/album/untrue))"
         in text

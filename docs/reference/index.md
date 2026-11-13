@@ -51,6 +51,12 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.sources.soundcloud.adapter` | Read uploads and their reposters from SoundCloud (client ID) |
 | `deadwax.sources.soundcloud.parse` | Turn SoundCloud uploads into identity, tags, texts, metrics, relations, and links |
 | `deadwax.sources.soundcloud.models` | Model SoundCloud API responses |
+| `deadwax.sources.beatport.adapter` | Search Beatport and read track and release pages |
+| `deadwax.sources.beatport.parse` | Turn Beatport page state into identity with tempo and key, tags, credits, and links |
+| `deadwax.sources.beatport.models` | Model the tracks and releases of Beatport's page state |
+| `deadwax.sources.junodownload.adapter` | Search Juno Download and read release pages |
+| `deadwax.sources.junodownload.parse` | Turn Juno Download pages into identity with tempo, genres, and links |
+| `deadwax.sources.junodownload.models` | Model Juno Download releases, tracks, and search results |
 | `deadwax.logs.settings` | Define logging settings |
 | `deadwax.logs.setup` | Configure console and file logging for applications |
 | `deadwax.logs.runs` | Journal each lookup run to its own event file and an index of runs |

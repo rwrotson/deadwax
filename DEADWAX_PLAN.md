@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–10 done; Stage 11 next.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–10 done; Stage 11 implemented and mock-tested, awaiting the user's live recording of Beatport and Juno Download.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -107,7 +107,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 8 | Done | Foundation: source groups, default source set, per-lookup concurrency cap, shared search → page helper. |
 | 9 | Done | ListenBrainz, SecondHandSongs, KEXP. |
 | 10 | Done | Spotify, YouTube (links only), SoundCloud. |
-| 11 | Not started | Beatport, Juno Download; BPM and key. |
+| 11 | Implemented, awaiting live verification | Beatport, Juno Download; BPM and key. |
 | 12 | Not started | Shops I: Juno, Hard Wax, Phonica, Soundohm; shop-text deduplication. |
 | 13 | Not started | Shops II: Boomkat, Norman Records, Forced Exposure, Bleep. |
 | 14 | Not started | Genius. |
@@ -156,10 +156,10 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 ### Stage 11: Beatport, Juno Download
 
-- [ ] Model: BPM and key as sourced identity values with discrepancies.
-- [ ] Version detection: mix names (Original, Extended, Dub, Radio Edit…) mapped to versions.
-- [ ] Beatport from `__NEXT_DATA__`: BPM, key, subgenre, mix name, ISRC, remixers, DJ charts as relations.
-- [ ] Juno Download: BPM, genre, label.
+- [x] Model: BPM and key as sourced identity values with discrepancies.
+- [x] Version detection: mix names (Original, Extended, Dub, Radio Edit…) mapped to versions.
+- [ ] Beatport from `__NEXT_DATA__`: BPM, key, subgenre, mix name, ISRC, remixers (done, mock-tested); DJ charts as relations (deferred until a recorded page shows them).
+- [ ] Juno Download: BPM, genre, label (done, mock-tested).
 
 **Acceptance:** an Extended Mix is not merged into the Original Mix; a BPM disagreement is a discrepancy. **Suggested message:** `feat(sources): add Beatport and Juno Download adapters with BPM and key`.
 
@@ -277,8 +277,15 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-13 | SoundCloud reposters become relations only when verified or with at least 1,000 followers, from the first 50; search hits are ordered official first (distributor metadata, then an uploader named like the artist); the candidate's date is the upload's `release_date` only. | Live: of 20 reposters of "Paranoid Android" one had over 1,000 followers; re-uploads won the search and their upload dates became date discrepancies. | 10 |
 | 2026-11-13 | YouTube treats "(Full Album …)" and a bare "(1997)" as upload notes. | Search with `type=playlist` never returns Topic channels' album playlists, only listeners' "full album" ones (live, "OK Computer"). | 10 |
 | 2026-11-13 | Every credential setting has instructions in README's "Credentials" section (rule in AGENTS.md). | User request. | all |
+| 2026-11-13 | Beatport is read from the `__NEXT_DATA__` state of its pages through `SearchPageAdapter` and the escalation ladder; the agent builds it on hand-made pages and the user records fixtures and runs live checks. | Plain requests get a Cloudflare 403; the agent's curl_cffi probe was refused by Claude Code's safety classifier. User choice. | 11 |
+| 2026-11-13 | Juno Download is plain HTML through `SearchPageAdapter`, built on hand-made pages; the user records and verifies it through `junodownload.proxy`. | The site resets TLS connections from the agent's network (likely a regional block). User choice. | 11 |
+| 2026-11-13 | `VersionKind.EXTENDED` (Extended/Club Mix, 12" Version) and `VersionKind.DUB` (plain Dub, Dub Mix); Radio, Single, Album, 7" Edit stay `edit`; "<Name> Edit"/"<Name> Re-Edit" and "<Name> Dub" are `remix` with the name as detail. | Extended and Radio Edit were both `edit` and merged; a DJ's edit is someone else's rework. User choice. | 11 |
+| 2026-11-13 | Two remixes by one remixer are different versions when one names a cut the other does not (`extended`, `radio`, `dub`, `instrumental`); "Club Mix" is not a cut, so Todd Terry's Club Mix stays his Remix. | "Todd Terry Extended Remix" matched "Todd Terry Remix" by detail similarity. | 11 |
+| 2026-11-13 | `RecordCandidate.bpm`/`key` → `Identity.bpm` (`Sourced[float]`) and `Identity.key` (`Sourced[str]`). Tempos agree when they round to the same whole beat; keys by `normalize_key` (pitch class and mode; enharmonics, Camelot and Open Key folded), unknown notations by their text. Disagreements are `bpm`/`key` discrepancies. | Stage 11 acceptance; Beatport and Juno print keys and tempos differently. | 11 |
+| 2026-11-13 | `junodownload.com` is service `junodownload` (was `juno`), adapter and settings `junodownload`; `juno` is left for the Stage 12 shop at juno.co.uk. `IdKind.BEATPORT_TRACK`/`BEATPORT_RELEASE` and URL rules for Beatport track and release pages and Juno Download product pages (albums). | Two Juno sources with different pages. | 11, 12 |
+| 2026-11-13 | DJ charts (`charted_by` relations) are not added in Stage 11. | They are probably fetched by the page after load, not in `__NEXT_DATA__`; without a recorded page their shape is unknown. Revisit after the user's recording, or with Resident Advisor in Stage 16. | 11, 16 |
+| 2026-11-13 | Beatport and Juno Download join collaborators with " & ". | `artist_similarity` normalizes away commas before `split_artists` looks for them, so "Burial, Kode9" does not match "Burial" (0.67); " & " does (0.9). The comma case is a core bug, not fixed in this stage. | 11 |
 
-### 2026-11-13 — Stage 8 evidence
 
 Changed:
 
@@ -369,7 +376,29 @@ Observed, not changed: Burial has no official SoundCloud upload, so a listener's
 
 Remains: nothing for Stage 10.
 
-**Current task:** Stage 11 (Beatport, Juno Download; BPM and key). **Next action:** at the start of Stage 11, verify each source's access notes; include "<Name> Edit" markers in the mix-name work.
+### 2026-11-13 — Stage 11 evidence (implemented, awaiting live verification)
+
+Access checked before coding: `www.beatport.com/search/tracks` answers plain curl with HTTP 403 and a Cloudflare page (robots.txt 200); a curl_cffi probe by the agent was refused by Claude Code's safety classifier (bot-check circumvention), so the agent neither recorded nor live-checked Beatport. `www.junodownload.com` resets the TLS handshake from this network (`SSL_ERROR_SYSCALL`).
+
+Changed:
+
+- Core: `VersionKind.EXTENDED|DUB`; exact mix-name rules and named edits in `versions`; cut words in `matching.same_version`; `normalize_key` (exported from `deadwax.core`); `bpm`/`key` on `RecordCandidate` and `Identity` with consensus and discrepancies in `merge`; BPM and key rows in Markdown and pretty output; `IdKind.BEATPORT_TRACK|BEATPORT_RELEASE` and URL rules (Beatport track/release, Juno Download product).
+- Sources: packages `beatport` and `junodownload` (adapter | parse | models, R8 contracts, R4 row), both `SearchPageAdapter`, group `streaming`, opt-in, rate 0.5; service `junodownload`; added after SoundCloud in `ADAPTERS`; recorder hosts.
+- `.env.example`, CLI settings, `docs/sources.md`, `docs/output.md`, `docs/architecture.md`, API reference index, README tables and tree.
+- Fixtures: Odesli and SoundCloud re-recorded live for `missing_remix` only (no credential value in them). Reason: iTunes now accepts the exact "Missing (Todd Terry Remix)" instead of "Club Mix / US Radio Edit", so Odesli seeds from that Apple link (song.link: not found) and SoundCloud's live search changed. `test_remix_is_not_merged_with_the_original` no longer expects an `artist` discrepancy: it came from the wrongly accepted iTunes track credited to "Everything But the Girl & Todd Terry".
+
+Commands and outcomes:
+
+- `uv run poe check`: format, lint, 25 import contracts kept, mypy strict clean, 784 passed, 99.07% branch coverage.
+- `uv run --group docs properdocs build --strict`: built without warnings.
+- Mock-tested (hand-made pages; Beatport's state shape and Juno's selectors are from memory, not from recorded pages): mix-name versions and matching (Extended vs Original, Radio Edit vs Extended, Dub, named edits, remix cuts, Club Mix); key notations; BPM agreement within a beat and a BPM discrepancy; the acceptance case through `merge` and through each adapter (an Extended mix hit becomes `other_version` with a version discrepancy and contributes no BPM or tags); Beatport track and release search, catalogue and search-service field names, track and release URLs, a link from an earlier pass, remixers, genre and sub-genre, not found, Cloudflare challenge → `blocked`, pages without state; Juno Download releases and tracks from search, tracklist tempo and artists, implausible tempo, album and product URL, release missing the track, no label, challenge → `blocked`, dates.
+- Live-verified: only the default set (Beatport and Juno Download are opt-in): `deadwax --track "Everything but the Girl - Missing (Todd Terry Remix)" --no-cache` — Spotify's "Todd Terry Remix / Radio Edit" is now an `other_version` relation with a version discrepancy; Odesli `not_found` for the iTunes seed; Deezer and Discogs `blocked` as before. Beatport and Juno Download are not live-verified.
+
+Observed, not changed: SoundCloud accepts "Missing (Todd Terry Lite Mix)" for the Todd Terry Remix (remix details similar enough; "lite" is not a cut word). Collaboration credits joined with ", " (Spotify) are not split by the matching gate (decision row above).
+
+Remains for Stage 11: the fixture recorder replays through plain httpx with escalation off, and its transport bypasses proxy settings, so it cannot record Beatport (Cloudflare) or Juno Download (regional block) as it is. The user saves, from a browser, the HTML of one Beatport track search, track page, release search and release page, and one Juno Download search and product page (for example for "Everything but the Girl - Missing (Todd Terry Remix)" and "Burial - Untrue"); the agent fits the parsers to them, turns them into fixtures and replayed tests, decides on DJ charts, and the user runs `deadwax --track "…" --sources core,beatport,junodownload --no-cache` with the `stealth` extra (and `DEADWAX_JUNODOWNLOAD__PROXY` where needed) on the five v1 check records and a dance record. Then the stage is marked Done.
+
+**Current task:** Stage 11 live verification. **Next action:** the user saves Beatport and Juno Download pages from a browser; the agent fits the parsers to them.
 
 ## Resume instructions
 

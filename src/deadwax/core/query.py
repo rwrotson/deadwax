@@ -36,6 +36,8 @@ class IdKind(StrEnum):
     APPLE_MUSIC = "apple_music"
     DEEZER = "deezer"
     SOUNDCLOUD = "soundcloud"
+    BEATPORT_TRACK = "beatport_track"
+    BEATPORT_RELEASE = "beatport_release"
 
 
 class Query(BaseModel):
@@ -81,6 +83,10 @@ _SPOTIFY = re.compile(r"^open\.spotify\.com$")
 _DEEZER = re.compile(r"^deezer\.com$")
 _APPLE_MUSIC = re.compile(r"^music\.apple\.com$")
 _SOUNDCLOUD = re.compile(r"^soundcloud\.com$")
+_BEATPORT = re.compile(r"^beatport\.com$")
+
+# Juno Download sells releases; their tracks have no pages of their own.
+_JUNO_DOWNLOAD = re.compile(r"^junodownload\.com$")
 
 # A SoundCloud track page is '/<user>/<track>', optionally with a secret-link token; the
 # names below are site sections and profile tabs, not users and tracks. Sets ('/<user>/sets/')
@@ -93,6 +99,19 @@ _SOUNDCLOUD_TRACK = re.compile(
 
 _URL_RULES = (
     _UrlRule(_SOUNDCLOUD, _SOUNDCLOUD_TRACK, EntityKind.TRACK),
+    _UrlRule(
+        _BEATPORT,
+        re.compile(r"^(?:/[a-z]{2})?/track/[^/]+/(?P<id>\d+)"),
+        EntityKind.TRACK,
+        IdKind.BEATPORT_TRACK,
+    ),
+    _UrlRule(
+        _BEATPORT,
+        re.compile(r"^(?:/[a-z]{2})?/release/[^/]+/(?P<id>\d+)"),
+        EntityKind.ALBUM,
+        IdKind.BEATPORT_RELEASE,
+    ),
+    _UrlRule(_JUNO_DOWNLOAD, re.compile(r"^/products/"), EntityKind.ALBUM),
     _UrlRule(_BANDCAMP, re.compile(r"^/album/"), EntityKind.ALBUM),
     _UrlRule(_BANDCAMP, re.compile(r"^/track/"), EntityKind.TRACK),
     _UrlRule(

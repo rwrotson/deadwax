@@ -7,21 +7,18 @@ from deadwax.core.query import DASHES
 
 # Whole-marker forms checked first, because 'Original Mix' or 'Radio Edit' also contain keywords.
 # An explicit version is the uncensored original; a clean one is the censored edit.
-_EXACT_RULES: tuple[tuple[VersionKind, re.Pattern[str]], ...] = (
-    (
-        VersionKind.ORIGINAL,
-        re.compile(
-            r"^(?:(?:original|album)(?: mix| version)?|explicit(?: version)?)$",
-            re.IGNORECASE,
+_EXACT_RULES: tuple[tuple[VersionKind, re.Pattern[str]], ...] = tuple(
+    (kind, re.compile(pattern, re.IGNORECASE))
+    for kind, pattern in (
+        (VersionKind.ORIGINAL, r"^(?:(?:original|album)(?: mix| version)?|explicit(?: version)?)$"),
+        (VersionKind.EXTENDED, r"^(?:extended|club|12(?:\"|''| ?inch))(?: mix| version| edit)?$"),
+        (VersionKind.DUB, r"^dub(?: mix| version)?$"),
+        (
+            VersionKind.EDIT,
+            r"^(?:(?:radio|single|short|clean|album|7(?:\"|''| ?inch))(?: edit| mix| version)?"
+            r"|edit)$",
         ),
-    ),
-    (
-        VersionKind.EDIT,
-        re.compile(
-            r"^(?:(?:radio|single|extended|short|clean)(?: edit| mix| version)?|edit)$",
-            re.IGNORECASE,
-        ),
-    ),
+    )
 )
 
 _KEYWORD_RULES: tuple[tuple[VersionKind, re.Pattern[str]], ...] = tuple(
@@ -35,7 +32,8 @@ _KEYWORD_RULES: tuple[tuple[VersionKind, re.Pattern[str]], ...] = tuple(
         (VersionKind.COVER, r"\bcover\b"),
         (
             VersionKind.REMIX,
-            r"\b(?:remix|rmx|re-?mix|rework|re-?edit|dub|vip|bootleg|flip|refix|mix)\b",
+            # A named edit such as 'Kode9 Edit' is someone's rework; generic edits are exact rules.
+            r"\b(?:remix|rmx|re-?mix|rework|re-?edit|dub|vip|bootleg|flip|refix|mix)\b|\bedit$",
         ),
         (VersionKind.REISSUE, r"\b(?:deluxe|expanded|anniversary|reissue)\b"),
         (
@@ -53,6 +51,8 @@ _PRIORITY = (
     VersionKind.COVER,
     VersionKind.INSTRUMENTAL,
     VersionKind.ACOUSTIC,
+    VersionKind.DUB,
+    VersionKind.EXTENDED,
     VersionKind.EDIT,
     VersionKind.ALTERNATE,
     VersionKind.REISSUE,

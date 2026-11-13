@@ -195,7 +195,7 @@ async def test_remix_is_not_merged_with_the_original(replay: Replay, config: Sou
     remix_of = [r for r in dossier.relations if r.kind is RelationKind.REMIX_OF]
     assert [r.target.name for r in remix_of] == ["Missing"]
     assert RelationKind.COVERED_BY not in relation_kinds(dossier)
-    assert {d.field for d in dossier.identity.discrepancies} >= {"artist", "date"}
+    assert {d.field for d in dossier.identity.discrepancies} >= {"date"}
     date = next(d for d in dossier.identity.discrepancies if d.field == "date")
     assert "bandcamp" not in {s.source for value in date.values for s in value.sources}
     assert tags_from(dossier, "bandcamp") == set()
@@ -406,7 +406,11 @@ def test_describe_sources_marks_groups_and_the_default_set() -> None:
         SourceGroup.STREAMING,
     }
     assert [info.source for info in infos if info.default] == ["musicbrainz", "deezer"]
-    assert [info.source for info in describe_sources() if not info.default] == ["soundcloud"]
+    assert [info.source for info in describe_sources() if not info.default] == [
+        "soundcloud",
+        "beatport",
+        "junodownload",
+    ]
 
 
 def test_no_source_is_named_like_a_group() -> None:
@@ -419,6 +423,7 @@ def test_describe_sources() -> None:
     assert list(sources) == [
         "spotify", "musicbrainz", "odesli", "itunes", "deezer", "discogs", "bandcamp", "lastfm",
         "wikipedia", "listenbrainz", "secondhandsongs", "kexp", "youtube", "soundcloud",
+        "beatport", "junodownload",
     ]  # fmt: skip
     assert sources["musicbrainz"].pass_ is Pass.IDENTITY
     assert sources["odesli"].status.ready
@@ -430,6 +435,10 @@ def test_describe_sources() -> None:
     assert sources["lastfm"].status.state is SourceState.MISSING_CREDENTIAL
     assert [r.setting for r in sources["lastfm"].requires] == ["lastfm.api_key"]
     assert sources["wikipedia"].status.ready
+    for name in ("beatport", "junodownload"):
+        assert sources[name].status.ready
+        assert sources[name].group is SourceGroup.STREAMING
+        assert not sources[name].default
     for name in ("spotify", "youtube", "soundcloud"):
         assert sources[name].status.state is SourceState.MISSING_CREDENTIAL
         assert sources[name].group is SourceGroup.STREAMING
