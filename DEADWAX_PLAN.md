@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages not yet defined.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stage 8 next.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -100,10 +100,132 @@ Open questions, settled at each source's stage:
 
 ## Implementation stages and acceptance criteria
 
-Not defined yet; the next step is to agree them with the user.
+Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infrastructure first; clean APIs next, to prove it; each model addition lands in the first stage whose source needs it; sources behind bot protection or with open terms-of-service questions last, so those decisions can be made meanwhile.
 
 | Stage | Status | Deliverable |
 | --- | --- | --- |
+| 8 | Not started | Foundation: source groups, default source set, per-lookup concurrency cap, shared search → page helper. |
+| 9 | Not started | ListenBrainz, SecondHandSongs, KEXP. |
+| 10 | Not started | Spotify, YouTube (links only), SoundCloud. |
+| 11 | Not started | Beatport, Juno Download; BPM and key. |
+| 12 | Not started | Shops I: Juno, Hard Wax, Phonica, Soundohm; shop-text deduplication. |
+| 13 | Not started | Shops II: Boomkat, Norman Records, Forced Exposure, Bleep. |
+| 14 | Not started | Genius. |
+| 15 | Not started | Reviews I: AllMusic, Album of the Year. |
+| 16 | Not started | Reviews II: press adapter with per-site rules, Resident Advisor. |
+| 17 | Not started | Radio: NTS, WFMU; context tags. |
+| 18 | Not started | Rate Your Music; browser-first fetching. |
+| 19 | Not started | 1001Tracklists, WhoSampled. |
+| 20 | Not started | Qualification. |
+
+Common acceptance for source stages 9–19, in addition to each stage's own:
+
+- Fixture tests for every extraction path, and for not found, blocked, and a missing key where one applies.
+- The matching gate drops a candidate of another version (tested).
+- Every new setting has a description and a line in `.env.example`; the source is described in `docs/sources.md` and the README tables.
+- `uv run poe check` and the strict docs build pass.
+- Live runs on the five v1 check records and at least one record the source is strong on; the report separates mock-tested from live-verified behaviour.
+
+### Stage 8: foundation
+
+- [ ] Source groups (`shops`, `press`, `catalogues`, `radio`, `streaming`, `samples`, and the v1 sources as `core`) accepted by `--sources` and `--exclude` and shown by `deadwax sources`.
+- [ ] The default set of enabled sources, decided with the user at the start of the stage (a full lookup would otherwise query 34 sources).
+- [ ] A per-lookup cap on concurrent adapters (setting), so a lookup with every source stays within rate limits.
+- [ ] A shared helper in `sources/_base.py` for HTML sources that search, pick a candidate through the matching gate, and read its page.
+
+**Acceptance:** orchestrator and CLI tests for groups, the default set, and the cap; the helper tested with a fake source. **Suggested message:** `feat(sources): add source groups and a concurrency cap for v2 sources`.
+
+### Stage 9: ListenBrainz, SecondHandSongs, KEXP
+
+- [ ] ListenBrainz by MBID: similar recordings and artists, listen counts; CritiqueBrainz reviews as `user` texts.
+- [ ] SecondHandSongs: original and first release, writers, covers and adaptations as directional relations.
+- [ ] KEXP: plays as `broadcast` relations with dates; DJ comments as texts.
+
+**Acceptance:** covers from SecondHandSongs and MusicBrainz merge into one relation per target. **Suggested message:** `feat(sources): add ListenBrainz, SecondHandSongs and KEXP adapters`.
+
+### Stage 10: Spotify, YouTube, SoundCloud
+
+- [ ] Spotify with client credentials: links, popularity, label, copyrights, ISRC; resolves Spotify URLs.
+- [ ] YouTube with a Data API key: links only (official uploads first), no facts.
+- [ ] SoundCloud through the web client: uploader descriptions, tags, counts, reposters as relations; resolves SoundCloud URLs.
+
+**Acceptance:** missing credentials give `skipped`; YouTube contributes nothing but links. **Suggested message:** `feat(sources): add Spotify, YouTube and SoundCloud adapters`.
+
+### Stage 11: Beatport, Juno Download
+
+- [ ] Model: BPM and key as sourced identity values with discrepancies.
+- [ ] Version detection: mix names (Original, Extended, Dub, Radio Edit…) mapped to versions.
+- [ ] Beatport from `__NEXT_DATA__`: BPM, key, subgenre, mix name, ISRC, remixers, DJ charts as relations.
+- [ ] Juno Download: BPM, genre, label.
+
+**Acceptance:** an Extended Mix is not merged into the Original Mix; a BPM disagreement is a discrepancy. **Suggested message:** `feat(sources): add Beatport and Juno Download adapters with BPM and key`.
+
+### Stage 12: shops I
+
+- [ ] Juno, Hard Wax, Phonica, Soundohm through the Stage 8 helper: `shop` texts, genres, "also bought" as `similar` where present.
+- [ ] Merge: `shop` texts that repeat one press release are deduplicated, keeping every source.
+
+**Acceptance:** the same press text from two shops appears once with both sources. **Suggested message:** `feat(sources): add Juno, Hard Wax, Phonica and Soundohm adapters`.
+
+### Stage 13: shops II
+
+- [ ] Boomkat (Cloudflare, escalation ladder), Norman Records, Forced Exposure, Bleep: `shop` and `label` texts, genres, related releases as `similar`.
+
+**Suggested message:** `feat(sources): add Boomkat, Norman Records, Forced Exposure and Bleep adapters`.
+
+### Stage 14: Genius
+
+- [ ] Decide with the user whether lyrics are stored, before the stage.
+- [ ] Genius API with a token: description and annotations as texts, credits, samples, interpolations, covers, and remixes as directional relations; lyrics from HTML only if decided.
+
+**Suggested message:** `feat(sources): add Genius adapter`.
+
+### Stage 15: reviews I
+
+- [ ] AllMusic: review with rating and critic, moods and themes as `mood`/`theme` tags, styles, credits, similar albums.
+- [ ] Album of the Year: critic scores per publication, user score, genres; review links carried in the context for Stage 16, with MusicBrainz review links.
+
+**Acceptance:** an AllMusic score from Wikipedia's ratings template and from AllMusic itself merge into one review. **Suggested message:** `feat(sources): add AllMusic and Album of the Year adapters`.
+
+### Stage 16: reviews II
+
+- [ ] Decide with the user how much review text is kept, before the stage.
+- [ ] Press adapter: one adapter, per-site rules (Pitchfork, The Quietus, The Wire, and others agreed at the stage) reading review links from the context.
+- [ ] Resident Advisor through its GraphQL endpoint: reviews, artist and label bios, DJ charts as relations.
+
+**Suggested message:** `feat(sources): add press review and Resident Advisor adapters`.
+
+### Stage 17: radio
+
+- [ ] Model: tags of an episode or set marked as context rather than the track's own.
+- [ ] NTS: episodes that played the track as `broadcast`, neighbouring tracks, episode genres as context tags.
+- [ ] WFMU: playlists as `broadcast`, DJ comments as texts.
+
+**Suggested message:** `feat(sources): add NTS and WFMU adapters`.
+
+### Stage 18: Rate Your Music
+
+- [ ] Decide with the user on terms of service, before the stage; if declined, the stage is dropped.
+- [ ] Browser-first fetching for a source that never answers plain httpx.
+- [ ] Primary and secondary genres, descriptors as `descriptor` tags, rating with vote count, chart positions, user reviews.
+
+**Suggested message:** `feat(sources): add Rate Your Music adapter`.
+
+### Stage 19: 1001Tracklists, WhoSampled
+
+- [ ] Decide with the user on terms of service for each, before the stage; a declined source is dropped.
+- [ ] 1001Tracklists: sets as `mix` relations, supporting DJs, neighbours in sets.
+- [ ] WhoSampled: samples used and sampled by with timestamp and element, covers, remixes.
+
+**Suggested message:** `feat(sources): add 1001Tracklists and WhoSampled adapters`.
+
+### Stage 20: qualification
+
+- [ ] README source tiers and docs pages for every v2 source.
+- [ ] Full checks, package build and wheel smoke, audit; `poe test-live` with the v2 sources.
+- [ ] Manual runs on the check records with the default set and with every source; the time of a full lookup recorded.
+
+**Acceptance:** all checks pass or blocked ones have precise reasons. **Suggested message:** `docs: document sources and qualify deadwax v2`.
 
 ## Verification
 
@@ -128,8 +250,9 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | --- | --- | --- | --- |
 | 2026-11-13 | v2 source scope: all sources planned in v1 except Rough Trade, Apple Music, Traxsource, Mixcloud and BBC Sounds; YouTube for links only. | User review of what each source can give. | v2 |
 | 2026-11-13 | The v1 plan is archived in `plans/v1.md`; this file carries the decisions that still apply as "Standing decisions". | Keep the active plan short for agents that read it before every session. User choice. | v2 |
+| 2026-11-13 | v2 stages 8–20; numbering continues v1. Model additions land with the first source that needs them; sources with open terms-of-service questions come last and are dropped if declined. | User request for a stage breakdown. | 8–20 |
 
-**Current task:** define v2 stages with the user. **Next action:** user review of the v2 scope and this plan.
+**Current task:** Stage 8 (foundation). **Next action:** user review of the v2 stages; at the start of Stage 8, decide the default source set with the user.
 
 ## Resume instructions
 
