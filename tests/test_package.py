@@ -72,3 +72,18 @@ def test_logs_package_reports_missing_extra() -> None:
 
     assert result.stdout.startswith("structlog ")
     assert "deadwax[logs]" in result.stdout
+
+
+def test_logs_package_does_not_load_the_sources_layer() -> None:
+    code = (
+        "import sys, deadwax.logs; print('deadwax.sources' in sys.modules, 'httpx' in sys.modules)"
+    )
+
+    result = subprocess.run(  # noqa: S603
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert result.stdout.split() == ["False", "False"]

@@ -5,6 +5,7 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | Module | Purpose |
 |--------|---------|
 | `deadwax.core.errors` | Define the library error hierarchy |
+| `deadwax.core.events` | Emit structured trace events with fields bound by scope |
 | `deadwax.core.query` | Parse 'Artist - Title' text and record page URLs into a query |
 | `deadwax.core.models` | Define the dossier, its facts, provenance, and adapter results |
 | `deadwax.core.normalize` | Build comparison keys for names, titles, and codes |
@@ -45,6 +46,7 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.sources.kexp.models` | Model KEXP API responses |
 | `deadwax.logs.settings` | Define logging settings |
 | `deadwax.logs.setup` | Configure console and file logging for applications |
+| `deadwax.logs.runs` | Journal each lookup run to its own event file and an index of runs |
 | `deadwax.cli.settings` | Load command settings from the environment |
 | `deadwax.cli.app` | Define the `deadwax` command |
 | `deadwax.main` | Run the `deadwax` console script |

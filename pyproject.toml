@@ -271,6 +271,9 @@ include_external_packages = true
 name = "R1: package layers"
 type = "layers"
 layers = ["deadwax.main", "deadwax.cli", "deadwax.logs | deadwax.sources", "deadwax.core"]
+# deadwax imports the sources layer only on first use of one of its names (and for type
+# checking), so deadwax.logs can take library names from deadwax without loading it.
+ignore_imports = ["deadwax -> deadwax.sources", "deadwax -> deadwax.sources.lookup"]
 
 [[tool.importlinter.contracts]]
 name = "R5: core modules"
@@ -393,6 +396,8 @@ forbidden_modules = ["structlog", "pydantic_settings", "platformdirs", "typer", 
 name = "R6: logging setup does not use HTTP, settings loading or CLI packages"
 type = "forbidden"
 source_modules = ["deadwax.logs"]
+# The deferred import of the sources layer by deadwax, as in R1.
+ignore_imports = ["deadwax -> deadwax.sources", "deadwax -> deadwax.sources.lookup"]
 forbidden_modules = [
     "httpx",
     "selectolax",

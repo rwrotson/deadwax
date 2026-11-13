@@ -38,3 +38,22 @@ class LogSettings(BaseModel):
         if value in {"", ".", ".."} or "/" in value or "\\" in value:
             raise ValueError("Log file name must be a basename")
         return value
+
+
+class RunLogSettings(BaseModel):
+    """Journal of lookups: one JSON Lines file of trace events per run and an index of runs."""
+
+    enabled: bool = Field(default=True, description="Write a journal entry for every run")
+    dir: Path | None = Field(
+        default=None,
+        description="Journal directory; required when the journal is enabled",
+    )
+    retention_days: int = Field(
+        default=90,
+        ge=0,
+        description="Days runs are kept; 0 keeps them forever",
+    )
+    dossier: bool = Field(
+        default=True,
+        description="Store the final dossier in the run's last event",
+    )

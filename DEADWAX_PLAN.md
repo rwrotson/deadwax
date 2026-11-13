@@ -317,6 +317,14 @@ Changed: `core.versions` classifies "explicit" and "explicit version" as `origin
 
 Commands and outcomes: `uv run poe check` passed (625 tests, 99.16% branch coverage); no other scenario changed. Live-verified: `deadwax --track "Kanye West - Stronger" --no-cache` resolves to recording `8009d470…` (2007-08-13), with `samples` Daft Punk "Harder, Better, Faster, Stronger", mash-ups as `sampled_by`, and ListenBrainz counts. iTunes reports `not_found` for the Apple Music ID MusicBrainz gives (`1445288542`); not investigated.
 
+### 2026-11-13 — run journal (out of stage, requested by the user)
+
+Decision: every CLI call, and any library run that opts in, leaves a structured journal so corner cases (errors, wrong narrowing, blocked sources) can be found across history and their cause read from the log. One JSON Lines file of events per run under `<log dir>/runs/<day>/`, a one-line summary per run in `<log dir>/runs.jsonl`, HTTP metadata only (sha256 and size instead of bodies), on by default in the CLI, a `deadwax runs` command to list and show runs.
+
+- R5 gains `events` (`trace()`, `trace_scope()`, `TraceFilter`) at the bottom, next to `errors`. Core and sources emit DEBUG events with fields under `record.deadwax`: `match.compare` (scores, verdict, failed checks), `search.pick`, `search.ranked`, `lookup.selected`, `lookup.resolver`, `lookup.kind_adopted`, `pass.start`, `adapter.end`, `merge.reference`, `merge.judge`, `http.request`, `http.retry`, `http.challenge`, `http.step_dropped`. `trace()` returns at once when nothing listens at DEBUG.
+- `deadwax.logs.run_journal()` is public and opt-in; `lookup()` never writes files. Concurrent journals in one process write separate files: one router handler dispatches by a run-id context variable. While a journal is open the `deadwax` logger is at DEBUG and does not propagate; a forwarding handler passes the application's handlers only the records at the level they had before.
+- `deadwax.logs` now imports public names from `deadwax`. Import-linter counts the deferred `deadwax → deadwax.sources` import as a dependency, so R1 and the logs R6 contract ignore that one edge; `tests/test_package.py` checks that importing `deadwax.logs` loads neither `deadwax.sources` nor httpx.
+
 **Current task:** Stage 10 (Spotify, YouTube, SoundCloud). **Next action:** at the start of Stage 10, verify each source's access notes.
 
 ## Resume instructions

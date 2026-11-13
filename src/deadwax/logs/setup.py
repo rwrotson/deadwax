@@ -1,11 +1,26 @@
 import logging
 import logging.handlers
 import sys
+from collections.abc import Mapping
 from typing import TextIO
 
 import structlog
 
+from deadwax import TRACE_ATTRIBUTE
 from deadwax.logs.settings import LogSettings
+
+
+def add_trace_fields(
+    _logger: object,
+    _method: str,
+    event_dict: structlog.types.EventDict,
+) -> structlog.types.EventDict:
+    """Add the fields of a deadwax trace event to the structlog event dictionary."""
+    fields = getattr(event_dict.get("_record"), TRACE_ATTRIBUTE, None)
+    if isinstance(fields, Mapping):
+        for key, value in fields.items():
+            event_dict.setdefault(key, value)
+    return event_dict
 
 
 class _AppFileHandler(logging.handlers.RotatingFileHandler):
@@ -64,6 +79,7 @@ def setup_logging(config: LogSettings | None = None) -> None:
         structlog.stdlib.add_logger_name,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
         structlog.processors.StackInfoRenderer(),
+        add_trace_fields,
     ]
 
     # Only JSON output formats exceptions as text; ConsoleRenderer renders exc_info itself.

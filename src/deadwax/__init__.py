@@ -2,6 +2,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from .core import (
+    TRACE_ATTRIBUTE,
     AdapterError,
     Capability,
     ConfigurationError,
@@ -91,6 +92,7 @@ def __getattr__(name: str) -> object:
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 __all__ = [
+    "TRACE_ATTRIBUTE",
     "AdapterError",
     "CacheSettings",
     "Capability",

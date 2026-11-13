@@ -10,7 +10,7 @@ Layers are listed from top to bottom. A layer may import any layer below it and 
 | --- | --- | --- | --- | --- |
 | Entry point | `deadwax/main.py` | `deadwax` console script; reports a missing `cli` extra | — | base |
 | CLI | `deadwax/cli/` | Composition root: loads `DEADWAX_*` settings, sets up logging, calls the library, renders output, maps errors to exit codes | Pydantic Settings, Typer, rich, platformdirs | `deadwax[cli]` |
-| Logging setup | `deadwax/logs/` | `LogSettings` and the opt-in `setup_logging()` for applications | structlog | `deadwax[logs]` |
+| Logging setup | `deadwax/logs/` | `LogSettings`, the opt-in `setup_logging()`, and the run journal (`run_journal()`) for applications | structlog | `deadwax[logs]` |
 | Sources | `deadwax/sources/` | Adapters, HTTP stack (rate limits, retries, cache, escalation), `lookup()` | httpx, selectolax; curl_cffi, Playwright | base; `deadwax[stealth]`, `deadwax[browser]` |
 | Core | `deadwax/core/` | Models, query parsing, normalization, matching, merge, adapter protocol, orchestrator, `DeadwaxError` hierarchy | Pydantic | base |
 
@@ -36,7 +36,7 @@ import-linter enforces the rules marked *contract* with `uv run poe lint-imports
 | --- | --- | --- |
 | `main` | `deadwax.cli.app`, lazily inside `main()`; stdlib | other `deadwax` modules |
 | `cli` | `deadwax` public names, `deadwax.logs`, `deadwax.cli.*` | `deadwax.core`, `deadwax.sources` |
-| `logs` | `deadwax.logs.*` | `deadwax.core`, `deadwax.sources` |
+| `logs` | `deadwax` public names, `deadwax.logs.*` | `deadwax.core`, `deadwax.sources` |
 | `sources` | the `deadwax.core` package, `deadwax.sources.*` within R4 | `deadwax.core.<module>` |
 | `core` | `deadwax.core.*` within R5 | any other `deadwax` layer |
 
@@ -74,8 +74,10 @@ versions
 normalize
 models
 query
-errors
+errors | events
 ```
+
+`events` holds `trace()` and `trace_scope()`, which every other core module may use.
 
 A change to this order is recorded in the decision log of `DEADWAX_PLAN.md`.
 

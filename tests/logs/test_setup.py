@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from deadwax.core import trace, trace_scope
 from deadwax.logs import LogSettings, setup_logging
 from deadwax.logs.setup import _AppConsoleHandler, _AppFileHandler
 
@@ -211,3 +212,17 @@ def test_library_records_reach_configured_handlers(
     event = json.loads(capsys.readouterr().err)
     assert event["event"] == "from library"
     assert event["logger"] == "deadwax.core.example"
+
+
+def test_console_shows_trace_event_fields(
+    clean_root_logger: logging.Logger,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _ = clean_root_logger
+    setup_logging(LogSettings(level="DEBUG", format="json"))
+
+    with trace_scope(source="itunes"):
+        trace(logging.getLogger("deadwax.tests"), "sample.event", score=1)
+
+    event = json.loads(capsys.readouterr().err.splitlines()[-1])
+    assert (event["event"], event["source"], event["score"]) == ("sample.event", "itunes", 1)
