@@ -13,6 +13,7 @@ from deadwax.core import (
     RecordKey,
     Relation,
     SourceError,
+    SourceGroup,
     recognize_url,
 )
 from deadwax.sources._base import HttpAdapter, search_key, service_for_url
@@ -32,6 +33,7 @@ class BandcampAdapter(HttpAdapter):
 
     name = "bandcamp"
     pass_ = Pass.ENRICH
+    group = SourceGroup.CORE
     capabilities = frozenset(
         {
             Capability.IDENTITY,

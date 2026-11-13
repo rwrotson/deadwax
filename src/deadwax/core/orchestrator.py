@@ -1,11 +1,12 @@
 import asyncio
+import contextlib
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from deadwax.core.adapter import Adapter, LookupContext, Pass, SourceState
+from deadwax.core.adapter import Adapter, LookupContext, Pass, SourceGroup, SourceState
 from deadwax.core.errors import (
     BlockedError,
     ConfigurationError,
@@ -35,8 +36,22 @@ def _failure(adapter: Adapter, kind: ErrorKind, reason: str, url: str | None = N
     return Partial(source=adapter.name, errors=[error])
 
 
-async def _call(adapter: Adapter, query: Query, context: LookupContext, seconds: float) -> Partial:
-    """Run one adapter; every failure except cancellation becomes an error in its partial."""
+async def _call(
+    adapter: Adapter,
+    query: Query,
+    context: LookupContext,
+    seconds: float,
+    slots: asyncio.Semaphore | None,
+) -> Partial:
+    """Run one adapter; every failure except cancellation becomes an error in its partial.
+
+    The timeout starts once the adapter has a slot, so waiting for one costs it nothing.
+    """
+    async with slots or contextlib.nullcontext():
+        return await _timed(adapter, query, context, seconds)
+
+
+async def _timed(adapter: Adapter, query: Query, context: LookupContext, seconds: float) -> Partial:
     try:
         async with asyncio.timeout(seconds):
             return await adapter.lookup(query, context)
@@ -62,32 +77,49 @@ class LookupOptions(BaseModel):
     )
     include: frozenset[str] | None = Field(
         default=None,
-        description="Adapters to run; all when unset",
+        description="Source and group names to run; all when unset",
     )
-    exclude: frozenset[str] = Field(default=frozenset(), description="Adapters not to run")
+    exclude: frozenset[str] = Field(
+        default=frozenset(),
+        description="Source and group names not to run",
+    )
+    concurrency: int | None = Field(
+        default=None,
+        ge=1,
+        description="Adapters run at once; unlimited when unset",
+    )
 
     def timeout_for(self, source: str) -> float:
         """Return the timeout of one adapter."""
         return self.adapter_timeouts.get(source, self.adapter_timeout)
 
 
+def expand_names(names: Collection[str], adapters: Sequence[Adapter]) -> frozenset[str]:
+    """Turn source and group names into the names of the adapters they denote."""
+    sources = [adapter.name for adapter in adapters]
+    groups = [group.value for group in SourceGroup]
+    unknown = sorted(set(names) - {*sources, *groups})
+    if unknown:
+        raise ConfigurationError(
+            f"unknown sources: {', '.join(unknown)}; "
+            f"known: {', '.join(sources)}; groups: {', '.join(groups)}",
+        )
+    return frozenset(
+        adapter.name for adapter in adapters if {adapter.name, adapter.group.value} & set(names)
+    )
+
+
 def _select(
     adapters: Sequence[Adapter],
     options: LookupOptions,
 ) -> tuple[list[Adapter], list[AdapterError]]:
-    names = [adapter.name for adapter in adapters]
-    unknown = sorted({*(options.include or ()), *options.exclude} - set(names))
-    if unknown:
-        raise ConfigurationError(
-            f"unknown sources: {', '.join(unknown)}; known: {', '.join(names)}",
-        )
+    include = expand_names(options.include, adapters) if options.include is not None else None
+    exclude = expand_names(options.exclude, adapters)
 
     ready: list[Adapter] = []
     skipped: list[AdapterError] = []
     for adapter in adapters:
-        if adapter.name in options.exclude or (
-            options.include is not None and adapter.name not in options.include
-        ):
+        if adapter.name in exclude or (include is not None and adapter.name not in include):
             continue
         status = adapter.status()
         if status.state is SourceState.READY:
@@ -104,6 +136,7 @@ class _Run:
         self.options = options
         self.now = now
         self.partials: list[Partial] = []
+        self.slots = asyncio.Semaphore(options.concurrency) if options.concurrency else None
 
     def context(self) -> LookupContext:
         dossier = merge(self.query, self.partials, generated_at=self.now())
@@ -116,7 +149,13 @@ class _Run:
         async with asyncio.TaskGroup() as group:
             tasks = [
                 group.create_task(
-                    _call(adapter, self.query, context, self.options.timeout_for(adapter.name)),
+                    _call(
+                        adapter,
+                        self.query,
+                        context,
+                        self.options.timeout_for(adapter.name),
+                        self.slots,
+                    ),
                 )
                 for adapter in adapters
             ]

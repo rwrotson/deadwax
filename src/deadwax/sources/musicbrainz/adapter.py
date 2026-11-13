@@ -14,6 +14,7 @@ from deadwax.core import (
     RecordKey,
     Relation,
     Scope,
+    SourceGroup,
     parse_title,
 )
 from deadwax.sources._base import HttpAdapter, search_key
@@ -59,6 +60,7 @@ class MusicBrainzAdapter(HttpAdapter):
 
     name = "musicbrainz"
     pass_ = Pass.IDENTITY
+    group = SourceGroup.CORE
     capabilities = frozenset(
         {
             Capability.IDENTITY,

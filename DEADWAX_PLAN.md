@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stage 8 next.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stage 8 done; Stage 9 next.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -104,7 +104,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 
 | Stage | Status | Deliverable |
 | --- | --- | --- |
-| 8 | Not started | Foundation: source groups, default source set, per-lookup concurrency cap, shared search → page helper. |
+| 8 | Done | Foundation: source groups, default source set, per-lookup concurrency cap, shared search → page helper. |
 | 9 | Not started | ListenBrainz, SecondHandSongs, KEXP. |
 | 10 | Not started | Spotify, YouTube (links only), SoundCloud. |
 | 11 | Not started | Beatport, Juno Download; BPM and key. |
@@ -120,6 +120,9 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 
 Common acceptance for source stages 9–19, in addition to each stage's own:
 
+- The adapter declares its `group`. An open-API source of the agreed default set (ListenBrainz, SecondHandSongs, KEXP, Spotify, YouTube, Genius) is added to `DEFAULT_SOURCES` in `sources/config.py` in its stage; other sources stay opt-in.
+- An HTML source that searches and reads one page builds on `SearchPageAdapter` in `sources/_base.py`, or the evidence says why not.
+
 - Fixture tests for every extraction path, and for not found, blocked, and a missing key where one applies.
 - The matching gate drops a candidate of another version (tested).
 - Every new setting has a description and a line in `.env.example`; the source is described in `docs/sources.md` and the README tables.
@@ -128,10 +131,10 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 ### Stage 8: foundation
 
-- [ ] Source groups (`shops`, `press`, `catalogues`, `radio`, `streaming`, `samples`, and the v1 sources as `core`) accepted by `--sources` and `--exclude` and shown by `deadwax sources`.
-- [ ] The default set of enabled sources, decided with the user at the start of the stage (a full lookup would otherwise query 34 sources).
-- [ ] A per-lookup cap on concurrent adapters (setting), so a lookup with every source stays within rate limits.
-- [ ] A shared helper in `sources/_base.py` for HTML sources that search, pick a candidate through the matching gate, and read its page.
+- [x] Source groups (`shops`, `press`, `catalogues`, `radio`, `streaming`, `samples`, and the v1 sources as `core`) accepted by `--sources` and `--exclude` and shown by `deadwax sources`.
+- [x] The default set of enabled sources, decided with the user at the start of the stage (a full lookup would otherwise query 34 sources).
+- [x] A per-lookup cap on concurrent adapters (setting), so a lookup with every source stays within rate limits.
+- [x] A shared helper in `sources/_base.py` for HTML sources that search, pick a candidate through the matching gate, and read its page.
 
 **Acceptance:** orchestrator and CLI tests for groups, the default set, and the cap; the helper tested with a fake source. **Suggested message:** `feat(sources): add source groups and a concurrency cap for v2 sources`.
 
@@ -251,8 +254,31 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-13 | v2 source scope: all sources planned in v1 except Rough Trade, Apple Music, Traxsource, Mixcloud and BBC Sounds; YouTube for links only. | User review of what each source can give. | v2 |
 | 2026-11-13 | The v1 plan is archived in `plans/v1.md`; this file carries the decisions that still apply as "Standing decisions". | Keep the active plan short for agents that read it before every session. User choice. | v2 |
 | 2026-11-13 | v2 stages 8–20; numbering continues v1. Model additions land with the first source that needs them; sources with open terms-of-service questions come last and are dropped if declined. | User request for a stage breakdown. | 8–20 |
+| 2026-11-13 | Default source set: `core` plus the open-API v2 sources (ListenBrainz, SecondHandSongs, KEXP, Spotify, YouTube, Genius); shops, press, scraped radio and samples sources are opt-in. Stage 8 ships `("core",)`; each of those sources joins `DEFAULT_SOURCES` in its own stage, since an unknown name in the set is a configuration error. | A full lookup would query 34 sources; open APIs are fast and within their terms. User choice. | 8, 9, 10, 14 |
+| 2026-11-13 | The default set is the setting `default_sources` (`DEADWAX_DEFAULT_SOURCES`, source and group names, comma-separated); `--sources`/`include=` replaces it for one run, `--exclude` subtracts from either, and `<source>.enabled=false` still wins. | Users choose whole groups with one value. User choice. | 8 |
+| 2026-11-13 | Every adapter has one `SourceGroup`; group names never equal source names (tested). Groups are expanded in the orchestrator (`expand_names`), so `include` and `exclude` take both. | One selection rule for the library and the command. | 8 |
+| 2026-11-13 | `concurrency` setting, default 8: one semaphore per lookup across passes; an adapter's timeout starts when it gets a slot. | Lookups with many sources stay within rate limits without timing out queued sources. User choice of the default. | 8 |
+| 2026-11-13 | `SearchPageAdapter` order: query URL of its service, a page of its service from earlier passes, then search. `pick_hit` takes the first `MATCH`, else the first `other_version` hit, which the merge turns into a relation and a version discrepancy; `NO_MATCH` hits are never read. | Another version's page still informs identity, and the merge gate already handles it. | 8, 12–19 |
 
-**Current task:** Stage 8 (foundation). **Next action:** user review of the v2 stages; at the start of Stage 8, decide the default source set with the user.
+### 2026-11-13 — Stage 8 evidence
+
+Changed:
+
+- Core: `SourceGroup`, a `group` on the `Adapter` protocol, `group` and `default` on `SourceInfo`, `expand_names()`, and `LookupOptions.concurrency` with a per-lookup semaphore taken before the adapter timeout starts.
+- Sources: `default_sources` and `concurrency` in `SourcesConfig`; every v1 adapter is in `core`; `lookup()` runs `default_sources` without `include`; `describe_sources()` fills `group` and `default`; `SearchHit`, `pick_hit()`, and `SearchPageAdapter` in `_base.py`.
+- CLI: `DEADWAX_DEFAULT_SOURCES` (comma-separated, `NoDecode`) and `DEADWAX_CONCURRENCY`; `deadwax sources` shows group and default columns and reports an unknown name in the default set as a usage error; help texts name groups.
+- Docs: `.env.example`, `docs/sources.md` (groups, default set, cap), `docs/output.md`, README.
+
+Commands and outcomes:
+
+- `uv run poe check`: format, lint, 18 import contracts kept, mypy strict clean, 597 tests passed, 99.26% branch coverage.
+- `uv run --group docs properdocs build --strict`: built without warnings.
+- Mock-tested: group include/exclude/mix and unknown names (orchestrator); the cap with 2 and unlimited, and a queued adapter not timing out; the default set and `include` replacing it (replayed `apple_url`); `describe_sources` groups and default flags; no source named like a group; `default_sources` parsing from a string, a list, the environment and TOML; CLI columns and exit 2; `SearchPageAdapter` with a fake source: search → pick → page, relative URL joined, resolved URL and earlier-pass link skip the search, no key and no match give `not_found`; `pick_hit` preference.
+- Live-verified: `deadwax --album "Burial - Untrue" --sources core --exclude bandcamp` and `deadwax --track "Burial - Archangel"` returned identities from the core sources with no Bandcamp facts in the first (28 s); Deezer and Discogs were `blocked` on this network, as in v1. `DEADWAX_DEFAULT_SOURCES=nonsense` and `--sources shopz` exit 2 listing sources and groups. No v2 source exists yet, so `SearchPageAdapter` is not live-verified.
+
+Remains: nothing for Stage 8.
+
+**Current task:** Stage 9 (ListenBrainz, SecondHandSongs, KEXP). **Next action:** user review of Stage 8; at the start of Stage 9, verify each source's access notes.
 
 ## Resume instructions
 

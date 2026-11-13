@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlsplit
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, SecretStr
+from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field, SecretStr
 
 DEFAULT_CONTACT = "https://github.com/rwrotson/deadwax"
 
@@ -33,6 +33,20 @@ def _check_proxy(value: SecretStr) -> SecretStr:
 
 # Secret because a proxy URL may carry a user name and password.
 type Proxy = Annotated[SecretStr, AfterValidator(_check_proxy)]
+
+
+def _split_names(value: object) -> object:
+    """Read a comma-separated string of names as a tuple; other values pass unchanged."""
+    if isinstance(value, str):
+        return tuple(name.strip() for name in value.split(",") if name.strip())
+    return value
+
+
+# Source and group names, given as a sequence or as one comma-separated string.
+type SourceNames = Annotated[tuple[str, ...], BeforeValidator(_split_names)]
+
+# Sources a lookup runs when no source list is given.
+DEFAULT_SOURCES: tuple[str, ...] = ("core",)
 
 
 class Escalation(StrEnum):
@@ -160,6 +174,11 @@ class SourcesConfig(_Model):
     http: HttpSettings = HttpSettings()
     cache: CacheSettings = CacheSettings()
     adapter_timeout: float = Field(default=30.0, gt=0, description="Seconds per source lookup")
+    default_sources: SourceNames = Field(
+        default=DEFAULT_SOURCES,
+        description="Source and group names a lookup runs when no source list is given",
+    )
+    concurrency: int = Field(default=8, ge=1, description="Sources queried at once in a lookup")
     musicbrainz: SourceSettings = SourceSettings()
     itunes: SourceSettings = SourceSettings()
     deezer: SourceSettings = SourceSettings()

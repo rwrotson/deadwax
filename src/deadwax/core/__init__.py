@@ -6,6 +6,7 @@ from .adapter import (
     LookupContext,
     Pass,
     Requirement,
+    SourceGroup,
     SourceInfo,
     SourceState,
     SourceStatus,
@@ -61,7 +62,7 @@ from .normalize import (
     normalize_text,
     split_featuring,
 )
-from .orchestrator import LookupOptions, run
+from .orchestrator import LookupOptions, expand_names, run
 from .query import EntityKind, IdKind, Query, parse_query, recognize_url
 from .versions import ParsedTitle, classify_marker, parse_title
 
@@ -108,6 +109,7 @@ __all__ = [
     "Requirement",
     "Scope",
     "SourceError",
+    "SourceGroup",
     "SourceInfo",
     "SourceState",
     "SourceStatus",
@@ -123,6 +125,7 @@ __all__ = [
     "build_identity",
     "classify_marker",
     "compare",
+    "expand_names",
     "fold",
     "merge",
     "normalize_artist",

@@ -17,10 +17,11 @@ Every fact carries the source and URL where it was found. Nothing is invented: m
 deadwax --track "Burial - Archangel"
 deadwax https://open.spotify.com/track/6LgJvl0Xdtc73RJ1mmpotq
 deadwax --album "Burial - Untrue" --sources musicbrainz,itunes --format json
+deadwax --album "Burial - Untrue" --sources core --exclude bandcamp
 deadwax sources
 ```
 
-A text query must state `--album` or `--track`; a URL implies its kind. Other options: `--exclude`, `--format pretty|json|markdown`, `--no-cache`, `--timeout`, `--config`, `--verbose`. Exit codes: 0 found, 1 unexpected error, 2 usage or configuration error, 3 nothing matched.
+A text query must state `--album` or `--track`; a URL implies its kind. `--sources` and `--exclude` take source and group names (`core`, `shops`, `press`, `catalogues`, `radio`, `streaming`, `samples`); without `--sources`, the sources of `DEADWAX_DEFAULT_SOURCES` (default `core`) run. Other options: `--exclude`, `--format pretty|json|markdown`, `--no-cache`, `--timeout`, `--config`, `--verbose`. Exit codes: 0 found, 1 unexpected error, 2 usage or configuration error, 3 nothing matched.
 
 ```python
 import asyncio

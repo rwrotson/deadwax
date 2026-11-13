@@ -62,3 +62,22 @@ def test_proxy_credentials_are_hidden() -> None:
 def test_invalid_proxies_are_rejected(proxy: str) -> None:
     with pytest.raises(ValidationError, match="'direct' or an http"):
         SourcesConfig.model_validate({"http": {"proxy": proxy}})
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [("core, shops,", ("core", "shops")), (["radio"], ("radio",)), ("", ())],
+)
+def test_default_sources_accept_a_comma_separated_string(
+    value: object,
+    expected: tuple[str, ...],
+) -> None:
+    config = SourcesConfig.model_validate({"default_sources": value})
+
+    assert config.default_sources == expected
+
+
+def test_default_set_and_concurrency() -> None:
+    assert (SourcesConfig().default_sources, SourcesConfig().concurrency) == (("core",), 8)
+    with pytest.raises(ValidationError):
+        SourcesConfig(concurrency=0)

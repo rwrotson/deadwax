@@ -112,11 +112,14 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
     track: Annotated[bool, typer.Option("--track", help="The query names a track.")] = False,
     sources: Annotated[
         str | None,
-        typer.Option("--sources", help="Only these sources, comma-separated."),
+        typer.Option(
+            "--sources",
+            help="Only these sources or groups, comma-separated; default: DEADWAX_DEFAULT_SOURCES.",
+        ),
     ] = None,
     exclude: Annotated[
         str | None,
-        typer.Option("--exclude", help="Skip these sources, comma-separated."),
+        typer.Option("--exclude", help="Skip these sources or groups, comma-separated."),
     ] = None,
     output: FormatOption = OutputFormat.PRETTY,
     no_cache: Annotated[bool, typer.Option("--no-cache", help="Bypass the cache.")] = False,
@@ -163,6 +166,10 @@ def sources_command(
     config: ConfigOption = None,
     verbose: VerboseOption = False,
 ) -> None:
-    """List the sources, what they contribute, and whether they can run."""
+    """List the sources, their groups, what they contribute, and whether they can run."""
     settings = _settings(config, verbose)
-    print_sources(describe_sources(settings.sources_config()), output)
+    try:
+        infos = describe_sources(settings.sources_config())
+    except ConfigurationError as error:
+        raise _usage_error(str(error)) from error
+    print_sources(infos, output)

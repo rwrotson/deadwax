@@ -9,6 +9,7 @@ from deadwax.core import (
     RecordKey,
     Requirement,
     Scope,
+    SourceGroup,
     Tag,
 )
 from deadwax.sources._base import HttpAdapter, search_key
@@ -33,6 +34,7 @@ class LastfmAdapter(HttpAdapter):
 
     name = "lastfm"
     pass_ = Pass.ENRICH
+    group = SourceGroup.CORE
     capabilities = frozenset(
         {Capability.IDENTITY, Capability.TAGS, Capability.TEXTS, Capability.RELATIONS},
     )

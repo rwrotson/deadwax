@@ -11,6 +11,7 @@ from deadwax.core import (
     Query,
     RecordKey,
     Scope,
+    SourceGroup,
     Text,
     normalize_text,
 )
@@ -30,6 +31,7 @@ class WikipediaAdapter(HttpAdapter):
 
     name = "wikipedia"
     pass_ = Pass.ENRICH
+    group = SourceGroup.CORE
     capabilities = frozenset(
         {
             Capability.IDENTITY,

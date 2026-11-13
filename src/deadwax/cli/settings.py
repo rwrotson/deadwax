@@ -2,12 +2,14 @@ import os
 from collections.abc import Iterator
 from contextvars import ContextVar
 from pathlib import Path
+from typing import Annotated
 
 from platformdirs import user_cache_path, user_config_path
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
 from pydantic.fields import FieldInfo
 from pydantic_settings import (
     BaseSettings,
+    NoDecode,
     PydanticBaseSettingsSource,
     SettingsConfigDict,
     TomlConfigSettingsSource,
@@ -27,8 +29,17 @@ from deadwax.logs import LogSettings
 APP_NAME = "deadwax"
 CONFIG_FILE_VARIABLE = "DEADWAX_CONFIG_FILE"
 
+# The library's default source set, shown and used when DEADWAX_DEFAULT_SOURCES is unset.
+_DEFAULT_SOURCES: tuple[str, ...] = SourcesConfig.model_fields["default_sources"].default
+
 # TOML file that load_settings() adds below the environment and .env for one load.
 _toml_file: ContextVar[Path | None] = ContextVar("deadwax_toml_file", default=None)
+
+
+def _split_names(value: object) -> object:
+    if isinstance(value, str):
+        return tuple(name.strip() for name in value.split(",") if name.strip())
+    return value
 
 
 class Settings(BaseSettings):
@@ -48,6 +59,14 @@ class Settings(BaseSettings):
         "only. Default: config.toml in the user configuration directory",
     )
     adapter_timeout: float = Field(default=30.0, gt=0, description="Seconds per source lookup")
+
+    # NoDecode: the environment gives a comma-separated string, not JSON.
+    default_sources: Annotated[tuple[str, ...], NoDecode, BeforeValidator(_split_names)] = Field(
+        default=_DEFAULT_SOURCES,
+        description="Source and group names a lookup runs when --sources is not given",
+    )
+
+    concurrency: int = Field(default=8, ge=1, description="Sources queried at once in a lookup")
     log: LogSettings = Field(default_factory=LogSettings)
     http: HttpSettings = Field(default_factory=HttpSettings)
     cache: CacheSettings = Field(default_factory=CacheSettings)

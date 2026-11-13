@@ -181,6 +181,7 @@ def test_config_file_and_environment_reach_the_sources(
 
 def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DEADWAX_ITUNES__ENABLED", "false")
+    monkeypatch.setenv("COLUMNS", "200")
 
     table = runner.invoke(app, ["sources"])
     as_json = runner.invoke(app, ["sources", "--format", "json"])
@@ -199,6 +200,29 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
     }
     assert "DEADWAX_DISCOGS__TOKEN" in table.stdout
     assert "DEADWAX_LASTFM__API_KEY" in table.stdout
+    assert {(row["group"], row["default"]) for row in json.loads(as_json.stdout)} == {
+        ("core", True),
+    }
+
+
+def test_sources_command_marks_the_default_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DEADWAX_DEFAULT_SOURCES", "musicbrainz,deezer")
+
+    result = runner.invoke(app, ["sources", "--format", "json"])
+
+    assert result.exit_code == 0
+    defaults = [row["source"] for row in json.loads(result.stdout) if row["default"]]
+    assert defaults == ["musicbrainz", "deezer"]
+
+
+def test_unknown_default_source_is_a_usage_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DEADWAX_DEFAULT_SOURCES", "core,nonsense")
+
+    result = runner.invoke(app, ["sources"])
+
+    assert result.exit_code == EXIT_USAGE
+    assert "unknown sources: nonsense" in result.stderr
+    assert "groups: core, shops" in result.stderr
 
 
 def test_settings_configure_logging(

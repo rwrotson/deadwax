@@ -9,6 +9,7 @@ from deadwax import (
     Pass,
     Query,
     Requirement,
+    SourceGroup,
     SourceInfo,
     SourceState,
     SourceStatus,
@@ -71,6 +72,8 @@ def test_json_and_markdown(dossier: Dossier) -> None:
 INFOS = [
     SourceInfo(
         source="musicbrainz",
+        group=SourceGroup.CORE,
+        default=True,
         pass_=Pass.IDENTITY,
         capabilities=[Capability.IDENTITY, Capability.LINKS],
         requires=[],
@@ -78,6 +81,8 @@ INFOS = [
     ),
     SourceInfo(
         source="lastfm",
+        group=SourceGroup.CORE,
+        default=True,
         pass_=Pass.ENRICH,
         capabilities=[Capability.TAGS],
         requires=[Requirement(setting="lastfm.api_key", purpose="every lookup")],
@@ -85,6 +90,8 @@ INFOS = [
     ),
     SourceInfo(
         source="bandcamp",
+        group=SourceGroup.CORE,
+        default=True,
         pass_=Pass.ENRICH,
         capabilities=[],
         requires=[],
@@ -96,6 +103,8 @@ INFOS = [
     ),
     SourceInfo(
         source="itunes",
+        group=SourceGroup.CORE,
+        default=False,
         pass_=Pass.ENRICH,
         capabilities=[],
         requires=[],
@@ -118,11 +127,17 @@ def test_sources(output: OutputFormat) -> None:
             "bandcamp",
             "itunes",
         ]
+        assert {(row["group"], row["default"]) for row in json.loads(text)} == {
+            ("core", True),
+            ("core", False),
+        }
     else:
         assert "missing DEADWAX_LASTFM__API_KEY" in text
         assert "missing extra: deadwax[browser]" in text
         assert "disabled" in text
         assert "identity, links" in text
+        assert "core" in text
+        assert "yes" in text
 
 
 def test_env_variable() -> None:

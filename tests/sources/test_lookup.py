@@ -16,6 +16,7 @@ from deadwax import (
     Rating,
     RelationKind,
     Scope,
+    SourceGroup,
     SourcesConfig,
     SourceState,
     TextKind,
@@ -293,6 +294,54 @@ async def test_discogs_url_resolves_first(replay: Replay, config: SourcesConfig)
     assert {"Thom Yorke", "Jonny Greenwood"} <= {
         r.target.name for r in dossier.relations if r.kind is RelationKind.MEMBER
     }
+
+
+@pytest.mark.asyncio
+async def test_default_sources_run_without_include(replay: Replay, config: SourcesConfig) -> None:
+    query = parse_query("https://music.apple.com/us/album/x/1097861387?i=1097861770")
+    seen: list[str] = []
+
+    dossier = await lookup(
+        query,
+        config.model_copy(update={"default_sources": ("itunes",)}),
+        transport=replay("apple_url", seen),
+    )
+
+    assert dossier.identity.title is not None
+    assert dossier.errors == []
+    assert seen
+    assert all("itunes.apple.com" in key for key in seen)
+
+
+@pytest.mark.asyncio
+async def test_include_replaces_the_default_sources(replay: Replay, config: SourcesConfig) -> None:
+    query = parse_query("https://music.apple.com/us/album/x/1097861387?i=1097861770")
+    seen: list[str] = []
+
+    await lookup(
+        query,
+        config.model_copy(update={"default_sources": ("unknown",)}),
+        include=["core"],
+        exclude=["musicbrainz", "deezer", "odesli", "discogs", "bandcamp", "lastfm", "wikipedia"],
+        transport=replay("apple_url", seen),
+    )
+
+    assert seen
+    assert all("itunes.apple.com" in key for key in seen)
+
+
+def test_describe_sources_marks_groups_and_the_default_set() -> None:
+    infos = describe_sources(
+        SourcesConfig.model_validate({"default_sources": "musicbrainz, deezer"}),
+    )
+
+    assert {info.group for info in infos} == {SourceGroup.CORE}
+    assert [info.source for info in infos if info.default] == ["musicbrainz", "deezer"]
+    assert all(info.default for info in describe_sources())
+
+
+def test_no_source_is_named_like_a_group() -> None:
+    assert {info.source for info in describe_sources()}.isdisjoint(set(SourceGroup))
 
 
 def test_describe_sources() -> None:

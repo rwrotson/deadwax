@@ -17,6 +17,7 @@ from deadwax.core import (
     Query,
     RecordCandidate,
     SourceError,
+    SourceGroup,
 )
 from deadwax.sources._base import HttpAdapter, service_for_url
 from deadwax.sources._html import parse_html
@@ -174,6 +175,7 @@ class OdesliAdapter(HttpAdapter):
 
     name = "odesli"
     pass_ = Pass.LINKS
+    group = SourceGroup.CORE
     capabilities = frozenset({Capability.LINKS})
     profile = Profile.BROWSER
 

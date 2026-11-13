@@ -1,20 +1,25 @@
 import re
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from urllib.parse import urlsplit
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
+from urllib.parse import urljoin, urlsplit
 
 from deadwax.core import (
     Capability,
     EntityKind,
     LinkTarget,
     LookupContext,
+    NotFoundError,
     Partial,
     Pass,
     Query,
     RecordKey,
     Requirement,
+    SourceGroup,
     SourceState,
     SourceStatus,
+    Verdict,
+    compare,
     recognize_url,
 )
 from deadwax.sources._http import ClientSpec, HttpClient, HttpResources, Profile
@@ -25,6 +30,7 @@ class HttpAdapter(ABC):
     """Base for adapters that talk to one source through an `HttpClient`."""
 
     name: str
+    group: SourceGroup
     pass_: Pass
     capabilities: frozenset[Capability]
     requires: tuple[Requirement, ...] = ()
@@ -158,3 +164,80 @@ def search_key(query: Query, context: LookupContext) -> RecordKey | None:
         kind=kind,
         version=identity.version,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class SearchHit:
+    """One search result: its page and the record it lists."""
+
+    url: str
+    key: RecordKey
+
+
+def pick_hit(reference: RecordKey, hits: Iterable[SearchHit]) -> SearchHit | None:
+    """Return the first hit of the record, else the first of another version of it.
+
+    The merge turns another version into a relation and a version discrepancy.
+    """
+    other_version = None
+    for hit in hits:
+        verdict = compare(reference, hit.key).verdict
+        if verdict is Verdict.MATCH:
+            return hit
+        if verdict is Verdict.OTHER_VERSION and other_version is None:
+            other_version = hit
+    return other_version
+
+
+class SearchPageAdapter(HttpAdapter):
+    """Base for HTML sources that search, pick a result through the matching gate, read its page.
+
+    The page comes from the query URL, a link an earlier pass found, or a search, in that order.
+    """
+
+    profile = Profile.BROWSER
+
+    # Service name of the source's pages, as `service_for_url` gives it.
+    service: str | None = None
+
+    def resolves(self, query: Query) -> bool:
+        """Pages of the source's own service."""
+        return (
+            self.service is not None
+            and query.url is not None
+            and service_for_url(query.url) == self.service
+        )
+
+    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+        """Find the record's page and read it."""
+        key = search_key(query, context)
+        url = await self._page_url(query, context, key)
+        response = await self.client.get(url)
+        return self.read_page(response.content, response.url, key)
+
+    async def _page_url(self, query: Query, context: LookupContext, key: RecordKey | None) -> str:
+        if query.url is not None and self.resolves(query):
+            return query.url
+        if self.service is not None and (known := context.urls(self.service)):
+            return known[0]
+        if key is None:
+            raise NotFoundError("neither the query nor earlier sources name the record")
+
+        url, params = self.search_request(key)
+        response = await self.client.get(url, params=params)
+        hit = pick_hit(key, self.search_hits(response.content, response.url))
+        if hit is None:
+            raise NotFoundError(f"no matching {self.name} record")
+        return urljoin(response.url, hit.url)
+
+    @abstractmethod
+    def search_request(self, key: RecordKey) -> tuple[str, Mapping[str, str]]:
+        """URL and query parameters of the search for a record."""
+
+    @abstractmethod
+    def search_hits(self, content: bytes, url: str) -> list[SearchHit]:
+        """Read the results of a search page; their URLs may be relative to it."""
+
+    @abstractmethod
+    def read_page(self, content: bytes, url: str, key: RecordKey | None) -> Partial:
+        """Read the facts of the record's page."""

@@ -32,6 +32,20 @@ class Capability(StrEnum):
     RELATIONS = "relations"
 
 
+class SourceGroup(StrEnum):
+    """Kind of source, selectable by name like a source."""
+
+    # The v1 sources.
+    CORE = "core"
+
+    SHOPS = "shops"
+    PRESS = "press"
+    CATALOGUES = "catalogues"
+    RADIO = "radio"
+    STREAMING = "streaming"
+    SAMPLES = "samples"
+
+
 class Requirement(_Model):
     """Setting an adapter needs, such as an API key."""
 
@@ -65,10 +79,14 @@ class SourceInfo(_Model):
     """What an adapter contributes and whether it can run."""
 
     source: str
+    group: SourceGroup
     pass_: Pass
     capabilities: list[Capability]
     requires: list[Requirement]
     status: SourceStatus
+
+    # Whether a lookup without an explicit source list runs the adapter.
+    default: bool
 
 
 class LookupContext(_Model):
@@ -95,6 +113,11 @@ class Adapter(Protocol):
     @property
     def name(self) -> str:
         """Source name used in provenance and errors."""
+        ...
+
+    @property
+    def group(self) -> SourceGroup:
+        """Group the source belongs to."""
         ...
 
     @property

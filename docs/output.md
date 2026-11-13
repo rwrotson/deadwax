@@ -68,7 +68,7 @@ Relation kinds are directional:
 | `not_found` | The source has no such record |
 | `no_match` | The source found something, but not this record |
 
-Sources excluded with `--exclude`, left out of `--sources`, or disabled in settings produce no error. A failing source never stops the others and never raises out of `lookup()`.
+Sources excluded with `--exclude`, left out of `--sources` or of the default set, or disabled in settings produce no error. A failing source never stops the others and never raises out of `lookup()`.
 
 ## Exit codes
 

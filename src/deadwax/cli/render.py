@@ -245,12 +245,20 @@ def _status(info: SourceInfo) -> Text:
     return Text(f"{status.state.value.replace('_', ' ')}{detail}", style="yellow")
 
 
+def _default(info: SourceInfo) -> str:
+    return "yes" if info.default else ""
+
+
+def _capabilities(info: SourceInfo) -> str:
+    return ", ".join(capability.value for capability in info.capabilities)
+
+
 def print_sources(
     infos: Sequence[SourceInfo],
     output: OutputFormat,
     console: Console | None = None,
 ) -> None:
-    """Print the sources with their pass, capabilities, and status."""
+    """Print the sources with their group, default membership, pass, capabilities, and status."""
     console = console or Console()
     if output is OutputFormat.JSON:
         payload = [info.model_dump(mode="json") for info in infos]
@@ -258,16 +266,31 @@ def print_sources(
         return
 
     if output is OutputFormat.MARKDOWN:
-        lines = ["| Source | Pass | Contributes | Status |", "| --- | --- | --- | --- |"]
+        lines = [
+            "| Source | Group | Default | Pass | Contributes | Status |",
+            "| --- | --- | --- | --- | --- | --- |",
+        ]
         for info in infos:
-            capabilities = ", ".join(capability.value for capability in info.capabilities)
-            row = f"| {info.source} | {info.pass_.value} | {capabilities} | {_status(info).plain} |"
-            lines.append(row)
+            cells = (
+                info.source,
+                info.group.value,
+                _default(info),
+                info.pass_.value,
+                _capabilities(info),
+                _status(info).plain,
+            )
+            lines.append(f"| {' | '.join(cells)} |")
         console.out("\n".join(lines), highlight=False)
         return
 
-    table = _table("source", "pass", "contributes", "status")
+    table = _table("source", "group", "default", "pass", "contributes", "status")
     for info in infos:
-        capabilities = ", ".join(capability.value for capability in info.capabilities)
-        table.add_row(info.source, info.pass_.value, capabilities, _status(info))
+        table.add_row(
+            info.source,
+            info.group.value,
+            _default(info),
+            info.pass_.value,
+            _capabilities(info),
+            _status(info),
+        )
     console.print(table)

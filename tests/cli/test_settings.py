@@ -113,3 +113,31 @@ def test_settings_cover_the_library_configuration(tmp_path: Path) -> None:
     assert config.cache.path == tmp_path / "own.sqlite"
     assert config.odesli.rate == 2
     assert load_settings().sources_config().cache.path == tmp_path / "cache.sqlite"
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [("core, shops,", ("core", "shops")), ("musicbrainz", ("musicbrainz",))],
+)
+def test_default_sources_from_a_comma_separated_variable(
+    monkeypatch: pytest.MonkeyPatch,
+    value: str,
+    expected: tuple[str, ...],
+) -> None:
+    monkeypatch.setenv("DEADWAX_DEFAULT_SOURCES", value)
+    monkeypatch.setenv("DEADWAX_CONCURRENCY", "3")
+
+    config = load_settings().sources_config()
+
+    assert (config.default_sources, config.concurrency) == (expected, 3)
+
+
+def test_default_sources_from_a_toml_list(tmp_path: Path) -> None:
+    config = tmp_path / "deadwax.toml"
+    config.write_text('default_sources = ["core", "radio"]\n')
+
+    assert load_settings(config).default_sources == ("core", "radio")
+
+
+def test_default_source_set_matches_the_library() -> None:
+    assert load_settings().default_sources == SourcesConfig().default_sources == ("core",)

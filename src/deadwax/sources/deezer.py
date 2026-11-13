@@ -18,6 +18,7 @@ from deadwax.core import (
     RecordKey,
     Scope,
     SourceError,
+    SourceGroup,
     Tag,
     TagKind,
     Verdict,
@@ -217,6 +218,7 @@ class DeezerAdapter(HttpAdapter):
 
     name = "deezer"
     pass_ = Pass.ENRICH
+    group = SourceGroup.CORE
     capabilities = frozenset({Capability.IDENTITY, Capability.LINKS, Capability.TAGS})
 
     def resolves(self, query: Query) -> bool:

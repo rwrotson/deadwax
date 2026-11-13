@@ -28,9 +28,11 @@ from deadwax.core import (
     Requirement,
     Scope,
     SourceError,
+    SourceGroup,
     SourceState,
     SourceStatus,
     Tag,
+    expand_names,
     parse_query,
     run,
 )
@@ -53,6 +55,7 @@ class FakeAdapter:
     resolves_urls: bool = False
     capabilities: frozenset[Capability] = frozenset({Capability.TAGS})
     requires: tuple[Requirement, ...] = ()
+    group: SourceGroup = SourceGroup.CORE
     calls: list[tuple[Query, LookupContext]] = field(default_factory=list)
 
     def status(self) -> SourceStatus:
@@ -304,8 +307,99 @@ async def test_include_and_exclude_select_adapters_without_errors() -> None:
 async def test_unknown_source_names_are_rejected() -> None:
     options = LookupOptions(exclude=frozenset({"spotify"}))
 
-    with pytest.raises(ConfigurationError, match="unknown sources: spotify; known: lastfm"):
+    with pytest.raises(
+        ConfigurationError,
+        match="unknown sources: spotify; known: lastfm; groups: core, shops, ",
+    ):
         await lookup([FakeAdapter("lastfm")], options=options)
+
+
+def grouped() -> list[FakeAdapter]:
+    return [
+        FakeAdapter("musicbrainz", Pass.IDENTITY),
+        FakeAdapter("juno", group=SourceGroup.SHOPS),
+        FakeAdapter("boomkat", group=SourceGroup.SHOPS),
+        FakeAdapter("kexp", group=SourceGroup.RADIO),
+    ]
+
+
+async def test_a_group_in_include_runs_only_its_members() -> None:
+    adapters = grouped()
+
+    errors = await lookup(adapters, options=LookupOptions(include=frozenset({"shops"})))
+
+    assert errors == []
+    assert [len(adapter.calls) for adapter in adapters] == [0, 1, 1, 0]
+
+
+async def test_a_group_in_exclude_removes_its_members() -> None:
+    adapters = grouped()
+
+    await lookup(adapters, options=LookupOptions(exclude=frozenset({"shops"})))
+
+    assert [len(adapter.calls) for adapter in adapters] == [1, 0, 0, 1]
+
+
+async def test_source_and_group_names_combine() -> None:
+    adapters = grouped()
+    options = LookupOptions(
+        include=frozenset({"core", "shops", "kexp"}),
+        exclude=frozenset({"boomkat"}),
+    )
+
+    await lookup(adapters, options=options)
+
+    assert [len(adapter.calls) for adapter in adapters] == [1, 1, 0, 1]
+
+
+async def test_expand_names_maps_groups_to_their_sources() -> None:
+    adapters: list[Adapter] = list(grouped())
+
+    assert expand_names(["shops", "musicbrainz"], adapters) == {"juno", "boomkat", "musicbrainz"}
+    assert expand_names(["samples"], adapters) == frozenset()
+    with pytest.raises(ConfigurationError, match="unknown sources: nts"):
+        expand_names(["nts"], adapters)
+
+
+def counting(running: list[int], peak: list[int]) -> Behaviour:
+    async def behaviour(query: Query, context: LookupContext) -> Partial:
+        running.append(1)
+        peak[0] = max(peak[0], len(running))
+        await asyncio.sleep(0.01)
+        running.pop()
+        return Partial(source="counted")
+
+    return behaviour
+
+
+@pytest.mark.parametrize(("concurrency", "expected"), [(2, 2), (None, 5)])
+async def test_concurrency_caps_adapters_running_at_once(
+    concurrency: int | None,
+    expected: int,
+) -> None:
+    running: list[int] = []
+    peak = [0]
+    adapters = [FakeAdapter(f"s{i}", behaviour=counting(running, peak)) for i in range(5)]
+
+    errors = await lookup(adapters, options=LookupOptions(concurrency=concurrency))
+
+    assert errors == []
+    assert all(len(adapter.calls) == 1 for adapter in adapters)
+    assert peak == [expected]
+
+
+async def test_waiting_for_a_slot_does_not_count_toward_the_timeout() -> None:
+    async def slow(query: Query, context: LookupContext) -> Partial:
+        await asyncio.sleep(0.2)
+        return found("first")
+
+    adapters = [FakeAdapter("first", behaviour=slow), FakeAdapter("second")]
+    options = LookupOptions(concurrency=1, adapter_timeouts={"second": 0.1})
+
+    errors = await lookup(adapters, options=options)
+
+    assert errors == []
+    assert len(adapters[1].calls) == 1
 
 
 async def test_no_adapters_gives_an_empty_dossier() -> None:

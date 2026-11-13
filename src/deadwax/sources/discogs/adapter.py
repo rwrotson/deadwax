@@ -21,6 +21,7 @@ from deadwax.core import (
     Requirement,
     Scope,
     SourceError,
+    SourceGroup,
     SourceStatus,
     Text,
 )
@@ -49,6 +50,7 @@ class DiscogsAdapter(HttpAdapter):
 
     name = "discogs"
     pass_ = Pass.ENRICH
+    group = SourceGroup.CORE
     capabilities = frozenset(
         {
             Capability.IDENTITY,

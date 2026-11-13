@@ -17,6 +17,7 @@ from deadwax.core import (
     RecordCandidate,
     RecordKey,
     Scope,
+    SourceGroup,
     Tag,
     TagKind,
     Verdict,
@@ -155,6 +156,7 @@ class ItunesAdapter(HttpAdapter):
 
     name = "itunes"
     pass_ = Pass.ENRICH
+    group = SourceGroup.CORE
     capabilities = frozenset({Capability.IDENTITY, Capability.LINKS, Capability.TAGS})
 
     def resolves(self, query: Query) -> bool:
