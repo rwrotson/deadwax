@@ -134,5 +134,6 @@ class SimilarArtistsResponse(ApiModel):
     """Response of artist.getSimilar."""
 
     similar: Annotated[SimilarArtists, BeforeValidator(_as_object)] = Field(
-        default=SimilarArtists(), alias="similarartists"
+        default=SimilarArtists(),
+        alias="similarartists",
     )

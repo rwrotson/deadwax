@@ -188,7 +188,10 @@ class Tag(Fact):
     name: str
     kind: TagKind = TagKind.TAG
     weight: float | None = Field(
-        default=None, ge=0, le=1, description="Relative weight in the source, scaled to 0-1"
+        default=None,
+        ge=0,
+        le=1,
+        description="Relative weight in the source, scaled to 0-1",
     )
 
 
@@ -272,7 +275,8 @@ class RecordCandidate(_Model):
     artist: str
     title: str
     version: VersionInfo | None = Field(
-        default=None, description="Explicit version; derived from the title when unset"
+        default=None,
+        description="Explicit version; derived from the title when unset",
     )
     date: str | None = None
     labels: list[CandidateLabel] = []

@@ -133,15 +133,20 @@ def track_partial(track: Track) -> Partial:
                 target=LinkTarget.TRACK,
                 preview_url=track.preview or None,
                 sources=sources,
-            )
+            ),
         )
     if track.album is not None and track.album.link:
         links.append(
-            Link(service="deezer", url=track.album.link, target=LinkTarget.ALBUM, sources=sources)
+            Link(service="deezer", url=track.album.link, target=LinkTarget.ALBUM, sources=sources),
         )
     if track.artist.link:
         links.append(
-            Link(service="deezer", url=track.artist.link, target=LinkTarget.ARTIST, sources=sources)
+            Link(
+                service="deezer",
+                url=track.artist.link,
+                target=LinkTarget.ARTIST,
+                sources=sources,
+            ),
         )
     return Partial(
         source=DeezerAdapter.name,
@@ -164,11 +169,16 @@ def album_partial(album: Album) -> Partial:
     links = []
     if album.link:
         links.append(
-            Link(service="deezer", url=album.link, target=LinkTarget.ALBUM, sources=sources)
+            Link(service="deezer", url=album.link, target=LinkTarget.ALBUM, sources=sources),
         )
     if album.artist.link:
         links.append(
-            Link(service="deezer", url=album.artist.link, target=LinkTarget.ARTIST, sources=sources)
+            Link(
+                service="deezer",
+                url=album.artist.link,
+                target=LinkTarget.ARTIST,
+                sources=sources,
+            ),
         )
     tags = [
         Tag(name=genre.name, kind=TagKind.GENRE, scope=Scope.RELEASE, sources=sources)
@@ -236,7 +246,8 @@ class DeezerAdapter(HttpAdapter):
             q = f"artist:{quoted(key.artist)} album:{quoted(key.title)}"
             albums = await self._get(AlbumSearch, "search/album", q=q, limit=_SEARCH_LIMIT)
             album = next(
-                (a for a in albums.data if _matches(key, a.artist.name, a.title, kind)), None
+                (a for a in albums.data if _matches(key, a.artist.name, a.title, kind)),
+                None,
             )
             if album is None:
                 raise NotFoundError("no matching Deezer album")

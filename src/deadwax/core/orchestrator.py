@@ -57,10 +57,12 @@ class LookupOptions(BaseModel):
 
     adapter_timeout: float = Field(default=30.0, gt=0, description="Seconds per adapter")
     adapter_timeouts: dict[str, float] = Field(
-        default_factory=dict, description="Per-adapter overrides of the timeout"
+        default_factory=dict,
+        description="Per-adapter overrides of the timeout",
     )
     include: frozenset[str] | None = Field(
-        default=None, description="Adapters to run; all when unset"
+        default=None,
+        description="Adapters to run; all when unset",
     )
     exclude: frozenset[str] = Field(default=frozenset(), description="Adapters not to run")
 
@@ -70,13 +72,14 @@ class LookupOptions(BaseModel):
 
 
 def _select(
-    adapters: Sequence[Adapter], options: LookupOptions
+    adapters: Sequence[Adapter],
+    options: LookupOptions,
 ) -> tuple[list[Adapter], list[AdapterError]]:
     names = [adapter.name for adapter in adapters]
     unknown = sorted({*(options.include or ()), *options.exclude} - set(names))
     if unknown:
         raise ConfigurationError(
-            f"unknown sources: {', '.join(unknown)}; known: {', '.join(names)}"
+            f"unknown sources: {', '.join(unknown)}; known: {', '.join(names)}",
         )
     ready: list[Adapter] = []
     skipped: list[AdapterError] = []
@@ -112,7 +115,7 @@ class _Run:
         async with asyncio.TaskGroup() as group:
             tasks = [
                 group.create_task(
-                    _call(adapter, self.query, context, self.options.timeout_for(adapter.name))
+                    _call(adapter, self.query, context, self.options.timeout_for(adapter.name)),
                 )
                 for adapter in adapters
             ]

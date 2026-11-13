@@ -37,7 +37,7 @@ WIKIDATA = "https://www.wikidata.org"
 KIND_TYPES: dict[EntityKind, frozenset[str]] = {
     EntityKind.TRACK: frozenset({"Q7366", "Q134556", "Q105543609", "Q2188189"}),
     EntityKind.ALBUM: frozenset(
-        {"Q482994", "Q208569", "Q169930", "Q209939", "Q222910", "Q186588", "Q20711488"}
+        {"Q482994", "Q208569", "Q169930", "Q209939", "Q222910", "Q186588", "Q20711488"},
     ),
 }
 
@@ -322,7 +322,10 @@ def claim_credits(item: models.Item, labels: Labels, scope: Scope) -> list[Credi
 
 
 def claim_relations(
-    item: models.Item, labels: Labels, scope: Scope, albums: Collection[str] = ()
+    item: models.Item,
+    labels: Labels,
+    scope: Scope,
+    albums: Collection[str] = (),
 ) -> list[Relation]:
     """Labels of the record and the albums it is part of; other 'part of' items are lists."""
     sources = [Provenance(source=SOURCE, url=entity_url(item.id))]
@@ -374,7 +377,7 @@ def claim_ratings(item: models.Item, labels: Labels, scope: Scope, known: set[st
                 rating=rating,
                 scope=scope,
                 sources=sources,
-            )
+            ),
         )
     return result
 
@@ -475,7 +478,7 @@ def ratings(wikitext: str, language: str, scope: Scope, url: str) -> list[Text]:
                     language=language,
                     scope=scope,
                     sources=sources,
-                )
+                ),
             )
     return result
 
@@ -550,6 +553,6 @@ def sections(html: str, title: str, language: str, scope: Scope, url: str) -> li
                 language=language,
                 scope=scope,
                 sources=[Provenance(source=SOURCE, url=f"{url}#{anchor}" if anchor else url)],
-            )
+            ),
         )
     return result

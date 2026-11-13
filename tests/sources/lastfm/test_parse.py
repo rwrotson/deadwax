@@ -32,7 +32,7 @@ def test_body_without_error_passes() -> None:
 def test_tags_have_weights_and_unused_ones_are_dropped() -> None:
     found = models.TopTags.model_validate(
         {"tag": [{"name": " electronic ", "count": 100}, {"name": "x", "count": 0},
-                 {"name": "ambient", "count": "40"}, {"name": " ", "count": 5}]}
+                 {"name": "ambient", "count": "40"}, {"name": " ", "count": 5}]},
     )  # fmt: skip
 
     tags = p.tags(found.tag, Scope.RECORDING, URL, limit=5)
@@ -81,7 +81,7 @@ def test_no_wiki() -> None:
 
 def test_similar_items() -> None:
     tracks = models.SimilarTracks.model_validate(
-        {"track": {"name": "Other", "match": "0.5", "url": "u", "artist": {"name": "B"}}}
+        {"track": {"name": "Other", "match": "0.5", "url": "u", "artist": {"name": "B"}}},
     )
     artists = models.SimilarArtists.model_validate({"artist": [{"name": "C"}]})
 

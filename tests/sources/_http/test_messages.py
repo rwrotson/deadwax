@@ -33,7 +33,9 @@ def test_full_url(url: str, params: tuple[tuple[str, str], ...], expected: str) 
     ],
 )
 def test_text_uses_the_declared_charset(
-    content_type: str | None, content: bytes, expected: str
+    content_type: str | None,
+    content: bytes,
+    expected: str,
 ) -> None:
     headers = {"content-type": content_type} if content_type else {}
 
@@ -81,7 +83,10 @@ async def test_httpx_fetcher_sends_profile_and_request_headers() -> None:
 @pytest.mark.asyncio
 async def test_httpx_fetcher_limits_size_and_wraps_transport_errors() -> None:
     fetcher = HttpxFetcher(
-        headers={}, timeout=1, max_bytes=3, transport=httpx.MockTransport(handler)
+        headers={},
+        timeout=1,
+        max_bytes=3,
+        transport=httpx.MockTransport(handler),
     )
     big = Request("GET", "https://x/ok", (("a", "1"),), (("x-extra", "yes"),))
 

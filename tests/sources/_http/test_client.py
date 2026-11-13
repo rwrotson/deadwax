@@ -108,7 +108,7 @@ class Setup:
             rng=random.Random(0),  # noqa: S311 -- seeded test jitter
         )
         config = SourcesConfig(
-            http=HttpSettings(retries=self.retries, escalation=escalation, contact="https://c")
+            http=HttpSettings(retries=self.retries, escalation=escalation, contact="https://c"),
         )
         spec = ClientSpec("lastfm", profile, {"x-source": "test"}, secret_params)
         return HttpClient(spec, config, resources)
@@ -149,7 +149,7 @@ async def test_not_found_is_raised_and_cached(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_retry_after_is_honoured(tmp_path: Path) -> None:
     server = Server(
-        [httpx.Response(429, headers={"Retry-After": "7"}), httpx.Response(200, text="ok")]
+        [httpx.Response(429, headers={"Retry-After": "7"}), httpx.Response(200, text="ok")],
     )
     setup = Setup(server)
     setup.cache = ResponseCache(tmp_path / "cache.sqlite")
@@ -308,7 +308,9 @@ async def test_api_profile_never_escalates() -> None:
     ],
 )
 def test_escalation_steps(
-    setting: Escalation | None, installed: set[str], expected: list[Escalation]
+    setting: Escalation | None,
+    installed: set[str],
+    expected: list[Escalation],
 ) -> None:
     assert escalation_steps(setting, installed.__contains__) == expected
 

@@ -29,7 +29,7 @@ class FakeLookup:
     dossier: Dossier
     error: Exception | None = None
     calls: list[tuple[Query, SourcesConfig, Collection[str] | None, Collection[str]]] = field(
-        default_factory=list
+        default_factory=list,
     )
 
     async def __call__(
@@ -162,7 +162,9 @@ def test_unexpected_errors_exit_1(fake: FakeLookup) -> None:
 
 
 def test_config_file_and_environment_reach_the_sources(
-    fake: FakeLookup, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    fake: FakeLookup,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     config = tmp_path / "deadwax.toml"
     config.write_text("adapter_timeout = 12\n[lastfm]\napi_key = 'from-file'\n")
@@ -200,7 +202,8 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_settings_configure_logging(
-    monkeypatch: pytest.MonkeyPatch, clean_root_logger: logging.Logger
+    monkeypatch: pytest.MonkeyPatch,
+    clean_root_logger: logging.Logger,
 ) -> None:
     monkeypatch.setenv("DEADWAX_LOG__LEVEL", "ERROR")
 
@@ -211,7 +214,8 @@ def test_settings_configure_logging(
 
 
 def test_verbose_enables_debug_logging(
-    monkeypatch: pytest.MonkeyPatch, clean_root_logger: logging.Logger
+    monkeypatch: pytest.MonkeyPatch,
+    clean_root_logger: logging.Logger,
 ) -> None:
     monkeypatch.setenv("DEADWAX_LOG__LEVEL", "ERROR")
     logging.getLogger("httpx").setLevel(logging.NOTSET)

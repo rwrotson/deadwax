@@ -45,7 +45,10 @@ async def test_entries_expire_after_their_ttl(tmp_path: Path) -> None:
     clock = Clock()
     cache = ResponseCache(tmp_path / "nested" / "cache.sqlite", clock=clock)
     response = Response(
-        url="https://x/1", status=200, content=b"\x00body", headers={"content-type": "text/html"}
+        url="https://x/1",
+        status=200,
+        content=b"\x00body",
+        headers={"content-type": "text/html"},
     )
 
     await cache.put("k", response, ttl=60)
@@ -63,7 +66,8 @@ async def test_entries_expire_after_their_ttl(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_broken_cache_counts_as_empty(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     cache = ResponseCache(tmp_path / "cache.sqlite")
     cache.close()

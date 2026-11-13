@@ -37,7 +37,7 @@ class WikipediaAdapter(HttpAdapter):
             Capability.CREDITS,
             Capability.TEXTS,
             Capability.RELATIONS,
-        }
+        },
     )
 
     async def _api[M: models.ApiModel](self, model: type[M], url: str, **params: str) -> M:
@@ -46,7 +46,10 @@ class WikipediaAdapter(HttpAdapter):
         return model.model_validate_json(response.content)
 
     async def _entities(
-        self, ids: Iterable[str], props: str, languages: Iterable[str] = ()
+        self,
+        ids: Iterable[str],
+        props: str,
+        languages: Iterable[str] = (),
     ) -> dict[str, models.Item]:
         wanted = list(dict.fromkeys(ids))
         extra = {"languages": "|".join(languages)} if languages else {}
@@ -80,7 +83,9 @@ class WikipediaAdapter(HttpAdapter):
         )
         original = await self._original_language(item)
         referenced = await self._entities(
-            p.referenced(item), "labels|aliases", p.languages(original)
+            p.referenced(item),
+            "labels|aliases",
+            p.languages(original),
         )
         labels = p.Labels(referenced, original)
         parts = await self._entities(item.items(p.PART_OF), "claims")

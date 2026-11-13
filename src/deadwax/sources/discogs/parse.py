@@ -128,7 +128,7 @@ def _credits_of(
                     detail=details,
                     scope=scope,
                     sources=sources,
-                )
+                ),
             )
     return result
 
@@ -169,7 +169,7 @@ def notes(text: str | None, title: str, scope: Scope, url: str) -> list[Text]:
             publication="Discogs",
             scope=scope,
             sources=[Provenance(source=SOURCE, url=url)],
-        )
+        ),
     ]
 
 
@@ -272,7 +272,9 @@ def find_track(release: models.Release, reference: RecordKey) -> models.Track | 
 
 
 def track_candidate(
-    release: models.Release, master: models.Master | None, track: models.Track
+    release: models.Release,
+    master: models.Master | None,
+    track: models.Track,
 ) -> RecordCandidate:
     """Describe a track by its tracklist entry on the main release."""
     artists = track.artists or release.artists
@@ -329,7 +331,7 @@ def version_relations(versions: Iterable[models.Version], exclude: int) -> list[
                 note=", ".join(d for d in details if d) or None,
                 scope=Scope.RELEASE_GROUP,
                 sources=[Provenance(source=SOURCE, url=url)],
-            )
+            ),
         )
         if len(result) >= VERSIONS_LIMIT:
             break
@@ -337,7 +339,10 @@ def version_relations(versions: Iterable[models.Version], exclude: int) -> list[
 
 
 def _artist_relation(
-    kind: RelationKind, ref: models.ArtistRef, note: str | None, url: str
+    kind: RelationKind,
+    ref: models.ArtistRef,
+    note: str | None,
+    url: str,
 ) -> Relation:
     return Relation(
         kind=kind,
@@ -360,7 +365,10 @@ def artist_relations(artist: models.Artist) -> list[Relation]:
     return [
         *(
             _artist_relation(
-                RelationKind.MEMBER, m, None if m.active is not False else "former", url
+                RelationKind.MEMBER,
+                m,
+                None if m.active is not False else "former",
+                url,
             )
             for m in artist.members
         ),
@@ -370,7 +378,10 @@ def artist_relations(artist: models.Artist) -> list[Relation]:
 
 
 def label_release_relations(
-    releases: Iterable[models.LabelRelease], label: str, label_id: int, record_title: str
+    releases: Iterable[models.LabelRelease],
+    label: str,
+    label_id: int,
+    record_title: str,
 ) -> list[Relation]:
     """Other releases of the label, one per artist and title."""
     url = page("label", label_id)
@@ -396,7 +407,7 @@ def label_release_relations(
                 note=", ".join(d.strip() for d in (label, item.catno) if d and d.strip()),
                 scope=Scope.LABEL,
                 sources=[Provenance(source=SOURCE, url=url)],
-            )
+            ),
         )
         if len(result) >= LABEL_RELEASES_LIMIT:
             break
@@ -410,7 +421,8 @@ def split_title(title: str) -> tuple[str, str]:
 
 
 def compilation_relations(
-    results: Iterable[models.SearchResult], exclude: set[int]
+    results: Iterable[models.SearchResult],
+    exclude: set[int],
 ) -> list[Relation]:
     """Compilations a track appears on, from a database search."""
     result = []
@@ -440,7 +452,7 @@ def compilation_relations(
                 note=", ".join([*item.label[:1], *(c for c in [item.catno] if c)]) or None,
                 scope=Scope.RECORDING,
                 sources=[Provenance(source=SOURCE, url=url)],
-            )
+            ),
         )
         if len(result) >= COMPILATIONS_LIMIT:
             break
@@ -448,7 +460,8 @@ def compilation_relations(
 
 
 def pick_result(
-    reference: RecordKey, results: Iterable[models.SearchResult]
+    reference: RecordKey,
+    results: Iterable[models.SearchResult],
 ) -> models.SearchResult | None:
     """Return the first search result whose artist and title match an album query.
 
@@ -476,7 +489,7 @@ def links(release: models.Release, master: models.Master | None) -> list[Link]:
                 url=page("master", master.id),
                 target=LinkTarget.ALBUM,
                 sources=sources,
-            )
+            ),
         )
     result.append(
         Link(
@@ -484,7 +497,7 @@ def links(release: models.Release, master: models.Master | None) -> list[Link]:
             url=page("release", release.id),
             target=LinkTarget.ALBUM,
             sources=sources,
-        )
+        ),
     )
     result += [
         Link(service=SOURCE, url=page("artist", a.id), target=LinkTarget.ARTIST, sources=sources)

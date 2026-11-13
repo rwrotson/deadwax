@@ -40,7 +40,7 @@ class BandcampAdapter(HttpAdapter):
             Capability.CREDITS,
             Capability.TEXTS,
             Capability.RELATIONS,
-        }
+        },
     )
     profile = Profile.BROWSER
 
@@ -62,7 +62,11 @@ class BandcampAdapter(HttpAdapter):
         return p.partial(record, await self._label_releases(record))
 
     async def _find(
-        self, query: Query, context: LookupContext, key: RecordKey | None, kind: EntityKind | None
+        self,
+        query: Query,
+        context: LookupContext,
+        key: RecordKey | None,
+        kind: EntityKind | None,
     ) -> tuple[p.Record, models.MobileDetails | None] | None:
         if self.resolves(query) and query.url is not None:
             return await self._open(query.url, key, kind)
@@ -86,7 +90,10 @@ class BandcampAdapter(HttpAdapter):
             return p.details_record(details), None
 
     async def _open(
-        self, url: str, key: RecordKey | None, kind: EntityKind | None
+        self,
+        url: str,
+        key: RecordKey | None,
+        kind: EntityKind | None,
     ) -> tuple[p.Record, models.MobileDetails | None]:
         """Read a page, moving between a track's page and its album's page to match the kind."""
         record = await self._page(url)
@@ -113,7 +120,10 @@ class BandcampAdapter(HttpAdapter):
         return record
 
     async def _details(
-        self, band_id: int, item_id: int, item_type: str
+        self,
+        band_id: int,
+        item_id: int,
+        item_type: str,
     ) -> models.MobileDetails | None:
         """Ask the mobile API, which names the label; its failure costs only the label."""
         params = {"band_id": str(band_id), "tralbum_id": str(item_id), "tralbum_type": item_type}
@@ -146,7 +156,8 @@ class BandcampAdapter(HttpAdapter):
         else:
             return p.pick_result(key, results)
         response = await self.client.get(
-            SEARCH_PAGE, params={"q": f"{key.artist} {key.title}", "item_type": item_type}
+            SEARCH_PAGE,
+            params={"q": f"{key.artist} {key.title}", "item_type": item_type},
         )
         return p.pick_result(key, p.html_search(response.content))
 

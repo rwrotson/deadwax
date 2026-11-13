@@ -51,7 +51,8 @@ def _utcnow() -> datetime:
 
 
 def escalation_steps(
-    setting: Escalation | None, installed: Callable[[str], bool] = _installed
+    setting: Escalation | None,
+    installed: Callable[[str], bool] = _installed,
 ) -> list[Escalation]:
     """Return the transports to try after plain httpx, weakest first.
 
@@ -85,7 +86,10 @@ class HttpResources:
     cache: ResponseCache | None = None
     transport: httpx.AsyncBaseTransport | None = None
     escalations: Mapping[Escalation, FetcherFactory] = field(
-        default_factory=lambda: {Escalation.IMPERSONATE: _impersonate, Escalation.BROWSER: _browser}
+        default_factory=lambda: {
+            Escalation.IMPERSONATE: _impersonate,
+            Escalation.BROWSER: _browser,
+        },
     )
     installed: Callable[[str], bool] = _installed
     sleep: Sleep = asyncio.sleep
@@ -272,7 +276,10 @@ class HttpClient:
                 if delay > self._policy.max_wait:
                     raise RateLimitedError(f"asked to wait {delay:.0f} s", url=safe_url)
                 logger.debug(
-                    "%s retry %s after HTTP %s", self.spec.source, safe_url, response.status
+                    "%s retry %s after HTTP %s",
+                    self.spec.source,
+                    safe_url,
+                    response.status,
                 )
             await self._resources.sleep(delay)
             attempt += 1

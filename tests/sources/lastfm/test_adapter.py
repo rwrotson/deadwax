@@ -51,7 +51,7 @@ def make(
         return httpx.Response(200, content=json.dumps(table[method]).encode())
 
     config = SourcesConfig.model_validate(
-        {"lastfm": {"rate": 1000, "api_key": key}, "http": {"retries": 0, "escalation": "none"}}
+        {"lastfm": {"rate": 1000, "api_key": key}, "http": {"retries": 0, "escalation": "none"}},
     )
     return LastfmAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 

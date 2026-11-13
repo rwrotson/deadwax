@@ -22,7 +22,10 @@ def test_import_leaves_global_logging_unconfigured() -> None:
 
     # Run in a fresh interpreter: this process already configured logging in other tests.
     result = subprocess.run(  # noqa: S603
-        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        check=True,
     )
 
     assert result.stdout.split() == ["0", "False"]
@@ -43,7 +46,10 @@ def test_import_does_not_load_optional_dependencies() -> None:
     code = f"import sys, deadwax; print(*(name in sys.modules for name in {OPTIONAL_PACKAGES!r}))"
 
     result = subprocess.run(  # noqa: S603
-        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        check=True,
     )
 
     assert result.stdout.split() == ["False"] * len(OPTIONAL_PACKAGES)
@@ -58,7 +64,10 @@ def test_logs_package_reports_missing_extra() -> None:
     )
 
     result = subprocess.run(  # noqa: S603
-        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        check=True,
     )
 
     assert result.stdout.startswith("structlog ")

@@ -41,8 +41,9 @@ def _prepare_handlers(
             fh.setLevel(config.file_level)
             fh.setFormatter(
                 structlog.stdlib.ProcessorFormatter(
-                    processors=json_processors, foreign_pre_chain=shared_processors
-                )
+                    processors=json_processors,
+                    foreign_pre_chain=shared_processors,
+                ),
             )
             handlers.append(fh)
     except Exception:

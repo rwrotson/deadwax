@@ -49,7 +49,7 @@ class HttpxFetcher:
                     size += len(chunk)
                     if size > self._max_bytes:
                         raise ResponseTooLargeError(
-                            f"response is larger than {self._max_bytes} bytes"
+                            f"response is larger than {self._max_bytes} bytes",
                         )
                     chunks.append(chunk)
                 return Response(

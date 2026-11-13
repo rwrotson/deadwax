@@ -76,7 +76,8 @@ async def test_track_by_isrc_from_an_earlier_pass() -> None:
     isrcs = [Sourced(value="GBAYE9701376", sources=SOURCES)]
 
     partial = await adapter({"/track/isrc:GBAYE9701376": TRACK}).lookup(
-        query, context(query, isrcs=isrcs)
+        query,
+        context(query, isrcs=isrcs),
     )
 
     assert partial.candidate is not None
@@ -165,7 +166,8 @@ async def test_nothing_found(query: Query, routes: dict[str, object]) -> None:
     ],
 )
 def test_errors_inside_successful_responses(
-    error: dict[str, object], raised: type[Exception]
+    error: dict[str, object],
+    raised: type[Exception],
 ) -> None:
     with pytest.raises(raised):
         check(json.dumps({"error": error}).encode(), "https://api.deezer.com/x")

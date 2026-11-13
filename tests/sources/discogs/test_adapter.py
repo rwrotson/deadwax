@@ -78,7 +78,7 @@ def make(
         {
             "discogs": {"rate": 1000, "token": token},
             "http": {"retries": 0, "escalation": "none", **http},
-        }
+        },
     )
     return DiscogsAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 
@@ -156,7 +156,7 @@ async def test_without_ids_or_token_the_search_is_skipped() -> None:
 
     assert partial.candidate is None
     assert [(e.kind, e.reason) for e in partial.errors] == [
-        (ErrorKind.SKIPPED, "search needs discogs.token, and earlier sources found no Discogs ID")
+        (ErrorKind.SKIPPED, "search needs discogs.token, and earlier sources found no Discogs ID"),
     ]
     assert adapter.status().state is SourceState.READY
     assert adapter.status().detail == "no discogs.token: no search"
@@ -201,7 +201,8 @@ async def test_album_search_finds_a_master() -> None:
         return 200, {"results": [{"id": 1, "type": "master", "title": "Band - Record"}]}
 
     partial = await make(routes(), token="t", search=search).lookup(
-        ALBUM, LookupContext(query=ALBUM)
+        ALBUM,
+        LookupContext(query=ALBUM),
     )
 
     assert partial.candidate is not None
@@ -222,7 +223,8 @@ async def test_release_search_without_master() -> None:
         return 200, {"results": [{"id": 10, "type": "release", "title": "Band - Record"}]}
 
     partial = await make(routes(), token="t", search=search).lookup(
-        TRACK, LookupContext(query=TRACK)
+        TRACK,
+        LookupContext(query=TRACK),
     )
 
     assert partial.candidate is not None
@@ -258,7 +260,8 @@ async def test_release_without_artist_or_label() -> None:
 )
 @pytest.mark.asyncio
 async def test_review_page_failures_keep_the_api_facts(
-    route: Route, expected: list[ErrorKind]
+    route: Route,
+    expected: list[ErrorKind],
 ) -> None:
     adapter = make(routes(**{PAGE: route}))
 
@@ -301,7 +304,7 @@ def test_rate_without_a_token(discogs: dict[str, object], rate: float) -> None:
 
 def test_user_agent_setting_applies_to_both_clients() -> None:
     config = SourcesConfig.model_validate(
-        {"discogs": {"user_agent": "Mine/1.0", "token": SecretStr("t")}}
+        {"discogs": {"user_agent": "Mine/1.0", "token": SecretStr("t")}},
     )
     adapter = DiscogsAdapter(config, HttpResources())
 

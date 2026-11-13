@@ -92,7 +92,9 @@ def raising(error: BaseException) -> Behaviour:
 
 
 async def lookup(
-    adapters: list[FakeAdapter], query: Query = TRACK, options: LookupOptions | None = None
+    adapters: list[FakeAdapter],
+    query: Query = TRACK,
+    options: LookupOptions | None = None,
 ) -> list[str]:
     protocol_adapters: list[Adapter] = list(adapters)
     dossier = await run(query, protocol_adapters, options, now=lambda: NOW)
@@ -109,9 +111,9 @@ async def test_identity_pass_runs_before_enrichment_and_feeds_its_context() -> N
                     url="https://open.spotify.com/track/1",
                     target=LinkTarget.TRACK,
                     sources=[Provenance(source="musicbrainz")],
-                )
-            ]
-        }
+                ),
+            ],
+        },
     )
     musicbrainz = FakeAdapter("musicbrainz", Pass.IDENTITY, returning(identity_partial))
     wikipedia = FakeAdapter("wikipedia")
@@ -158,7 +160,10 @@ async def test_url_resolver_runs_first_and_sets_the_kind() -> None:
 async def test_resolver_without_kind_leaves_the_query_unchanged() -> None:
     query = Query(url="https://song.link/x")
     odesli = FakeAdapter(
-        "odesli", Pass.IDENTITY, returning(Partial(source="odesli")), resolves_urls=True
+        "odesli",
+        Pass.IDENTITY,
+        returning(Partial(source="odesli")),
+        resolves_urls=True,
     )
     discogs = FakeAdapter("discogs")
 
@@ -199,7 +204,9 @@ async def test_text_query_has_no_resolver() -> None:
     ],
 )
 async def test_failures_become_errors_and_others_continue(
-    error: Exception, kind: ErrorKind, caplog: pytest.LogCaptureFixture
+    error: Exception,
+    kind: ErrorKind,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     broken = FakeAdapter("discogs", behaviour=raising(error))
     working = FakeAdapter("lastfm")
@@ -239,7 +246,9 @@ async def test_cancellation_propagates() -> None:
 
 async def test_unready_adapters_are_skipped_and_disabled_ones_are_silent() -> None:
     missing_key = FakeAdapter(
-        "lastfm", state=SourceState.MISSING_CREDENTIAL, detail="needs lastfm.api_key"
+        "lastfm",
+        state=SourceState.MISSING_CREDENTIAL,
+        detail="needs lastfm.api_key",
     )
     missing_extra = FakeAdapter("bandcamp", state=SourceState.MISSING_EXTRA)
     disabled = FakeAdapter("discogs", state=SourceState.DISABLED)
@@ -260,7 +269,8 @@ async def test_include_and_exclude_select_adapters_without_errors() -> None:
         FakeAdapter("lastfm"),
     ]
     options = LookupOptions(
-        include=frozenset({"musicbrainz", "discogs"}), exclude=frozenset({"discogs"})
+        include=frozenset({"musicbrainz", "discogs"}),
+        exclude=frozenset({"discogs"}),
     )
 
     errors = await lookup(adapters, options=options)

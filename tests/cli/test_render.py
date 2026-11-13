@@ -64,7 +64,7 @@ def test_untitled_artist_is_omitted(dossier: Dossier) -> None:
 def test_json_and_markdown(dossier: Dossier) -> None:
     assert Dossier.model_validate_json(rendered(dossier, OutputFormat.JSON)) == dossier
     assert rendered(dossier, OutputFormat.MARKDOWN).startswith(
-        "# Everything but the Girl — Missing"
+        "# Everything but the Girl — Missing",
     )
 
 
@@ -89,7 +89,9 @@ INFOS = [
         capabilities=[],
         requires=[],
         status=SourceStatus(
-            source="bandcamp", state=SourceState.MISSING_EXTRA, detail="deadwax[browser]"
+            source="bandcamp",
+            state=SourceState.MISSING_EXTRA,
+            detail="deadwax[browser]",
         ),
     ),
     SourceInfo(

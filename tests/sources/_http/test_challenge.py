@@ -21,6 +21,9 @@ from deadwax.sources._http import detect_challenge
     ],
 )
 def test_detects_challenges(
-    status: int, headers: dict[str, str], body: bytes, expected: str | None
+    status: int,
+    headers: dict[str, str],
+    body: bytes,
+    expected: str | None,
 ) -> None:
     assert detect_challenge(status, headers, body) == expected

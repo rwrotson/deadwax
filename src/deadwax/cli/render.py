@@ -241,7 +241,9 @@ def _status(info: SourceInfo) -> Text:
 
 
 def print_sources(
-    infos: Sequence[SourceInfo], output: OutputFormat, console: Console | None = None
+    infos: Sequence[SourceInfo],
+    output: OutputFormat,
+    console: Console | None = None,
 ) -> None:
     """Print the sources with their pass, capabilities, and status."""
     console = console or Console()

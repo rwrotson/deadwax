@@ -71,7 +71,10 @@ def details(item_id: int, item_type: str, label: str | None = None) -> bytes:
 
 
 ALBUM_PAGE = page(
-    "album", 1, "Record", tracks=[{"id": 2, "title": "Song", "title_link": "/track/song"}]
+    "album",
+    1,
+    "Record",
+    tracks=[{"id": 2, "title": "Song", "title_link": "/track/song"}],
 )
 TRACK_PAGE = page("track", 2, "Song", album_url="/album/record")
 
@@ -85,7 +88,7 @@ def adapter(routes: Mapping[str, Route], seen: list[str] | None = None) -> Bandc
         return httpx.Response(status, content=body)
 
     config = SourcesConfig.model_validate(
-        {"bandcamp": {"rate": 1000}, "http": {"retries": 0, "escalation": "none"}}
+        {"bandcamp": {"rate": 1000}, "http": {"retries": 0, "escalation": "none"}},
     )
     return BandcampAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 
@@ -102,7 +105,10 @@ def result(item_type: str, item_id: int, name: str, url: str) -> dict[str, objec
 def context(query: Query, *bandcamp: str) -> LookupContext:
     links = [
         Link(
-            service="bandcamp", url=url, target=LinkTarget.ALBUM, sources=[Provenance(source="mb")]
+            service="bandcamp",
+            url=url,
+            target=LinkTarget.ALBUM,
+            sources=[Provenance(source="mb")],
         )
         for url in bandcamp
     ]
@@ -202,7 +208,7 @@ async def test_html_search_when_the_endpoint_fails() -> None:
         '<div class="subhead">by Band</div></li>'
     ).encode()
     found = adapter(
-        {SEARCH_API: (500, b"error"), SEARCH_PAGE: (200, search_page), ALBUM: (200, ALBUM_PAGE)}
+        {SEARCH_API: (500, b"error"), SEARCH_PAGE: (200, search_page), ALBUM: (200, ALBUM_PAGE)},
     )
 
     partial = await found.lookup(query, LookupContext(query=query))
@@ -219,7 +225,7 @@ async def test_blocked_page_falls_back_to_the_mobile_api() -> None:
             SEARCH_API: search(result("a", 1, "Record", ALBUM)),
             ALBUM: (200, CHALLENGE),
             MOBILE_API: (200, details(1, "a")),
-        }
+        },
     )
 
     partial = await found.lookup(query, LookupContext(query=query))
@@ -260,7 +266,7 @@ async def test_label_account_lists_label_releases() -> None:
             ALBUM: (200, ALBUM_PAGE),
             MOBILE_API: (200, details(1, "a", "Band")),
             "https://band.bandcamp.com/music": (200, grid),
-        }
+        },
     )
 
     partial = await found.lookup(query, LookupContext(query=query))

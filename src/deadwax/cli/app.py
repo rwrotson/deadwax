@@ -58,7 +58,10 @@ def root(
     _version: Annotated[
         bool,
         typer.Option(
-            "--version", callback=_show_version, is_eager=True, help="Show the version and exit."
+            "--version",
+            callback=_show_version,
+            is_eager=True,
+            help="Show the version and exit.",
         ),
     ] = False,
 ) -> None:
@@ -107,15 +110,18 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
     album: Annotated[bool, typer.Option("--album", help="The query names an album.")] = False,
     track: Annotated[bool, typer.Option("--track", help="The query names a track.")] = False,
     sources: Annotated[
-        str | None, typer.Option("--sources", help="Only these sources, comma-separated.")
+        str | None,
+        typer.Option("--sources", help="Only these sources, comma-separated."),
     ] = None,
     exclude: Annotated[
-        str | None, typer.Option("--exclude", help="Skip these sources, comma-separated.")
+        str | None,
+        typer.Option("--exclude", help="Skip these sources, comma-separated."),
     ] = None,
     output: FormatOption = OutputFormat.PRETTY,
     no_cache: Annotated[bool, typer.Option("--no-cache", help="Bypass the cache.")] = False,
     timeout: Annotated[
-        float | None, typer.Option("--timeout", min=0.001, help="Seconds per source.")
+        float | None,
+        typer.Option("--timeout", min=0.001, help="Seconds per source."),
     ] = None,
     config: ConfigOption = None,
     verbose: VerboseOption = False,
@@ -138,7 +144,7 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
                 settings.sources_config(),
                 include=_names(sources),
                 exclude=_names(exclude) or (),
-            )
+            ),
         )
     except (InvalidQueryError, ConfigurationError) as error:
         raise _usage_error(str(error)) from error

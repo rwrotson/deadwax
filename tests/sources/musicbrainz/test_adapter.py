@@ -50,7 +50,9 @@ def respond(routes: dict[str, object]) -> Callable[[httpx.Request], httpx.Respon
 
 
 async def lookup(
-    query: Query, routes: dict[str, object], identity: Identity | None = None
+    query: Query,
+    routes: dict[str, object],
+    identity: Identity | None = None,
 ) -> Partial:
     resources = HttpResources(transport=httpx.MockTransport(respond(routes)))
     config = SourcesConfig(musicbrainz=SourceSettings(rate=1000))
@@ -135,7 +137,7 @@ async def test_other_urls_are_looked_up(relation: dict[str, object]) -> None:
 async def test_unknown_url_without_earlier_results_is_not_found() -> None:
     query = parse_query("https://brianleeds.bandcamp.com/album/x")
     routes: dict[str, object] = {
-        "url": {"id": MBID.format(6), "resource": query.url, "relations": []}
+        "url": {"id": MBID.format(6), "resource": query.url, "relations": []},
     }
 
     with pytest.raises(NotFoundError):

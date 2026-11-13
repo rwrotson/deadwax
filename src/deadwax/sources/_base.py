@@ -55,7 +55,9 @@ class HttpAdapter(ABC):
         missing = self.missing_credential()
         if missing is not None:
             return SourceStatus(
-                source=self.name, state=SourceState.MISSING_CREDENTIAL, detail=missing
+                source=self.name,
+                state=SourceState.MISSING_CREDENTIAL,
+                detail=missing,
             )
         return SourceStatus(source=self.name, state=SourceState.READY)
 

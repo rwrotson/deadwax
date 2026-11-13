@@ -104,7 +104,8 @@ def nested_model(field: FieldInfo) -> type[BaseModel] | None:
 
 
 def env_fields(
-    model: type[BaseModel] = Settings, prefix: str = "DEADWAX_"
+    model: type[BaseModel] = Settings,
+    prefix: str = "DEADWAX_",
 ) -> Iterator[tuple[str, FieldInfo]]:
     """Yield every leaf setting with its environment variable name."""
     for name, field in model.model_fields.items():

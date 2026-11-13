@@ -99,7 +99,7 @@ def untrue_dossier() -> str:
                 detail="all tracks",
                 scope=Scope.RELEASE,
                 sources=SOURCE,
-            )
+            ),
         ],
         texts=texts,
         relations=[
@@ -119,8 +119,11 @@ def untrue_dossier() -> str:
         ],
         links=[
             Link(
-                service="bandcamp", url=SOURCE[0].url or "", target=LinkTarget.ALBUM, sources=SOURCE
-            )
+                service="bandcamp",
+                url=SOURCE[0].url or "",
+                target=LinkTarget.ALBUM,
+                sources=SOURCE,
+            ),
         ],
     )
     second = Partial(source="discogs", candidate=other)

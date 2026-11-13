@@ -16,13 +16,14 @@ SOURCES = [Provenance(source="musicbrainz")]
 
 def test_context_prefers_query_ids_over_found_ones() -> None:
     query = Query(
-        url="https://musicbrainz.org/recording/x", ids={IdKind.MUSICBRAINZ_RECORDING: "q"}
+        url="https://musicbrainz.org/recording/x",
+        ids={IdKind.MUSICBRAINZ_RECORDING: "q"},
     )
     identity = Identity(
         external_ids=[
             ExternalId(kind=IdKind.MUSICBRAINZ_RECORDING, value="found", sources=SOURCES),
             ExternalId(kind=IdKind.WIKIDATA, value="Q1", sources=SOURCES),
-        ]
+        ],
     )
     context = LookupContext(query=query, identity=identity)
 

@@ -108,7 +108,7 @@ def test_other_version_is_kept_out_and_reported() -> None:
     assert discrepancy.field == "version"
     assert [v.value for v in discrepancy.values] == ["original", "remix: Todd Terry Remix"]
     assert discrepancy.values[1].sources == [
-        Provenance(source="lastfm", url="https://x.example/remix")
+        Provenance(source="lastfm", url="https://x.example/remix"),
     ]
 
 
@@ -123,7 +123,9 @@ def test_version_discrepancy_without_matching_title_cites_the_query() -> None:
 def test_album_other_version_becomes_release_relation() -> None:
     query = parse_query("Burial - Untrue", EntityKind.ALBUM)
     deluxe = RecordCandidate(
-        artist="Burial", title="Untrue (Deluxe Edition)", kind=EntityKind.ALBUM
+        artist="Burial",
+        title="Untrue (Deluxe Edition)",
+        kind=EntityKind.ALBUM,
     )
 
     dossier = merge(query, [partial("discogs", deluxe)], generated_at=NOW)
@@ -136,7 +138,9 @@ def test_unrelated_candidate_becomes_no_match_error() -> None:
     other = RecordCandidate(artist="Somebody Else", title="Missing", url="https://x.example/o")
 
     dossier = merge(
-        TRACK, [partial("discogs", other, tags=[tag("x", "discogs")])], generated_at=NOW
+        TRACK,
+        [partial("discogs", other, tags=[tag("x", "discogs")])],
+        generated_at=NOW,
     )
 
     assert dossier.tags == []
@@ -284,7 +288,10 @@ def test_facts_are_deduplicated_and_ordered_by_scope() -> None:
                 sources=provenance("a"),
             ),
             Relation(
-                kind=RelationKind.LABEL, target=target, scope=Scope.RELEASE, sources=provenance("a")
+                kind=RelationKind.LABEL,
+                target=target,
+                scope=Scope.RELEASE,
+                sources=provenance("a"),
             ),
         ],
         "links": [
@@ -308,7 +315,7 @@ def test_facts_are_deduplicated_and_ordered_by_scope() -> None:
     }
     facts_b = {
         "credits": [
-            Credit(role="producer", name="burial", scope=Scope.RECORDING, sources=provenance("b"))
+            Credit(role="producer", name="burial", scope=Scope.RECORDING, sources=provenance("b")),
         ],
         "links": [
             Link(
@@ -316,13 +323,15 @@ def test_facts_are_deduplicated_and_ordered_by_scope() -> None:
                 url="https://www.open.spotify.com/album/1",
                 target=LinkTarget.ALBUM,
                 sources=provenance("b"),
-            )
+            ),
         ],
         "tags": [Tag(name="2 Step", scope=Scope.RELEASE, weight=0.2, sources=provenance("b"))],
     }
 
     dossier = merge(
-        query, [partial("a", record, **facts_a), partial("b", record, **facts_b)], generated_at=NOW
+        query,
+        [partial("a", record, **facts_a), partial("b", record, **facts_b)],
+        generated_at=NOW,
     )
 
     assert [c.role for c in dossier.credits] == ["Mastered By", "Producer"]
@@ -339,7 +348,10 @@ def test_adapter_errors_are_passed_through() -> None:
     blocked = AdapterError(source="bandcamp", kind=ErrorKind.BLOCKED, reason="challenge page")
 
     dossier = merge(
-        TRACK, [partial("bandcamp", None, errors=[blocked])], [failure], generated_at=NOW
+        TRACK,
+        [partial("bandcamp", None, errors=[blocked])],
+        [failure],
+        generated_at=NOW,
     )
 
     assert dossier.errors == [failure, blocked]

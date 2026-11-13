@@ -69,7 +69,7 @@ _SOURCES_NAMES = frozenset(
         "SourceSettings",
         "describe_sources",
         "lookup",
-    }
+    },
 )
 
 

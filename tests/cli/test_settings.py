@@ -66,7 +66,8 @@ def test_every_setting_has_a_description() -> None:
 
 
 def test_toml_file_sits_below_environment_and_flags(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     config = tmp_path / "deadwax.toml"
     config.write_text("adapter_timeout = 9\n[http]\nretries = 1\ntimeout = 5\n[cache]\nttl = 60\n")
@@ -80,7 +81,9 @@ def test_toml_file_sits_below_environment_and_flags(
 
 
 def test_config_file_from_the_environment_and_the_default(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, isolated_user_dirs: Path
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    isolated_user_dirs: Path,
 ) -> None:
     named = tmp_path / "named.toml"
     named.write_text("[lastfm]\napi_key = 'k'\n")

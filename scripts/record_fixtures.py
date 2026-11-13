@@ -45,19 +45,21 @@ LIVE_DEFAULT = ("bandcamp", "discogs")
 SCENARIOS: dict[str, Query] = {
     "paranoid_android": parse_query("Radiohead - Paranoid Android", EntityKind.TRACK),
     "huerco_s": parse_query(
-        "Huerco S. - For Those of You Who Have Never (And Also Those Who Have)", EntityKind.ALBUM
+        "Huerco S. - For Those of You Who Have Never (And Also Those Who Have)",
+        EntityKind.ALBUM,
     ),
     "kino": parse_query("Кино - Группа крови", EntityKind.TRACK),
     "missing_remix": parse_query(
-        "Everything but the Girl - Missing (Todd Terry Remix)", EntityKind.TRACK
+        "Everything but the Girl - Missing (Todd Terry Remix)",
+        EntityKind.TRACK,
     ),
     "spotify_url": parse_query("https://open.spotify.com/track/6LgJvl0Xdtc73RJ1mmpotq"),
     "apple_url": parse_query(
-        "https://music.apple.com/us/album/paranoid-android/1097861387?i=1097861770"
+        "https://music.apple.com/us/album/paranoid-android/1097861387?i=1097861770",
     ),
     "no_match": parse_query("Zzqx Nonexistent Artist - No Such Song At All", EntityKind.TRACK),
     "bandcamp_url": parse_query(
-        "https://brianleeds.bandcamp.com/album/for-those-of-you-who-have-never-and-also-those-who-have"
+        "https://brianleeds.bandcamp.com/album/for-those-of-you-who-have-never-and-also-those-who-have",
     ),
     "discogs_url": parse_query("https://www.discogs.com/master/21491-Radiohead-OK-Computer"),
 }

@@ -15,7 +15,7 @@ SECRET_PARAMS = frozenset({"key", "api_key", "token"})
 # Fast limits so replayed lookups do not wait between requests.
 FAST = {"rate": 1000}
 SOURCES = (
-    "musicbrainz", "itunes", "deezer", "odesli", "discogs", "bandcamp", "lastfm", "wikipedia"
+    "musicbrainz", "itunes", "deezer", "odesli", "discogs", "bandcamp", "lastfm", "wikipedia",
 )  # fmt: skip
 
 

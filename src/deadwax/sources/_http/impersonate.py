@@ -23,7 +23,11 @@ class ImpersonateFetcher:
     name = "impersonate"
 
     def __init__(
-        self, *, timeout: float, max_bytes: int, identity: BrowserIdentity = CHROME
+        self,
+        *,
+        timeout: float,
+        max_bytes: int,
+        identity: BrowserIdentity = CHROME,
     ) -> None:
         try:
             from curl_cffi.requests import AsyncSession  # noqa: PLC0415 -- optional extra (R7)
@@ -31,7 +35,9 @@ class ImpersonateFetcher:
             raise ConfigurationError(MISSING_EXTRA) from error
         self._max_bytes = max_bytes
         self._session: AsyncSession[CurlResponse] = AsyncSession(
-            impersonate=identity.impersonate, timeout=timeout, allow_redirects=True
+            impersonate=identity.impersonate,
+            timeout=timeout,
+            allow_redirects=True,
         )
 
     async def fetch(self, request: Request) -> Response:

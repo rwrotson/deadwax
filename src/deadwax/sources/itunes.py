@@ -111,7 +111,7 @@ def partial(item: Item) -> Partial:
                 target=target,
                 preview_url=item.preview_url,
                 sources=sources,
-            )
+            ),
         )
     if kind is EntityKind.TRACK and item.collection_view_url:
         album_url = clean_url(item.collection_view_url, album=True)
@@ -119,7 +119,7 @@ def partial(item: Item) -> Partial:
     if item.artist_view_url:
         artist_url = clean_url(item.artist_view_url)
         links.append(
-            Link(service=SERVICE, url=artist_url, target=LinkTarget.ARTIST, sources=sources)
+            Link(service=SERVICE, url=artist_url, target=LinkTarget.ARTIST, sources=sources),
         )
     tags = []
     if item.primary_genre_name:
@@ -129,7 +129,7 @@ def partial(item: Item) -> Partial:
                 kind=TagKind.GENRE,
                 scope=Scope.RELEASE,
                 sources=sources,
-            )
+            ),
         )
     return Partial(
         source=ItunesAdapter.name,

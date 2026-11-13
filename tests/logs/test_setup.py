@@ -23,7 +23,9 @@ def test_setup_logging_without_dir_logs_only_to_console(
 
 
 def test_setup_logging_ignores_environment_when_called_without_arguments(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, clean_root_logger: logging.Logger
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    clean_root_logger: logging.Logger,
 ) -> None:
     monkeypatch.setenv("DEADWAX_LOG__DIR", str(tmp_path))
     monkeypatch.setenv("DEADWAX_LOG__LEVEL", "ERROR")
@@ -44,7 +46,8 @@ def test_setup_logging_creates_log_dir(tmp_path: Path, clean_root_logger: loggin
 
 
 def test_setup_logging_does_not_add_duplicate_handlers(
-    tmp_path: Path, clean_root_logger: logging.Logger
+    tmp_path: Path,
+    clean_root_logger: logging.Logger,
 ) -> None:
     config = LogSettings(dir=tmp_path / "logs")
     setup_logging(config)
@@ -56,7 +59,8 @@ def test_setup_logging_does_not_add_duplicate_handlers(
 
 
 def test_setup_logging_preserves_unrelated_handlers(
-    tmp_path: Path, clean_root_logger: logging.Logger
+    tmp_path: Path,
+    clean_root_logger: logging.Logger,
 ) -> None:
     foreign_console = logging.StreamHandler()
     foreign_file = logging.handlers.RotatingFileHandler(tmp_path / "foreign.log")
@@ -74,7 +78,8 @@ def test_setup_logging_preserves_unrelated_handlers(
 
 
 def test_setup_logging_replaces_own_handlers_on_reconfiguration(
-    tmp_path: Path, clean_root_logger: logging.Logger
+    tmp_path: Path,
+    clean_root_logger: logging.Logger,
 ) -> None:
     setup_logging(LogSettings(dir=tmp_path / "first"))
     previous_file = next(
@@ -88,7 +93,7 @@ def test_setup_logging_replaces_own_handlers_on_reconfiguration(
             file_level="DEBUG",
             console_level="WARNING",
             format="json",
-        )
+        ),
     )
 
     assert len(_app_handlers(clean_root_logger)) == _EXPECTED_HANDLER_COUNT
@@ -110,7 +115,8 @@ def test_setup_logging_replaces_own_handlers_on_reconfiguration(
 
 
 def test_setup_logging_failed_reconfiguration_keeps_previous_handlers(
-    tmp_path: Path, clean_root_logger: logging.Logger
+    tmp_path: Path,
+    clean_root_logger: logging.Logger,
 ) -> None:
     setup_logging(LogSettings(dir=tmp_path / "working", level="WARNING"))
     previous_handlers = _app_handlers(clean_root_logger)
@@ -128,7 +134,9 @@ def test_setup_logging_failed_reconfiguration_keeps_previous_handlers(
 
 
 def test_setup_logging_closes_prepared_handlers_on_failure(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, clean_root_logger: logging.Logger
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    clean_root_logger: logging.Logger,
 ) -> None:
     closed: list[logging.Handler] = []
 
@@ -152,7 +160,9 @@ def test_setup_logging_sets_root_level(tmp_path: Path, clean_root_logger: loggin
 
 
 def test_setup_logging_json_formatter(
-    tmp_path: Path, clean_root_logger: logging.Logger, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path,
+    clean_root_logger: logging.Logger,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     config = LogSettings(dir=tmp_path / "logs", format="json")
     setup_logging(config)
@@ -164,7 +174,8 @@ def test_setup_logging_json_formatter(
 
 
 def test_setup_logging_writes_exceptions_as_json_text(
-    tmp_path: Path, clean_root_logger: logging.Logger
+    tmp_path: Path,
+    clean_root_logger: logging.Logger,
 ) -> None:
     setup_logging(LogSettings(dir=tmp_path))
 
@@ -178,7 +189,8 @@ def test_setup_logging_writes_exceptions_as_json_text(
 
 
 def test_setup_logging_renders_exceptions_on_console(
-    clean_root_logger: logging.Logger, capsys: pytest.CaptureFixture[str]
+    clean_root_logger: logging.Logger,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     setup_logging(LogSettings())
     try:
@@ -189,7 +201,8 @@ def test_setup_logging_renders_exceptions_on_console(
 
 
 def test_library_records_reach_configured_handlers(
-    clean_root_logger: logging.Logger, capsys: pytest.CaptureFixture[str]
+    clean_root_logger: logging.Logger,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     _ = clean_root_logger
     setup_logging(LogSettings(format="json", level="DEBUG"))

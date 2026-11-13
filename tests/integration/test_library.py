@@ -78,7 +78,9 @@ def summary(name: str, dossier: Dossier) -> str:
 @pytest.mark.parametrize("text", LIBRARY.values(), ids=list(LIBRARY))
 @pytest.mark.asyncio
 async def test_library_track(
-    text: str, request: pytest.FixtureRequest, live_report: list[str]
+    text: str,
+    request: pytest.FixtureRequest,
+    live_report: list[str],
 ) -> None:
     query = parse_query(text, EntityKind.TRACK)
 
@@ -95,7 +97,10 @@ async def test_library_track(
     assert query.title is not None
     reference = RecordKey(query.artist, query.title, EntityKind.TRACK)
     found = RecordKey(
-        identity.artist.value, identity.title.value, EntityKind.TRACK, identity.version
+        identity.artist.value,
+        identity.title.value,
+        EntityKind.TRACK,
+        identity.version,
     )
     assert compare(reference, found).verdict is Verdict.MATCH
     assert identity.version.kind is parse_title(query.title).version.kind

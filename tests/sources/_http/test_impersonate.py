@@ -38,7 +38,10 @@ class FakeSession:
         if url.endswith("/fail"):
             raise FakeRequestsError("handshake failed")
         return FakeCurlResponse(
-            url, 200, b"<html>page</html>", {"Content-Type": "text/html", "X": None}
+            url,
+            200,
+            b"<html>page</html>",
+            {"Content-Type": "text/html", "X": None},
         )
 
     async def close(self) -> None:
@@ -76,7 +79,7 @@ async def test_impersonated_request(sessions: list[FakeSession]) -> None:
             "GET",
             "https://www.discogs.com/release/1",
             {"params": [("a", "1")], "headers": {"x": "y"}, "content": None},
-        )
+        ),
     ]
     assert response.text == "<html>page</html>"
     assert response.headers == {"content-type": "text/html", "x": ""}

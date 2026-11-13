@@ -199,7 +199,7 @@ def recommendations(document: Document) -> list[Relation]:
                 ),
                 scope=Scope.RELEASE,
                 sources=[],
-            )
+            ),
         )
     return result
 
@@ -235,7 +235,7 @@ def _comments(ld: JsonObject) -> tuple[Text, ...]:
                     author=_name(author),
                     scope=Scope.RELEASE,
                     sources=[],
-                )
+                ),
             )
     return tuple(result)
 
@@ -275,7 +275,7 @@ def page_record(page: Page) -> Record | None:
         else (ld.get("@type") == "MusicRecording")
     )
     url = page_url(
-        (tralbum.url if tralbum is not None else None) or _string(ld.get("@id")) or page.url
+        (tralbum.url if tralbum is not None else None) or _string(ld.get("@id")) or page.url,
     )
     publisher = ld.get("publisher")
     return Record(
@@ -412,7 +412,7 @@ def partial(record: Record, label_releases: Sequence[Relation] = ()) -> Partial:
                 target=Entity(type=EntityType.LABEL, name=record.label),
                 scope=Scope.RELEASE,
                 sources=sources,
-            )
+            ),
         )
     if record.album is not None:
         kind = RelationKind.COMPILATION if on_compilation(record) else RelationKind.APPEARS_ON
@@ -423,15 +423,15 @@ def partial(record: Record, label_releases: Sequence[Relation] = ()) -> Partial:
             url=record.url,
             target=LinkTarget.TRACK if record.kind is EntityKind.TRACK else LinkTarget.ALBUM,
             sources=sources,
-        )
+        ),
     ]
     if record.album is not None and record.album.url:
         links.append(
-            Link(service=SOURCE, url=record.album.url, target=LinkTarget.ALBUM, sources=sources)
+            Link(service=SOURCE, url=record.album.url, target=LinkTarget.ALBUM, sources=sources),
         )
     if record.seller_url:
         links.append(
-            Link(service=SOURCE, url=record.seller_url, target=LinkTarget.ARTIST, sources=sources)
+            Link(service=SOURCE, url=record.seller_url, target=LinkTarget.ARTIST, sources=sources),
         )
     return Partial(
         source=SOURCE,
@@ -462,7 +462,8 @@ def matches(reference: RecordKey, artist: str | None, title: str, kind: EntityKi
 
 
 def pick_result(
-    reference: RecordKey, results: Iterable[models.SearchResult]
+    reference: RecordKey,
+    results: Iterable[models.SearchResult],
 ) -> models.SearchResult | None:
     """Return the first search result of the right type that matches the query."""
     wanted = "t" if reference.kind is EntityKind.TRACK else "a"
@@ -495,7 +496,8 @@ def html_search(content: bytes) -> list[models.SearchResult]:
         kind = (text_of(item.css_first(".itemtype")) or "").lower()
         title = text_of(item.css_first(".heading a"))
         href = attribute(item.css_first(".itemurl a"), "href") or attribute(
-            item.css_first(".heading a"), "href"
+            item.css_first(".heading a"),
+            "href",
         )
         subhead = text_of(item.css_first(".subhead")) or ""
         artist = re.sub(r"^(?:from .+? )?by\s+", "", subhead, flags=re.IGNORECASE).strip()
@@ -508,7 +510,7 @@ def html_search(content: bytes) -> list[models.SearchResult]:
                 name=title,
                 band_name=artist or None,
                 item_url_path=page_url(href),
-            )
+            ),
         )
     return result
 
@@ -519,7 +521,10 @@ def same_name(left: str | None, right: str | None) -> bool:
 
 
 def label_releases(
-    content: bytes, base_url: str, label: str, exclude: int | None
+    content: bytes,
+    base_url: str,
+    label: str,
+    exclude: int | None,
 ) -> list[Relation]:
     """Read other releases from the grid of a label's music page."""
     sources = [Provenance(source=SOURCE, url=base_url)]
@@ -550,7 +555,7 @@ def label_releases(
                 note=label,
                 scope=Scope.LABEL,
                 sources=sources,
-            )
+            ),
         )
         if len(result) >= LABEL_RELEASES_LIMIT:
             break

@@ -129,7 +129,7 @@ def test_mobile_details(recorded: Recorded, album: p.Record) -> None:
             "huerco_s",
             "GET https://bandcamp.com/api/mobile/24/tralbum_details"
             "?band_id=1046469632&tralbum_id=3201218634&tralbum_type=a",
-        )
+        ),
     )
 
     record = p.details_record(details)

@@ -7,7 +7,7 @@ _PUNCTUATION_FOLD = str.maketrans({**dict.fromkeys(DASHES, "-"), **dict.fromkeys
 
 # Latin letters that Unicode does not decompose into a base letter and a mark.
 _LATIN_LETTERS = str.maketrans(
-    {"ø": "o", "đ": "d", "ł": "l", "ħ": "h", "\u0131": "i", "æ": "ae", "œ": "oe", "þ": "th"}
+    {"ø": "o", "đ": "d", "ł": "l", "ħ": "h", "\u0131": "i", "æ": "ae", "œ": "oe", "þ": "th"},
 )
 
 _FEATURING = r"(?:feat\.?|ft\.?|featuring)"

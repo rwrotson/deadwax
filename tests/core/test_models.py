@@ -42,5 +42,5 @@ def test_json_schema_is_available() -> None:
     schema = Dossier.model_json_schema()
 
     assert {"query", "identity", "tags", "credits", "texts", "relations", "links", "errors"} <= set(
-        schema["properties"]
+        schema["properties"],
     )

@@ -69,7 +69,7 @@ def adapter(requests: list[httpx.Request], body: bytes | None = None) -> OdesliA
         return httpx.Response(200, content=body or page({"pageData": PAGE_DATA}))
 
     config = SourcesConfig.model_validate(
-        {"odesli": {"rate": 1000}, "http": {"escalation": "none"}}
+        {"odesli": {"rate": 1000}, "http": {"escalation": "none"}},
     )
     return OdesliAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 
@@ -79,7 +79,10 @@ async def test_links_on_every_platform_from_a_curated_link() -> None:
     requests: list[httpx.Request] = []
     query = parse_query("Radiohead - Paranoid Android", EntityKind.TRACK)
     spotify = Link(
-        service="spotify", url=SPOTIFY, target=LinkTarget.TRACK, sources=[Provenance(source="mb")]
+        service="spotify",
+        url=SPOTIFY,
+        target=LinkTarget.TRACK,
+        sources=[Provenance(source="mb")],
     )
 
     found = await adapter(requests).lookup(query, LookupContext(query=query, links=[spotify]))
@@ -105,7 +108,8 @@ async def test_query_url_is_the_seed_and_albums_have_album_links() -> None:
     query = parse_query("https://open.spotify.com/album/6dVIqQ8qmQ5GBnJ9shOYGE")
 
     found = await adapter(requests, page({"pageData": album})).lookup(
-        query, LookupContext(query=query)
+        query,
+        LookupContext(query=query),
     )
 
     assert str(requests[0].url).endswith("open.spotify.com%2Falbum%2F6dVIqQ8qmQ5GBnJ9shOYGE")
@@ -128,7 +132,8 @@ def test_unknown_record_redirects_to_a_page_without_data() -> None:
 
 
 @pytest.mark.parametrize(
-    "body", [b"<html>Just text</html>", page({"pageData": {"sections": "wrong"}})]
+    "body",
+    [b"<html>Just text</html>", page({"pageData": {"sections": "wrong"}})],
 )
 def test_unexpected_pages(body: bytes) -> None:
     with pytest.raises(SourceError):

@@ -10,7 +10,8 @@ def live_report(request: pytest.FixtureRequest) -> list[str]:
 
 
 def pytest_terminal_summary(
-    terminalreporter: pytest.TerminalReporter, config: pytest.Config
+    terminalreporter: pytest.TerminalReporter,
+    config: pytest.Config,
 ) -> None:
     """Print what each live lookup found."""
     lines = config.stash.get(_REPORT, [])

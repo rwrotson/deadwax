@@ -109,7 +109,8 @@ async def test_mainstream_track(replay: Replay, config: SourcesConfig) -> None:
 @pytest.mark.asyncio
 async def test_album_on_a_small_label(replay: Replay, config: SourcesConfig) -> None:
     query = parse_query(
-        "Huerco S. - For Those of You Who Have Never (And Also Those Who Have)", EntityKind.ALBUM
+        "Huerco S. - For Those of You Who Have Never (And Also Those Who Have)",
+        EntityKind.ALBUM,
     )
 
     dossier = await replayed(query, "huerco_s", replay, config)
@@ -212,7 +213,10 @@ async def test_remix_is_not_merged_with_the_original(replay: Replay, config: Sou
 )
 @pytest.mark.asyncio
 async def test_streaming_urls_resolve_to_the_same_recording(
-    url: str, scenario: str, replay: Replay, config: SourcesConfig
+    url: str,
+    scenario: str,
+    replay: Replay,
+    config: SourcesConfig,
 ) -> None:
     dossier = await replayed(parse_query(url), scenario, replay, config)
 
@@ -292,7 +296,7 @@ def test_describe_sources() -> None:
     sources = {info.source: info for info in describe_sources()}
 
     assert list(sources) == [
-        "musicbrainz", "odesli", "itunes", "deezer", "discogs", "bandcamp", "lastfm", "wikipedia"
+        "musicbrainz", "odesli", "itunes", "deezer", "discogs", "bandcamp", "lastfm", "wikipedia",
     ]  # fmt: skip
     assert sources["musicbrainz"].pass_ is Pass.IDENTITY
     assert sources["odesli"].status.ready

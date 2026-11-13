@@ -99,7 +99,7 @@ def test_errors_in_the_body(body: bytes, error: type[SourceError]) -> None:
 
 def test_referenced_items() -> None:
     assert p.referenced(SONG) == [
-        "Q10", "Q20", "Q40", "Q50", "Q51", "Q7737", "Q30", "Q31", "Q60", "Q61"
+        "Q10", "Q20", "Q40", "Q50", "Q51", "Q7737", "Q30", "Q31", "Q60", "Q61",
     ]  # fmt: skip
 
 
@@ -324,5 +324,5 @@ def test_pick_and_helpers() -> None:
     assert p.wiki_code(code) == "ru"
     assert p.wiki_code(models.Claims()) is None
     assert p.article_url("ru", "Группа крови (песня)").startswith(
-        "https://ru.wikipedia.org/wiki/%D0%93"
+        "https://ru.wikipedia.org/wiki/%D0%93",
     )

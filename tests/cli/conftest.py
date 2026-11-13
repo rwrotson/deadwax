@@ -48,7 +48,7 @@ def dossier() -> Dossier:
                             {"value": "1995", "sources": mb},
                             {"value": "1994", "sources": itunes},
                         ],
-                    }
+                    },
                 ],
             },
             "tags": [
@@ -128,10 +128,10 @@ def dossier() -> Dossier:
                     "url": "https://open.spotify.com/track/1",
                     "target": "track",
                     "sources": mb,
-                }
+                },
             ],
             "errors": [
-                {"source": "deezer", "kind": "blocked", "reason": "Akamai block (tried httpx)"}
+                {"source": "deezer", "kind": "blocked", "reason": "Akamai block (tried httpx)"},
             ],
-        }
+        },
     )

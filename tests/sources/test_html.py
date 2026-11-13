@@ -14,7 +14,7 @@ def test_text_and_attributes() -> None:
 
 def test_attribute_json() -> None:
     document = parse_html(
-        '<a data-ok="{&quot;a&quot;: 1}"></a><a data-list="[1]"></a><a data-bad="{oops"></a>'
+        '<a data-ok="{&quot;a&quot;: 1}"></a><a data-list="[1]"></a><a data-bad="{oops"></a>',
     )
 
     assert attribute_json(document, "data-ok") == {"a": 1}
@@ -33,7 +33,7 @@ def test_json_ld_types_lists_and_graphs() -> None:
         <script type="application/ld+json">{"@graph": [{"@type": "Person", "name": "C"}]}</script>
         <script type="application/ld+json">{not json</script>
         <script type="application/ld+json">{"name": "untyped"}</script>
-        """
+        """,
     )
 
     assert [item["name"] for item in json_ld(document, "MusicAlbum", "MusicRelease")] == ["A", "B"]

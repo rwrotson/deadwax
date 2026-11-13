@@ -66,7 +66,7 @@ class MusicBrainzAdapter(HttpAdapter):
             Capability.TAGS,
             Capability.CREDITS,
             Capability.RELATIONS,
-        }
+        },
     )
 
     def resolves(self, query: Query) -> bool:
@@ -133,7 +133,9 @@ class MusicBrainzAdapter(HttpAdapter):
     async def _by_isrc(self, isrc: str, reference: RecordKey) -> Target | None:
         try:
             found = await self._get(
-                models.RecordingSearch, f"isrc/{isrc}", inc="artist-credits+releases"
+                models.RecordingSearch,
+                f"isrc/{isrc}",
+                inc="artist-credits+releases",
             )
         except NotFoundError:
             return None
@@ -142,7 +144,10 @@ class MusicBrainzAdapter(HttpAdapter):
 
     async def _search_recordings(self, query: str) -> models.RecordingSearch:
         return await self._get(
-            models.RecordingSearch, "recording", query=query, limit=_SEARCH_LIMIT
+            models.RecordingSearch,
+            "recording",
+            query=query,
+            limit=_SEARCH_LIMIT,
         )
 
     async def _search_track(self, reference: RecordKey) -> Target | None:
@@ -174,7 +179,9 @@ class MusicBrainzAdapter(HttpAdapter):
         if not artist_credit:
             return []
         artist = await self._get(
-            models.Artist, f"artist/{artist_credit[0].artist.id}", inc="artist-rels"
+            models.Artist,
+            f"artist/{artist_credit[0].artist.id}",
+            inc="artist-rels",
         )
         return p.member_relations(artist)
 

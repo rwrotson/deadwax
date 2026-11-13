@@ -116,7 +116,7 @@ def make(seen: list[httpx.Request] | None = None, **overrides: Handler) -> Wikip
         return httpx.Response(200, content=json.dumps(body).encode())
 
     config = SourcesConfig.model_validate(
-        {"wikipedia": {"rate": 1000}, "http": {"retries": 0, "escalation": "none"}}
+        {"wikipedia": {"rate": 1000}, "http": {"retries": 0, "escalation": "none"}},
     )
     return WikipediaAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 
@@ -162,7 +162,7 @@ async def test_kind_of_a_url_query_comes_from_the_item() -> None:
     assert partial.candidate is not None
     assert partial.candidate.kind is EntityKind.ALBUM
     assert [(t.publication, t.scope) for t in partial.texts if t.kind is TextKind.REVIEW] == [
-        ("AllMusic", Scope.RELEASE_GROUP)
+        ("AllMusic", Scope.RELEASE_GROUP),
     ]
 
 
@@ -182,7 +182,7 @@ async def test_track_found_by_search() -> None:
 async def test_search_without_kind_or_results() -> None:
     query = parse_query("https://example.com/x")
     identity = Identity.model_validate(
-        {"artist": {"value": "Группа", "sources": []}, "title": {"value": "Песня", "sources": []}}
+        {"artist": {"value": "Группа", "sources": []}, "title": {"value": "Песня", "sources": []}},
     )
     seen: list[httpx.Request] = []
 

@@ -34,7 +34,7 @@ class LastfmAdapter(HttpAdapter):
     name = "lastfm"
     pass_ = Pass.ENRICH
     capabilities = frozenset(
-        {Capability.IDENTITY, Capability.TAGS, Capability.TEXTS, Capability.RELATIONS}
+        {Capability.IDENTITY, Capability.TAGS, Capability.TEXTS, Capability.RELATIONS},
     )
     requires = (Requirement(setting="lastfm.api_key", purpose="every lookup"),)
     secret_params = frozenset({"api_key"})
@@ -65,7 +65,10 @@ class LastfmAdapter(HttpAdapter):
 
     async def _artist_tags(self, artist: str, page: str | None) -> list[Tag]:
         found = await self._call(
-            models.TopTagsResponse, "artist.getTopTags", artist=artist, autocorrect="1"
+            models.TopTagsResponse,
+            "artist.getTopTags",
+            artist=artist,
+            autocorrect="1",
         )
         return p.tags(found.toptags.tag, Scope.ARTIST, page, p.ARTIST_TAGS_LIMIT)
 
@@ -75,7 +78,10 @@ class LastfmAdapter(HttpAdapter):
         names = {"artist": track.artist.name, "track": track.name}
         top = await self._call(models.TopTagsResponse, "track.getTopTags", **names)
         similar = await self._call(
-            models.SimilarTracksResponse, "track.getSimilar", **names, limit=SIMILAR_TRACKS
+            models.SimilarTracksResponse,
+            "track.getSimilar",
+            **names,
+            limit=SIMILAR_TRACKS,
         )
         artist_page = track.artist.url or _artist_page(track.url)
         return Partial(

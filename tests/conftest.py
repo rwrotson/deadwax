@@ -9,7 +9,9 @@ import structlog
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
-        "--live", action="store_true", help="also run tests/integration against live sources"
+        "--live",
+        action="store_true",
+        help="also run tests/integration against live sources",
     )
 
 

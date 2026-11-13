@@ -43,13 +43,15 @@ class Query(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     kind: EntityKind | None = Field(
-        default=None, description="Track or album; a URL query may leave it to the resolver"
+        default=None,
+        description="Track or album; a URL query may leave it to the resolver",
     )
     artist: str | None = None
     title: str | None = None
     url: str | None = None
     ids: dict[IdKind, str] = Field(
-        default_factory=dict, description="Identifiers recognized in the URL"
+        default_factory=dict,
+        description="Identifiers recognized in the URL",
     )
 
     @model_validator(mode="after")
@@ -124,10 +126,16 @@ _URL_RULES = (
         IdKind.SPOTIFY,
     ),
     _UrlRule(
-        _DEEZER, re.compile(r"^(?:/[a-z]{2})?/track/(?P<id>\d+)"), EntityKind.TRACK, IdKind.DEEZER
+        _DEEZER,
+        re.compile(r"^(?:/[a-z]{2})?/track/(?P<id>\d+)"),
+        EntityKind.TRACK,
+        IdKind.DEEZER,
     ),
     _UrlRule(
-        _DEEZER, re.compile(r"^(?:/[a-z]{2})?/album/(?P<id>\d+)"), EntityKind.ALBUM, IdKind.DEEZER
+        _DEEZER,
+        re.compile(r"^(?:/[a-z]{2})?/album/(?P<id>\d+)"),
+        EntityKind.ALBUM,
+        IdKind.DEEZER,
     ),
     _UrlRule(
         _APPLE_MUSIC,

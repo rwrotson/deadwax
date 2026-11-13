@@ -96,7 +96,9 @@ class ResponseCache:
 
 
 def open_cache(
-    settings: CacheSettings, *, clock: Callable[[], float] = time.time
+    settings: CacheSettings,
+    *,
+    clock: Callable[[], float] = time.time,
 ) -> ResponseCache | None:
     """Open the cache the settings describe, or return None when caching is off."""
     if not settings.enabled or settings.path is None:

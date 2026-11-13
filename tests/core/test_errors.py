@@ -12,7 +12,8 @@ from deadwax.core import (
 
 
 @pytest.mark.parametrize(
-    "error", [InvalidQueryError, ConfigurationError, SourceError, BlockedError, NotFoundError]
+    "error",
+    [InvalidQueryError, ConfigurationError, SourceError, BlockedError, NotFoundError],
 )
 def test_errors_share_the_library_base(error: type[DeadwaxError]) -> None:
     assert issubclass(error, DeadwaxError)

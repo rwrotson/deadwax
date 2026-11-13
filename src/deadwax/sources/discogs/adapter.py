@@ -57,7 +57,7 @@ class DiscogsAdapter(HttpAdapter):
             Capability.CREDITS,
             Capability.TEXTS,
             Capability.RELATIONS,
-        }
+        },
     )
     requires = (Requirement(setting="discogs.token", purpose="search and compilations"),)
     default_user_agent = DEFAULT_USER_AGENT
@@ -139,7 +139,10 @@ class DiscogsAdapter(HttpAdapter):
         return await self._partial(release, master, kind, key)
 
     async def _target(
-        self, query: Query, context: LookupContext, key: RecordKey | None
+        self,
+        query: Query,
+        context: LookupContext,
+        key: RecordKey | None,
     ) -> tuple[str | None, str | None] | None:
         """Return master and release IDs from the query, earlier passes, or a search.
 
@@ -169,7 +172,8 @@ class DiscogsAdapter(HttpAdapter):
         else:
             params |= {"release_title": key.title, "type": "master"}
         found = p.pick_result(
-            key, (await self._get(models.Search, "database/search", **params)).results
+            key,
+            (await self._get(models.Search, "database/search", **params)).results,
         )
         if found is None:
             return None
@@ -224,12 +228,16 @@ class DiscogsAdapter(HttpAdapter):
         )
 
     async def _versions(
-        self, master: models.Master | None, release: models.Release
+        self,
+        master: models.Master | None,
+        release: models.Release,
     ) -> list[Relation]:
         if master is None:
             return []
         versions = await self._get(
-            models.Versions, f"masters/{master.id}/versions", per_page=PAGE_SIZE
+            models.Versions,
+            f"masters/{master.id}/versions",
+            per_page=PAGE_SIZE,
         )
         return p.version_relations(versions.versions, release.id)
 
@@ -244,12 +252,17 @@ class DiscogsAdapter(HttpAdapter):
         if label is None or label.id is None:
             return []
         found = await self._get(
-            models.LabelReleases, f"labels/{label.id}/releases", per_page=PAGE_SIZE
+            models.LabelReleases,
+            f"labels/{label.id}/releases",
+            per_page=PAGE_SIZE,
         )
         return p.label_release_relations(found.releases, p.clean_name(label.name), label.id, title)
 
     async def _compilations(
-        self, track: models.Track, release: models.Release, master: models.Master | None
+        self,
+        track: models.Track,
+        release: models.Release,
+        master: models.Master | None,
     ) -> list[Relation]:
         """Search compilations with the track; the search needs the token."""
         if self.token is None:
@@ -275,7 +288,7 @@ class DiscogsAdapter(HttpAdapter):
         except BlockedError as error:
             reason = f"reviews: {error}"
             return [], [
-                AdapterError(source=self.name, kind=ErrorKind.BLOCKED, reason=reason, url=url)
+                AdapterError(source=self.name, kind=ErrorKind.BLOCKED, reason=reason, url=url),
             ]
         except NotFoundError:
             return [], []
@@ -283,6 +296,6 @@ class DiscogsAdapter(HttpAdapter):
         except (SourceError, ConfigurationError) as error:
             reason = f"reviews: {error}"
             return [], [
-                AdapterError(source=self.name, kind=ErrorKind.FAILED, reason=reason, url=url)
+                AdapterError(source=self.name, kind=ErrorKind.FAILED, reason=reason, url=url),
             ]
         return p.reviews(response.content, response.url), []

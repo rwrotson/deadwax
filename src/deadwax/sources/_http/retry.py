@@ -36,7 +36,11 @@ class RetryPolicy:
         return rng.uniform(0, min(self.cap, self.base * 2**attempt))
 
     def delay(
-        self, attempt: int, retry_after: str | None, rng: random.Random, now: datetime
+        self,
+        attempt: int,
+        retry_after: str | None,
+        rng: random.Random,
+        now: datetime,
     ) -> float:
         """Return the delay before a retry, preferring the server's Retry-After."""
         hinted = parse_retry_after(retry_after, now)

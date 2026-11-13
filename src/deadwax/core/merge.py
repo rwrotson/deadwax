@@ -135,7 +135,7 @@ def _judge(reference: RecordKey | None, partials: Iterable[Partial]) -> _Judgeme
                     reason=f"best candidate '{candidate.artist} - {candidate.title}' "
                     "does not match the query",
                     url=candidate.url,
-                )
+                ),
             )
     return judgement
 
@@ -186,7 +186,9 @@ def _version(accepted: list[RecordCandidate]) -> VersionInfo:
 
 
 def _version_discrepancy(
-    version: VersionInfo, title: Sourced[str] | None, other_versions: list[Partial]
+    version: VersionInfo,
+    title: Sourced[str] | None,
+    other_versions: list[Partial],
 ) -> Discrepancy | None:
     others = [
         (_version_label(_resolve_version(partial.candidate)), _provenance(partial))
@@ -241,7 +243,9 @@ def _external_ids(
         for kind, value in candidate.ids.items():
             known = ids.get((kind, value))
             ids[kind, value] = ExternalId(
-                kind=kind, value=value, sources=_union(known.sources if known else [], [provenance])
+                kind=kind,
+                value=value,
+                sources=_union(known.sources if known else [], [provenance]),
             )
     discrepancies = []
     for kind in dict.fromkeys(external_id.kind for external_id in ids.values()):
@@ -256,7 +260,9 @@ def _external_ids(
 
 
 def build_identity(
-    query: Query, accepted: list[Partial], other_versions: list[Partial]
+    query: Query,
+    accepted: list[Partial],
+    other_versions: list[Partial],
 ) -> Identity:
     """Combine the candidates of matching partials into one identity with its discrepancies."""
     matched = [
@@ -265,7 +271,8 @@ def build_identity(
         if partial.candidate is not None
     ]
     artist, artist_conflict = _consensus(
-        "artist", ((c.artist, normalize_artist(c.artist), p) for c, p in matched)
+        "artist",
+        ((c.artist, normalize_artist(c.artist), p) for c, p in matched),
     )
     title, title_conflict = _consensus(
         "title",
@@ -275,7 +282,9 @@ def build_identity(
         ),
     )
     date, date_conflict = _consensus(
-        "date", ((c.date, c.date[:4], p) for c, p in matched if c.date), _most_precise
+        "date",
+        ((c.date, c.date[:4], p) for c, p in matched if c.date),
+        _most_precise,
     )
     version = _version([candidate for candidate, _ in matched])
     version_conflict = _version_discrepancy(version, title, other_versions)
@@ -306,7 +315,9 @@ def _combine_tags(kept: Tag, other: Tag) -> Tag:
 
 
 def _dedupe[T: Attributed](
-    items: Iterable[T], key: Callable[[T], Hashable], combine: Callable[[T, T], T] = _combine
+    items: Iterable[T],
+    key: Callable[[T], Hashable],
+    combine: Callable[[T, T], T] = _combine,
 ) -> list[T]:
     merged: dict[Hashable, T] = {}
     for item in items:
@@ -364,7 +375,9 @@ def _text_key(text: Text) -> tuple[object, ...]:
 def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Partial]) -> _Facts:
     scope_rank = _scope_rank(kind)
     tags = _dedupe(
-        (tag for p in accepted for tag in p.tags), lambda t: normalize_text(t.name), _combine_tags
+        (tag for p in accepted for tag in p.tags),
+        lambda t: normalize_text(t.name),
+        _combine_tags,
     )
     credit_facts = _dedupe(
         (credit for p in accepted for credit in p.credits),

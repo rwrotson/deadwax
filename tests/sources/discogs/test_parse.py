@@ -20,7 +20,7 @@ def ok_computer(recorded: Recorded) -> models.Release:
 def huerco(recorded: Recorded) -> tuple[models.Master, models.Release]:
     master = models.Master.model_validate_json(recorded("huerco_s", f"GET {API}/masters/1016511"))
     release = models.Release.model_validate_json(
-        recorded("huerco_s", f"GET {API}/releases/8541536")
+        recorded("huerco_s", f"GET {API}/releases/8541536"),
     )
     return master, release
 
@@ -36,7 +36,7 @@ def test_album_candidate(huerco: tuple[models.Master, models.Release]) -> None:
         "https://www.discogs.com/master/1016511",
     )
     assert [(label.name, label.catalog_number) for label in candidate.labels] == [
-        ("Proibito", "PRB018")
+        ("Proibito", "PRB018"),
     ]
     assert candidate.ids == {
         IdKind.DISCOGS_RELEASE: "8541536",
@@ -163,7 +163,7 @@ def test_placeholder_labels_and_dates() -> None:
 
 def test_versions_and_label_releases(recorded: Recorded) -> None:
     versions = models.Versions.model_validate_json(
-        recorded("paranoid_android", f"GET {API}/masters/21491/versions?per_page=25")
+        recorded("paranoid_android", f"GET {API}/masters/21491/versions?per_page=25"),
     )
     catalog = models.LabelReleases(
         releases=[
@@ -171,7 +171,7 @@ def test_versions_and_label_releases(recorded: Recorded) -> None:
             models.LabelRelease(id=2, title="Other", artist="A (2)", catno="C1", year=2000),
             models.LabelRelease(id=3, title="Other", artist="A"),
             *(models.LabelRelease(id=10 + n, title=f"T{n}") for n in range(20)),
-        ]
+        ],
     )
 
     others = p.version_relations(versions.versions, 4950798)
@@ -186,7 +186,7 @@ def test_versions_and_label_releases(recorded: Recorded) -> None:
 
 def test_artist_relations(recorded: Recorded) -> None:
     radiohead = models.Artist.model_validate_json(
-        recorded("paranoid_android", f"GET {API}/artists/3840")
+        recorded("paranoid_android", f"GET {API}/artists/3840"),
     )
     person = models.Artist(
         id=1,

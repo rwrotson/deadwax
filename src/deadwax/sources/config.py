@@ -28,17 +28,23 @@ class HttpSettings(_Model):
     )
     retries: int = Field(default=3, ge=0, description="Retries after 429, 5xx, or network errors")
     retry_base: float = Field(
-        default=1.0, gt=0, description="Seconds of the first backoff; it doubles on each retry"
+        default=1.0,
+        gt=0,
+        description="Seconds of the first backoff; it doubles on each retry",
     )
     max_retry_wait: float = Field(
-        default=60.0, ge=0, description="Longest Retry-After wait, in seconds, before giving up"
+        default=60.0,
+        ge=0,
+        description="Longest Retry-After wait, in seconds, before giving up",
     )
     escalation: Escalation | None = Field(
         default=None,
         description="Strongest transport for blocked HTML pages; unset: strongest installed",
     )
     max_response_bytes: int = Field(
-        default=10_000_000, gt=0, description="Responses larger than this are rejected"
+        default=10_000_000,
+        gt=0,
+        description="Responses larger than this are rejected",
     )
 
 
@@ -47,11 +53,14 @@ class CacheSettings(_Model):
 
     enabled: bool = Field(default=True, description="Read and write the response cache")
     path: Path | None = Field(
-        default=None, description="SQLite file of the cache; no cache when unset"
+        default=None,
+        description="SQLite file of the cache; no cache when unset",
     )
     ttl: float = Field(default=7 * 86400, ge=0, description="Seconds a response stays fresh")
     not_found_ttl: float = Field(
-        default=86400, ge=0, description="Seconds a 'not found' response stays fresh"
+        default=86400,
+        ge=0,
+        description="Seconds a 'not found' response stays fresh",
     )
 
 
@@ -60,10 +69,14 @@ class SourceSettings(_Model):
 
     enabled: bool = Field(default=True, description="Use this source")
     rate: float | None = Field(
-        default=None, gt=0, description="Requests per second; the source default when unset"
+        default=None,
+        gt=0,
+        description="Requests per second; the source default when unset",
     )
     ttl: float | None = Field(
-        default=None, ge=0, description="Cache lifetime in seconds; the cache default when unset"
+        default=None,
+        ge=0,
+        description="Cache lifetime in seconds; the cache default when unset",
     )
     user_agent: str | None = Field(
         default=None,
@@ -75,7 +88,8 @@ class DiscogsSettings(SourceSettings):
     """Settings of the Discogs source."""
 
     token: SecretStr | None = Field(
-        default=None, description="Personal access token; needed for search"
+        default=None,
+        description="Personal access token; needed for search",
     )
 
 

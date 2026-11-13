@@ -18,7 +18,7 @@ CREDIT = [{"name": "Everything but the Girl", "joinphrase": "", "artist": ARTIST
 
 def recording(rid: str, **fields: object) -> models.Recording:
     return models.Recording.model_validate(
-        {"id": rid, "title": "Missing", "artist-credit": CREDIT} | fields
+        {"id": rid, "title": "Missing", "artist-credit": CREDIT} | fields,
     )
 
 
@@ -90,7 +90,8 @@ def test_ranking_prefers_official_main_releases_then_year_then_release_count() -
     ]
 
     ranked = p.rank_recordings(
-        RecordKey("Everything but the Girl", "Missing", EntityKind.TRACK), candidates
+        RecordKey("Everything but the Girl", "Missing", EntityKind.TRACK),
+        candidates,
     )
 
     assert [r.id for r in ranked] == ["many", "few", "partial-date"]
@@ -109,7 +110,7 @@ def test_first_release_prefers_official_main_releases() -> None:
                     "secondary-types": ["Compilation"],
                     "primary-type": "Album",
                 },
-            }
+            },
         ),
         models.ReleaseRef.model_validate(
             {
@@ -117,7 +118,7 @@ def test_first_release_prefers_official_main_releases() -> None:
                 "status": "Official",
                 "date": "1994",
                 "release-group": {"id": "h", "primary-type": "Album"},
-            }
+            },
         ),
     ]
 
@@ -140,13 +141,19 @@ def test_first_release_prefers_official_main_releases() -> None:
     ],
 )
 def test_recording_relation_directions(
-    kind: str, direction: str, expected: RelationKind, note: str | None
+    kind: str,
+    direction: str,
+    expected: RelationKind,
+    note: str | None,
 ) -> None:
     target = {"id": "r9", "title": "Other", "artist-credit": CREDIT}
     found = p.recording_relations(
         [
             relation(
-                type=kind, direction=direction, **{"target-type": "recording"}, recording=target
+                type=kind,
+                direction=direction,
+                **{"target-type": "recording"},
+                recording=target,
             ),
             relation(
                 type="music video",
@@ -166,7 +173,7 @@ def test_recording_relation_directions(
     )
 
     assert [(r.kind, r.note, r.target.artist) for r in found] == [
-        (expected, note, "Everything but the Girl")
+        (expected, note, "Everything but the Girl"),
     ]
 
 
@@ -194,7 +201,7 @@ WORK = models.Work.model_validate(
                 "recording": {"id": "r1", "title": "Missing"},
             },
         ],
-    }
+    },
 )
 
 
@@ -208,7 +215,9 @@ WORK = models.Work.model_validate(
     ],
 )
 def test_work_relations(
-    version: VersionKind, is_cover: bool, expected: list[tuple[RelationKind, str]]
+    version: VersionKind,
+    is_cover: bool,
+    expected: list[tuple[RelationKind, str]],
 ) -> None:
     found = p.work_relations(WORK, "r1", VersionInfo(kind=version), is_cover)
 
@@ -261,7 +270,7 @@ def test_url_relations_give_ids_and_links() -> None:
 
     assert p.url_ids(relations) == {"wikidata": "Q3859219", "discogs_master": "21491"}
     assert [(link.service, link.target) for link in p.links(relations, LinkTarget.TRACK, "u")] == [
-        ("spotify", LinkTarget.ALBUM)
+        ("spotify", LinkTarget.ALBUM),
     ]
 
 

@@ -46,7 +46,7 @@ _COMMENT_KINDS = frozenset(
         VersionKind.EDIT,
         VersionKind.REMASTER,
         VersionKind.ALTERNATE,
-    }
+    },
 )
 
 # Recording-to-recording relation types: (kind when this recording is entity0, kind otherwise).
@@ -130,7 +130,8 @@ def _is_main(release: models.ReleaseRef) -> bool:
 
 
 def rank_recordings(
-    reference: RecordKey, recordings: Iterable[models.Recording]
+    reference: RecordKey,
+    recordings: Iterable[models.Recording],
 ) -> list[models.Recording]:
     """Return the recordings that match the reference, the most likely original first."""
     matching = [
@@ -160,7 +161,8 @@ def rank_recordings(
 
 
 def rank_release_groups(
-    reference: RecordKey, groups: Iterable[models.ReleaseGroup]
+    reference: RecordKey,
+    groups: Iterable[models.ReleaseGroup],
 ) -> list[models.ReleaseGroup]:
     """Return the release groups that match the reference, plain albums first."""
     matching = [
@@ -193,7 +195,10 @@ def first_release(releases: Iterable[models.ReleaseRef]) -> models.ReleaseRef | 
 
 
 def tags(
-    folksonomy: Sequence[models.Tag], genres: Sequence[models.Tag], scope: Scope, url: str
+    folksonomy: Sequence[models.Tag],
+    genres: Sequence[models.Tag],
+    scope: Scope,
+    url: str,
 ) -> list[Tag]:
     """Turn genres and tags with positive votes into weighted tags."""
     voted = [tag for tag in [*genres, *folksonomy] if tag.count > 0]
@@ -214,7 +219,7 @@ def tags(
                 weight=round(tag.count / top, 3),
                 scope=scope,
                 sources=[Provenance(source=SOURCE, url=url)],
-            )
+            ),
         )
     return result
 
@@ -245,7 +250,9 @@ def _recording_entity(recording: models.RecordingRef) -> Entity:
 
 
 def recording_relations(
-    relations: Iterable[models.Relation], scope: Scope, url: str
+    relations: Iterable[models.Relation],
+    scope: Scope,
+    url: str,
 ) -> list[Relation]:
     """Turn remix, sample, mash-up and edit relations between recordings into relations."""
     result = []
@@ -261,13 +268,15 @@ def recording_relations(
                 note=note,
                 scope=scope,
                 sources=[Provenance(source=SOURCE, url=url)],
-            )
+            ),
         )
     return result
 
 
 def appearances(
-    releases: Iterable[models.ReleaseRef], skip_group: str | None, url: str
+    releases: Iterable[models.ReleaseRef],
+    skip_group: str | None,
+    url: str,
 ) -> list[Relation]:
     """Turn the official releases of a recording into appearances, one per release group."""
     result: list[Relation] = []
@@ -297,7 +306,7 @@ def appearances(
                 ),
                 scope=Scope.RECORDING,
                 sources=[Provenance(source=SOURCE, url=url)],
-            )
+            ),
         )
     return result
 
@@ -317,7 +326,7 @@ def links(relations: Iterable[models.Relation], default: LinkTarget, url: str) -
                 url=relation.url.resource,
                 target=link_target(relation.url.resource, default),
                 sources=[Provenance(source=SOURCE, url=url)],
-            )
+            ),
         )
     return result
 
@@ -393,13 +402,17 @@ def member_relations(artist: models.Artist) -> list[Relation]:
                 note=", ".join(relation.attributes) or None,
                 scope=Scope.ARTIST,
                 sources=[Provenance(source=SOURCE, url=url)],
-            )
+            ),
         )
     return result
 
 
 def work_relations(
-    work: models.Work, recording_id: str, version: VersionInfo, is_cover: bool, limit: int = 50
+    work: models.Work,
+    recording_id: str,
+    version: VersionInfo,
+    is_cover: bool,
+    limit: int = 50,
 ) -> list[Relation]:
     """Relate a recording to its work and the work's other recordings.
 

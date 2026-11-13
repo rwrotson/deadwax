@@ -58,7 +58,9 @@ def key_similarity(left: str, right: str) -> float:
         return 1.0
     by_characters = SequenceMatcher(None, left, right).ratio()
     by_words = SequenceMatcher(
-        None, " ".join(sorted(left.split())), " ".join(sorted(right.split()))
+        None,
+        " ".join(sorted(left.split())),
+        " ".join(sorted(right.split())),
     )
     return max(by_characters, by_words.ratio())
 
@@ -77,7 +79,8 @@ def artist_similarity(left: str, right: str) -> float:
 def title_similarity(left: str, right: str) -> float:
     """Compare titles without version markers and featured artists."""
     return key_similarity(
-        normalize_text(parse_title(left).base), normalize_text(parse_title(right).base)
+        normalize_text(parse_title(left).base),
+        normalize_text(parse_title(right).base),
     )
 
 

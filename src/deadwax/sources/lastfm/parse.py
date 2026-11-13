@@ -53,7 +53,10 @@ def check(content: bytes, url: str) -> None:
 
 
 def tags(
-    found: Iterable[models.Tag], scope: Scope, url: str | None, limit: int = TAGS_LIMIT
+    found: Iterable[models.Tag],
+    scope: Scope,
+    url: str | None,
+    limit: int = TAGS_LIMIT,
 ) -> list[Tag]:
     """Return the most used tags with their relative count as weight; unused tags are dropped."""
     sources = [Provenance(source=SOURCE, url=url)]
@@ -64,8 +67,12 @@ def tags(
         weight = min(tag.count, 100) / 100
         result.append(
             Tag(
-                name=tag.name.strip(), kind=TagKind.TAG, weight=weight, scope=scope, sources=sources
-            )
+                name=tag.name.strip(),
+                kind=TagKind.TAG,
+                weight=weight,
+                scope=scope,
+                sources=sources,
+            ),
         )
     return result[:limit]
 
@@ -104,21 +111,27 @@ def wiki_texts(wiki: models.Wiki | None, scope: Scope, url: str | None) -> list[
             date=published(wiki.published),
             scope=scope,
             sources=[Provenance(source=SOURCE, url=url)],
-        )
+        ),
     ]
 
 
 def track_candidate(track: models.TrackInfo) -> RecordCandidate:
     """Describe a track; its version is derived from the title."""
     return RecordCandidate(
-        kind=EntityKind.TRACK, artist=track.artist.name, title=track.name, url=track.url
+        kind=EntityKind.TRACK,
+        artist=track.artist.name,
+        title=track.name,
+        url=track.url,
     )
 
 
 def album_candidate(album: models.AlbumInfo) -> RecordCandidate:
     """Describe an album."""
     return RecordCandidate(
-        kind=EntityKind.ALBUM, artist=album.artist, title=album.name, url=album.url
+        kind=EntityKind.ALBUM,
+        artist=album.artist,
+        title=album.name,
+        url=album.url,
     )
 
 
@@ -133,7 +146,10 @@ def similar_tracks(found: Iterable[models.SimilarTrack], url: str | None) -> lis
         Relation(
             kind=RelationKind.SIMILAR,
             target=Entity(
-                type=EntityType.RECORDING, name=track.name, artist=track.artist.name, url=track.url
+                type=EntityType.RECORDING,
+                name=track.name,
+                artist=track.artist.name,
+                url=track.url,
             ),
             note=_note(track.match),
             scope=Scope.RECORDING,

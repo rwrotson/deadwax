@@ -30,7 +30,11 @@ class BrowserFetcher:
     name = "browser"
 
     def __init__(
-        self, *, timeout: float, max_bytes: int, identity: BrowserIdentity = CHROME
+        self,
+        *,
+        timeout: float,
+        max_bytes: int,
+        identity: BrowserIdentity = CHROME,
     ) -> None:
         try:
             import playwright.async_api  # noqa: F401, PLC0415 -- optional extra (R7)
@@ -79,7 +83,9 @@ class BrowserFetcher:
         page.on("response", record)
         try:
             await page.goto(
-                request.full_url, wait_until="domcontentloaded", timeout=self._timeout_ms
+                request.full_url,
+                wait_until="domcontentloaded",
+                timeout=self._timeout_ms,
             )
 
             # Pages that keep polling never become idle; the DOM is loaded by then anyway.

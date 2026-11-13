@@ -29,7 +29,8 @@ def test_text_query_splits_artist_and_title(text: str, artist: str, title: str) 
 
 
 @pytest.mark.parametrize(
-    "text", ["", "   ", "Burial", "Burial -", "- Archangel", "Jay-Z", 'Burial - ""']
+    "text",
+    ["", "   ", "Burial", "Burial -", "- Archangel", "Jay-Z", 'Burial - ""'],
 )
 def test_text_query_without_artist_and_title_is_rejected(text: str) -> None:
     with pytest.raises(InvalidQueryError):
@@ -113,7 +114,9 @@ def test_text_query_requires_kind() -> None:
     ],
 )
 def test_url_kind_and_ids_are_recognized(
-    url: str, kind: EntityKind | None, ids: dict[IdKind, str]
+    url: str,
+    kind: EntityKind | None,
+    ids: dict[IdKind, str],
 ) -> None:
     assert recognize_url(url) == (kind, ids)
 
