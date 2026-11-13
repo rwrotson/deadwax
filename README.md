@@ -71,11 +71,11 @@ Names written in a non-Latin script are compared as written: a store that lists 
 
 | Group | Sources | Caveats |
 |-------|---------|---------|
-| Shops | Boomkat, Juno, Norman, Forced Exposure, Hard Wax, Phonica, Soundohm, Bleep, Rough Trade | shop copy as `shop` texts |
+| Shops | Boomkat, Juno, Norman, Forced Exposure, Hard Wax, Phonica, Soundohm, Bleep | shop copy as `shop` texts |
 | Reviews and press | AllMusic, Resident Advisor (GraphQL), press reviews through one adapter with per-site rules | |
-| Catalogues and communities | Apple Music, Rate Your Music, Genius, Album of the Year, ListenBrainz, SecondHandSongs | Rate Your Music only through a browser |
-| Radio and mixes | NTS, Mixcloud, 1001Tracklists, KEXP, WFMU, BBC Sounds | |
-| Streaming and download stores | Spotify, SoundCloud, YouTube, Beatport, Juno Download, Traxsource | Spotify for search and links only; YouTube not as a fact source |
+| Catalogues and communities | Rate Your Music, Genius, Album of the Year, ListenBrainz, SecondHandSongs | Rate Your Music only through a browser |
+| Radio and mixes | NTS, 1001Tracklists, KEXP, WFMU | |
+| Streaming and download stores | Spotify, SoundCloud, YouTube, Beatport, Juno Download | Spotify for search and links only; YouTube for links only |
 | Samples | WhoSampled | needs a separate decision on its terms of service |
 
 Never used: Every Noise at Once, direct Metacritic scraping (Metacritic scores come from Wikipedia), Spotify audio features.
