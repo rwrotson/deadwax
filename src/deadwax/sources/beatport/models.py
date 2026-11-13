@@ -3,52 +3,42 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, ConfigDict, model_validator
 
 
-def _as_list(value: object) -> list[Any]:
-    """Accept one object where search results give a list, and the reverse."""
-    if value is None:
-        return []
-    return value if isinstance(value, list) else [value]
-
-
 class _Model(BaseModel):
     model_config = ConfigDict(extra="ignore", frozen=True)
 
-    # Search results name fields after their entity ('track_name'); catalogue pages do not.
+    # Search results prefix field names with their entity ('track_name'); pages do not.
     renames: ClassVar[dict[str, str]] = {}
-    lists: ClassVar[frozenset[str]] = frozenset()
 
     @model_validator(mode="before")
     @classmethod
-    def _catalogue_names(cls, data: Any) -> Any:  # noqa: ANN401 -- raw input of any shape
+    def _page_names(cls, data: Any) -> Any:  # noqa: ANN401 -- raw input of any shape
         if not isinstance(data, dict):
             return data
-        renamed = {cls.renames.get(name, name): value for name, value in data.items()}
-        for name in cls.lists & renamed.keys():
-            renamed[name] = _as_list(renamed[name])
-        return renamed
+        return {cls.renames.get(name, name): value for name, value in data.items()}
 
 
-class Named(_Model):
-    """Artist, genre, or label."""
+class Artist(_Model):
+    """Credited artist; `type` tells artists from remixers."""
 
-    renames = {
-        "artist_id": "id",
-        "genre_id": "id",
-        "label_id": "id",
-        "artist_name": "name",
-        "genre_name": "name",
-        "label_name": "name",
-    }
+    renames = {"artist_id": "id", "artist_name": "name", "artist_type_name": "type"}
 
     id: int | None = None
     name: str
-    slug: str | None = None
+    type: str | None = None
 
 
-class Key(_Model):
-    """Musical key of a track."""
+class Named(_Model):
+    """Genre, sub-genre, or label."""
 
-    name: str
+    renames = {"genre_name": "name", "label_name": "name"}
+
+    name: str | None = None
+
+
+class Genre(Named):
+    """Genre of a track page, with its sub-genre."""
+
+    sub_genre: Named | None = None
 
 
 class ReleaseRef(_Model):
@@ -60,56 +50,36 @@ class ReleaseRef(_Model):
     name: str | None = None
     slug: str | None = None
     catalog_number: str | None = None
-    label: Named | None = None
+    release_date: str | None = None
 
 
 class Track(_Model):
-    """Track of the catalogue (track pages) or of search results."""
+    """Track of a track page or of search results."""
 
-    renames = {
-        "track_id": "id",
-        "track_name": "name",
-        "key_name": "key",
-        "genre": "genres",
-        "sub_genre": "sub_genres",
-    }
-    lists = frozenset({"genres", "sub_genres", "artists", "remixers"})
+    renames = {"track_id": "id", "track_name": "name", "key_name": "key"}
 
     id: int
     name: str
     mix_name: str | None = None
-    slug: str | None = None
     bpm: float | None = None
-    key: Key | None = None
+    key: str | None = None
     isrc: str | None = None
-    genres: list[Named] = []
-    sub_genres: list[Named] = []
-    artists: list[Named] = []
-    remixers: list[Named] = []
+    artists: list[Artist] = []
+
+    # A track page gives one genre object, search results a list.
+    genre: Genre | list[Named] | None = None
+
     release: ReleaseRef | None = None
     label: Named | None = None
+    catalog_number: str | None = None
     publish_date: str | None = None
-    new_release_date: str | None = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def _key_name(cls, data: Any) -> Any:  # noqa: ANN401 -- raw input of any shape
-        """Search results give the key as a bare name."""
-        if not isinstance(data, dict):
-            return data
-        return {
-            name: {"name": value}
-            if name in {"key", "key_name"} and isinstance(value, str)
-            else value
-            for name, value in data.items()
-        }
+    release_date: str | None = None
 
 
 class Release(_Model):
-    """Release of the catalogue (release pages) or of search results."""
+    """Release of a release page or of search results."""
 
-    renames = {"release_id": "id", "release_name": "name", "genre": "genres"}
-    lists = frozenset({"genres", "artists", "remixers"})
+    renames = {"release_id": "id", "release_name": "name"}
 
     id: int
     name: str
@@ -117,8 +87,44 @@ class Release(_Model):
     catalog_number: str | None = None
     upc: str | None = None
     label: Named | None = None
-    artists: list[Named] = []
-    remixers: list[Named] = []
-    genres: list[Named] = []
+    artists: list[Artist] = []
+    remixers: list[Artist] = []
+    genre: list[Named] = []
     publish_date: str | None = None
     new_release_date: str | None = None
+    release_date: str | None = None
+
+
+class ChartOwner(_Model):
+    """DJ profile that published a chart."""
+
+    owner_name: str | None = None
+
+
+class Chart(_Model):
+    """DJ chart that lists a track."""
+
+    id: int
+    name: str
+    slug: str | None = None
+    publish_date: str | None = None
+    artist: Artist | None = None
+    person: ChartOwner | None = None
+
+
+class Charts(_Model):
+    """Page of charts that list a track."""
+
+    results: list[Chart] = []
+
+
+class TrackSearch(_Model):
+    """Track search results."""
+
+    data: list[Track] = []
+
+
+class ReleaseSearch(_Model):
+    """Release search results."""
+
+    data: list[Release] = []

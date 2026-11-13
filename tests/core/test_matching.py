@@ -63,6 +63,7 @@ def test_remix_query_against_candidates(candidate: RecordKey, verdict: Verdict) 
         ("Track (Kode9 Edit)", "Track (Kode9 Re-Edit)", Verdict.MATCH),
         ("Track (Todd Terry Remix)", "Track (Todd Terry Extended Remix)", Verdict.OTHER_VERSION),
         ("Track (Todd Terry Remix)", "Track (Todd Terry Dub)", Verdict.OTHER_VERSION),
+        ("Track (Todd Terry Remix)", "Track (Todd Terry Remix - Intro)", Verdict.OTHER_VERSION),
         ("Track (Todd Terry Remix)", "Track (Todd Terry Club Mix)", Verdict.MATCH),
     ],
 )

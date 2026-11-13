@@ -17,7 +17,6 @@ FAST = {"rate": 1000}
 SOURCES = (
     "musicbrainz", "itunes", "deezer", "odesli", "discogs", "bandcamp", "lastfm", "wikipedia",
     "listenbrainz", "secondhandsongs", "kexp", "spotify", "youtube", "soundcloud", "beatport",
-    "junodownload",
 )  # fmt: skip
 
 

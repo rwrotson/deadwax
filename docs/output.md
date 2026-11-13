@@ -28,7 +28,7 @@ Candidates are compared with the query text, or for a URL query with the URL's o
 
 Each source's candidate is compared with the query by artist and base title, and its version separately. A candidate for the same work in another version (the original of a remix, a live take, a remaster) contributes none of its facts. It becomes a relation of kind `other_version`, with the version in `note`, and a `version` discrepancy. A candidate that matches neither becomes an error of kind `no_match`. Album and track never match each other, and a title alone never matches.
 
-Mix names are versions: `Original Mix` is the original, `Extended Mix`, `Club Mix`, and `12" Version` are `extended`, a plain `Dub` is `dub`, and `Radio Edit` or `Single Edit` is `edit`. A remixer's cut (`Todd Terry Remix`) or a named edit (`Kode9 Edit`) is a `remix` with its name as `detail`; remixes by different people, and an extended, radio, dub, or instrumental cut of one remix, are different versions. Tempos agree when they round to the same whole beat; keys agree across notations (`A Minor`, `Am`, Camelot `8A`, Open Key `1m`) and enharmonic spellings.
+Mix names are versions: `Original Mix` is the original, `Extended Mix`, `Club Mix`, and `12" Version` are `extended`, a plain `Dub` is `dub`, and `Radio Edit` or `Single Edit` is `edit`. A remixer's cut (`Todd Terry Remix`) or a named edit (`Kode9 Edit`) is a `remix` with its name as `detail`; remixes by different people, and an extended, radio, dub, instrumental, or intro cut of one remix, are different versions. Tempos agree when they round to the same whole beat; keys agree across notations (`A Minor`, `Am`, Camelot `8A`, Open Key `1m`) and enharmonic spellings.
 
 ## Facts
 
@@ -61,6 +61,7 @@ Relation kinds are directional:
 | `remix_of`, `remixed_by` | The original it remixes; remixes of it |
 | `samples`, `sampled_by` | What it samples; what samples it |
 | `reposted_by` | Accounts that reposted the upload (SoundCloud) |
+| `charted_by` | DJ charts that list the track, with the DJ as the target's artist (Beatport) |
 | `similar` | Similar records or artists according to a source |
 | `other_version` | Another version of the same work, kept apart from the identity |
 

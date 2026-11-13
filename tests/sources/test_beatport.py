@@ -1,5 +1,6 @@
 import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 import httpx
 import pytest
@@ -7,6 +8,7 @@ import pytest
 from deadwax.core import (
     BlockedError,
     EntityKind,
+    EntityType,
     IdKind,
     Link,
     LinkTarget,
@@ -16,6 +18,7 @@ from deadwax.core import (
     Provenance,
     Query,
     RelationKind,
+    Scope,
     SourceError,
     TagKind,
     VersionKind,
@@ -24,106 +27,49 @@ from deadwax.core import (
 )
 from deadwax.sources import SourcesConfig
 from deadwax.sources._http import HttpResources
-from deadwax.sources.beatport import BeatportAdapter, parse
+from deadwax.sources.beatport import BeatportAdapter, models
+from deadwax.sources.beatport import parse as p
+
+# Pages saved from a browser on 2026-11-13 and trimmed by scripts/beatport_pages.py.
+PAGES = Path(__file__).resolve().parent.parent / "fixtures" / "beatport" / "pages"
 
 SITE = "https://www.beatport.com"
-ORIGINAL_URL = f"{SITE}/track/missing/1"
-EXTENDED_URL = f"{SITE}/track/missing/2"
-RELEASE_URL = f"{SITE}/release/missing-remixes/10"
-
-ARTIST = {"id": 5, "name": "Everything but the Girl", "slug": "everything-but-the-girl"}
-RELEASE = {
-    "id": 10,
-    "name": "Missing (Remixes)",
-    "slug": "missing-remixes",
-    "label": {"id": 3, "name": "Blanco y Negro"},
-}
-ORIGINAL = {
-    "id": 1,
-    "name": "Missing",
-    "mix_name": "Todd Terry Remix",
-    "slug": "missing",
-    "bpm": 124,
-    "key": {"name": "A Minor", "camelot_number": 8, "camelot_letter": "A"},
-    "isrc": "GBAHT9500001",
-    "genre": {"id": 5, "name": "House"},
-    "sub_genre": {"id": 51, "name": "Deep House"},
-    "artists": [ARTIST],
-    "remixers": [{"id": 6, "name": "Todd Terry"}],
-    "release": RELEASE | {"catalog_number": "NEG84CD"},
-    "publish_date": "1995-10-02",
-}
-EXTENDED = ORIGINAL | {"id": 2, "mix_name": "Todd Terry Extended Remix", "bpm": 125}
-
-# Search results use the search service's field names.
-SEARCH_ORIGINAL = {
-    "track_id": 1,
-    "track_name": "Missing",
-    "mix_name": "Todd Terry Remix",
-    "slug": "missing",
-    "artists": [{"artist_id": 5, "artist_name": "Everything but the Girl"}],
-    "genre": [{"genre_id": 5, "genre_name": "House"}],
-    "key_name": "A Minor",
-    "bpm": 124,
-}
-SEARCH_RELEASE = {
-    "release_id": 10,
-    "release_name": "Missing (Remixes)",
-    "slug": "missing-remixes",
-    "catalog_number": "NEG84CD",
-    "artists": [{"artist_id": 5, "artist_name": "Everything but the Girl"}],
+REMIX_EDIT = f"{SITE}/track/missing/1331132"
+RADIO_EDIT = f"{SITE}/track/missing/27201133"
+NOTHING_LEFT = f"{SITE}/release/nothing-left-to-lose/4075859"
+YOUNG_AND_DUMB = f"{SITE}/release/young-and-dumb/7657829"
+SERVED = {
+    REMIX_EDIT: "track_1331132",
+    RADIO_EDIT: "track_27201133",
+    NOTHING_LEFT: "release_4075859",
+    YOUNG_AND_DUMB: "release_7657829",
+    f"{SITE}/search/tracks": "search_tracks",
+    f"{SITE}/search/releases": "search_releases",
 }
 NOW = datetime(2026, 11, 13, tzinfo=UTC)
 
 
-def page(page_props: dict[str, object]) -> str:
-    state = json.dumps({"props": {"pageProps": page_props}})
-    script = f'<script id="__NEXT_DATA__" type="application/json">{state}</script>'
-    return f"<html><body>{script}</body></html>"
-
-
-def search(*results: dict[str, object]) -> str:
-    query = {"queryKey": ["search"], "state": {"data": {"data": list(results)}}}
-    return page({"dehydratedState": {"queries": [query]}})
-
-
-PAGES = {
-    ORIGINAL_URL: page({"track": ORIGINAL}),
-    EXTENDED_URL: page({"track": EXTENDED}),
-    RELEASE_URL: page(
-        {
-            "release": RELEASE
-            | {"catalog_number": "NEG84CD", "upc": "0075678723421", "artists": [ARTIST]},
-            "dehydratedState": {
-                "queries": [{"state": {"data": {"results": [ORIGINAL, EXTENDED]}}}],
-            },
-        },
-    ),
-}
+def state_page(props: dict[str, object]) -> str:
+    state = json.dumps({"props": {"pageProps": props}})
+    return f'<script id="__NEXT_DATA__" type="application/json">{state}</script>'
 
 
 def make(
-    tracks: str | None = None,
     pages: dict[str, str] | None = None,
     status: int = 200,
-) -> tuple[BeatportAdapter, list[str]]:
-    seen: list[str] = []
-    served = PAGES | (pages or {})
+) -> tuple[BeatportAdapter, list[httpx.Request]]:
+    seen: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        url = str(request.url)
-        seen.append(url)
+        seen.append(request)
         if status != 200:
             return httpx.Response(status, headers={"cf-mitigated": "challenge"})
-        if request.url.path == "/search/tracks":
-            return httpx.Response(
-                200,
-                text=tracks if tracks is not None else search(SEARCH_ORIGINAL),
-            )
-        if request.url.path == "/search/releases":
-            return httpx.Response(200, text=search(SEARCH_RELEASE))
-        found = served.get(url.split("?", maxsplit=1)[0])
-        return httpx.Response(200, text=found) if found is not None else httpx.Response(404)
+        url = str(request.url).split("?", maxsplit=1)[0]
+        if pages is not None and url in pages:
+            return httpx.Response(200, text=pages[url])
+        if url in SERVED:
+            return httpx.Response(200, content=(PAGES / f"{SERVED[url]}.html").read_bytes())
+        return httpx.Response(404)
 
     config = SourcesConfig.model_validate(
         {"beatport": {"rate": 1000}, "http": {"retries": 0, "escalation": "none"}},
@@ -142,149 +88,169 @@ async def looked_up(
         await adapter.aclose()
 
 
+def urls(seen: list[httpx.Request]) -> list[str]:
+    return [str(request.url).split("?", maxsplit=1)[0] for request in seen]
+
+
 @pytest.mark.asyncio
-async def test_track_by_search_reads_tempo_key_genres_and_remixers() -> None:
+async def test_track_by_search_with_tempo_key_genre_and_charts() -> None:
     adapter, seen = make()
-    query = parse_query("Everything but the Girl - Missing (Todd Terry Remix)", EntityKind.TRACK)
+    query = parse_query(
+        "Everything but the Girl - Missing (Todd Terry Remix - Radio Edit)",
+        EntityKind.TRACK,
+    )
 
     partial = await looked_up(adapter, query)
 
-    assert seen[0].startswith(f"{SITE}/search/tracks?q=Everything")
-    assert seen[1:] == [ORIGINAL_URL]
+    assert urls(seen) == [f"{SITE}/search/tracks", RADIO_EDIT]
+    assert seen[0].url.params["q"] == (
+        "Everything but the Girl Missing (Todd Terry Remix - Radio Edit)"
+    )
     candidate = partial.candidate
     assert candidate is not None
     assert (candidate.artist, candidate.title) == (
-        "Everything but the Girl",
-        "Missing (Todd Terry Remix)",
+        "Everything But The Girl",
+        "Missing (Todd Terry Remix - Radio Edit)",
     )
     assert candidate.version is not None
-    assert (candidate.version.kind, candidate.version.detail) == (
-        VersionKind.REMIX,
-        "Todd Terry Remix",
-    )
-    assert (candidate.bpm, candidate.key) == (124, "A Minor")
-    assert candidate.isrcs == ["GBAHT9500001"]
+    assert candidate.version.kind is VersionKind.REMIX
+    assert (candidate.bpm, candidate.key, candidate.date) == (124, "A Minor", "2002-01-01")
+    assert candidate.isrcs == ["GBAHT0109010"]
     assert [(label.name, label.catalog_number) for label in candidate.labels] == [
-        ("Blanco y Negro", "NEG84CD"),
+        ("Virgin Records", "542 6165"),
     ]
-    assert candidate.date == "1995-10-02"
-    assert candidate.ids == {IdKind.BEATPORT_TRACK: "1"}
-    assert [(tag.name, tag.kind) for tag in partial.tags] == [
-        ("House", TagKind.GENRE),
-        ("Deep House", TagKind.STYLE),
+    assert candidate.ids == {IdKind.BEATPORT_TRACK: "27201133"}
+    assert [(tag.name, tag.kind) for tag in partial.tags] == [("Pop", TagKind.GENRE)]
+    assert [
+        (r.kind, r.target.type, r.target.name, r.target.artist, r.target.date, r.target.url)
+        for r in partial.relations
+    ] == [
+        (
+            RelationKind.CHARTED_BY,
+            EntityType.CHART,
+            "Pete Tong | Creamfields | Aug 2026",
+            "Pete Tong",
+            "2026-11-11",
+            f"{SITE}/chart/pete-tong-creamfields-aug-2026/908621",
+        ),
+        (
+            RelationKind.CHARTED_BY,
+            EntityType.CHART,
+            "2026 September - Hot Indian Summer Traxx",
+            "Thomas Bogdan",
+            "2026-09-02",
+            f"{SITE}/chart/2026-september-hot-indian-summer-traxx/901380",
+        ),
     ]
-    assert [(credit.role, credit.name) for credit in partial.credits] == [("remixer", "Todd Terry")]
     assert partial.links == [
         Link(
             service="beatport",
-            url=ORIGINAL_URL,
+            url=RADIO_EDIT,
             target=LinkTarget.TRACK,
-            sources=[Provenance(source="beatport", url=ORIGINAL_URL)],
+            sources=[Provenance(source="beatport", url=RADIO_EDIT)],
         ),
     ]
 
 
 @pytest.mark.asyncio
-async def test_extended_mix_found_for_another_mix_is_kept_out_of_the_record() -> None:
-    extended_hit = SEARCH_ORIGINAL | {"track_id": 2, "mix_name": "Todd Terry Extended Remix"}
-    adapter, seen = make(tracks=search(extended_hit))
+async def test_another_mix_is_kept_out_of_the_record() -> None:
+    adapter, seen = make()
     query = parse_query("Everything but the Girl - Missing (Todd Terry Remix)", EntityKind.TRACK)
 
     partial = await looked_up(adapter, query)
     dossier = merge(query, [partial], generated_at=NOW)
 
-    assert seen[1:] == [EXTENDED_URL]
+    # The page lists no full Todd Terry Remix; the first other version is read instead.
+    assert urls(seen)[1:] == [REMIX_EDIT]
     assert dossier.identity.bpm is None
     assert dossier.tags == []
     [relation] = dossier.relations
     assert relation.kind is RelationKind.OTHER_VERSION
-    assert relation.target.url == EXTENDED_URL
+    assert relation.target.url == REMIX_EDIT
     assert [d.field for d in dossier.identity.discrepancies] == ["version"]
 
 
 @pytest.mark.asyncio
-async def test_extended_mix_versus_original_mix() -> None:
-    original = SEARCH_ORIGINAL | {"track_id": 3, "mix_name": "Original Mix"}
-    extended = SEARCH_ORIGINAL | {"track_id": 4, "mix_name": "Extended Mix"}
-    pages = {
-        f"{SITE}/track/missing/3": page(
-            {"track": ORIGINAL | {"id": 3, "mix_name": "Original Mix", "remixers": []}},
-        ),
-        f"{SITE}/track/missing/4": page(
-            {"track": ORIGINAL | {"id": 4, "mix_name": "Extended Mix", "remixers": []}},
-        ),
-    }
-    adapter, seen = make(tracks=search(extended, original), pages=pages)
-    query = parse_query("Everything but the Girl - Missing", EntityKind.TRACK)
-
-    partial = await looked_up(adapter, query)
-
-    assert seen[1:] == [f"{SITE}/track/missing/3"]
-    assert partial.candidate is not None
-    assert partial.candidate.version is not None
-    assert partial.candidate.version.kind is VersionKind.ORIGINAL
-
-
-@pytest.mark.asyncio
-async def test_track_url_is_read_without_searching() -> None:
+async def test_remixers_are_credits_not_artists() -> None:
     adapter, seen = make()
 
-    partial = await looked_up(adapter, parse_query(EXTENDED_URL))
+    partial = await looked_up(adapter, parse_query(REMIX_EDIT))
 
-    assert seen == [EXTENDED_URL]
+    assert urls(seen) == [REMIX_EDIT]
     assert partial.candidate is not None
-    assert partial.candidate.bpm == 125
-
-
-@pytest.mark.asyncio
-async def test_page_found_by_earlier_passes() -> None:
-    adapter, seen = make()
-    query = parse_query("Everything but the Girl - Missing (Todd Terry Remix)", EntityKind.TRACK)
-    link = Link(service="beatport", url=ORIGINAL_URL, target=LinkTarget.TRACK, sources=[])
-
-    await looked_up(adapter, query, LookupContext(query=query, links=[link]))
-
-    assert seen == [ORIGINAL_URL]
+    assert partial.candidate.artist == "Everything But The Girl"
+    assert [(c.role, c.name, c.scope) for c in partial.credits] == [
+        ("remixer", "CL McSpadden", Scope.RECORDING),
+    ]
+    assert partial.relations == []
 
 
 @pytest.mark.asyncio
 async def test_release_by_search() -> None:
     adapter, seen = make()
-    query = parse_query("Everything but the Girl - Missing (Remixes)", EntityKind.ALBUM)
+    query = parse_query("Everything but the Girl - Nothing Left To Lose", EntityKind.ALBUM)
 
     partial = await looked_up(adapter, query)
 
-    assert seen[0].startswith(f"{SITE}/search/releases?q=")
-    assert seen[1:] == [RELEASE_URL]
+    assert urls(seen) == [f"{SITE}/search/releases", NOTHING_LEFT]
     candidate = partial.candidate
     assert candidate is not None
-    assert (candidate.kind, candidate.title, candidate.bpm) == (
+    assert (candidate.kind, candidate.artist, candidate.title, candidate.date) == (
         EntityKind.ALBUM,
-        "Missing (Remixes)",
-        None,
+        "Everything But The Girl",
+        "Nothing Left To Lose",
+        "2023-03-29",
     )
-    assert candidate.upcs == ["0075678723421"]
-    assert candidate.ids == {IdKind.BEATPORT_RELEASE: "10"}
-    assert [tag.name for tag in partial.tags] == ["House", "Deep House"]
+    assert candidate.upcs == ["00044003356849"]
+    assert candidate.ids == {IdKind.BEATPORT_RELEASE: "4075859"}
+    assert [(c.name, c.scope) for c in partial.credits] == [("Four Tet", Scope.RELEASE)]
     assert [link.target for link in partial.links] == [LinkTarget.ALBUM]
 
 
 @pytest.mark.asyncio
+async def test_release_url_is_read_without_searching() -> None:
+    adapter, seen = make()
+
+    partial = await looked_up(adapter, parse_query(YOUNG_AND_DUMB))
+
+    assert urls(seen) == [YOUNG_AND_DUMB]
+    assert partial.candidate is not None
+    assert partial.candidate.labels[0].name == "Everything But The Girl"
+
+
+@pytest.mark.asyncio
+async def test_page_found_by_earlier_passes() -> None:
+    adapter, seen = make()
+    query = parse_query("Everything but the Girl - Missing", EntityKind.TRACK)
+    link = Link(service="beatport", url=RADIO_EDIT, target=LinkTarget.TRACK, sources=[])
+
+    await looked_up(adapter, query, LookupContext(query=query, links=[link]))
+
+    assert urls(seen) == [RADIO_EDIT]
+
+
+@pytest.mark.asyncio
 async def test_no_matching_result() -> None:
-    adapter, _ = make(tracks=search())
-    query = parse_query("Burial - Archangel", EntityKind.TRACK)
+    adapter, _ = make()
 
     with pytest.raises(NotFoundError, match="no matching beatport"):
-        await looked_up(adapter, query)
+        await looked_up(adapter, parse_query("Burial - Archangel", EntityKind.TRACK))
+
+
+@pytest.mark.asyncio
+async def test_search_page_without_results() -> None:
+    adapter, _ = make(pages={f"{SITE}/search/tracks": state_page({})})
+
+    with pytest.raises(NotFoundError):
+        await looked_up(adapter, parse_query("Burial - Archangel", EntityKind.TRACK))
 
 
 @pytest.mark.asyncio
 async def test_challenge_is_blocked() -> None:
     adapter, _ = make(status=403)
-    query = parse_query("Burial - Archangel", EntityKind.TRACK)
 
     with pytest.raises(BlockedError):
-        await looked_up(adapter, query)
+        await looked_up(adapter, parse_query("Burial - Archangel", EntityKind.TRACK))
 
 
 @pytest.mark.asyncio
@@ -293,47 +259,54 @@ async def test_challenge_is_blocked() -> None:
     [
         ("<html></html>", "no __NEXT_DATA__"),
         ('<script id="__NEXT_DATA__">{not json</script>', "not valid JSON"),
-        (
-            page({"track": {"id": 9, "name": "Other", "mix_name": "Original Mix"}}),
-            "does not list its track",
-        ),
+        ('<script id="__NEXT_DATA__">[]</script>', "no page properties"),
+        (state_page({"chartPosition": None}), "neither a track nor a release"),
+        (state_page({"track": {"track_id": 1}}), "unexpected Beatport page state"),
     ],
 )
-async def test_unreadable_track_page(content: str, message: str) -> None:
-    adapter, _ = make(pages={ORIGINAL_URL: content})
+async def test_unreadable_page(content: str, message: str) -> None:
+    adapter, _ = make(pages={REMIX_EDIT: content})
 
     with pytest.raises(SourceError, match=message):
-        await looked_up(adapter, parse_query(ORIGINAL_URL))
+        await looked_up(adapter, parse_query(REMIX_EDIT))
 
 
-@pytest.mark.asyncio
-async def test_release_page_without_a_release() -> None:
-    adapter, _ = make(pages={RELEASE_URL: page({"tracks": [ORIGINAL | {"release": RELEASE}]})})
+def test_search_results_of_another_shape_give_no_hits() -> None:
+    query = {"queryKey": ["search-tracks"], "state": {"data": {"data": 1}}}
+    other = {"queryKey": ["search-releases"], "state": {"data": {"data": [{"release_id": 1}]}}}
 
-    with pytest.raises(SourceError, match="lists no release"):
-        await looked_up(adapter, parse_query(RELEASE_URL))
-
-
-def test_state_objects_of_other_shapes_are_skipped() -> None:
-    state = {
-        "a": [{"id": 1, "mix_name": "Original Mix"}, "text", None],
-        "b": {"track_id": 2, "track_name": "Untitled", "mix_name": None, "genre": None},
-        "c": {"id": 3, "name": "Plain", "mix_name": "", "key": None, "artists": [ARTIST]},
-    }
-
-    found = {track.id: track for track in parse.tracks(state)}
-
-    assert sorted(found) == [2, 3]
-    assert found[2].genres == []
-    assert parse.track_title(found[3]) == "Plain"
-    assert parse.mix_version(found[3].mix_name) is None
-    assert parse.mix_version("Part 2") is None
-    assert parse.track_partial(found[3], ORIGINAL_URL).candidate is not None
+    assert p.track_hits({"dehydratedState": {"queries": [query, "x"]}}) == []
+    assert p.release_hits({"dehydratedState": {"queries": [other]}}) == []
+    assert p.release_hits({"dehydratedState": {"queries": {}}}) == []
 
 
-def test_fullest_copy_of_a_track_wins() -> None:
-    short = {"id": 1, "name": "Missing", "mix_name": "Original Mix"}
+def test_chart_owner_and_slug() -> None:
+    by_person = models.Chart(id=1, name="Mix", person=models.ChartOwner(owner_name="DJ"))
 
-    [track] = parse.tracks({"list": [short], "page": ORIGINAL | {"mix_name": "Original Mix"}})
+    assert p.chart_owner(by_person) == "DJ"
+    assert p.chart_owner(models.Chart(id=2, name="Mix")) is None
+    assert p.chart_url(models.Chart(id=3, name="Best Of 2026!")) == f"{SITE}/chart/best-of-2026/3"
+    assert p.slug("Buzzin' Fly") == "buzzin-fly"
+    assert p.slug("!!!") == "-"
 
-    assert track.bpm == 124
+
+def test_genres_of_search_results_and_track_pages() -> None:
+    hit = models.Track.model_validate(
+        {
+            "track_id": 1,
+            "track_name": "Untitled",
+            "mix_name": "Part 2",
+            "genre": [{"genre_name": "House"}, {"genre_name": None}],
+        },
+    )
+    page = models.Track.model_validate(
+        {"id": 2, "name": "Plain", "genre": {"name": "House", "sub_genre": {"name": "Soulful"}}},
+    )
+
+    assert [tag.name for tag in p.track_partial(hit, models.Charts(), "u").tags] == ["House"]
+    assert p.mix_version(hit.mix_name) is None
+    assert p.track_title(page) == "Plain"
+    assert [(t.name, t.kind) for t in p.track_partial(page, models.Charts(), "u").tags] == [
+        ("House", TagKind.GENRE),
+        ("Soulful", TagKind.STYLE),
+    ]

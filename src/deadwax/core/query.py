@@ -85,9 +85,6 @@ _APPLE_MUSIC = re.compile(r"^music\.apple\.com$")
 _SOUNDCLOUD = re.compile(r"^soundcloud\.com$")
 _BEATPORT = re.compile(r"^beatport\.com$")
 
-# Juno Download sells releases; their tracks have no pages of their own.
-_JUNO_DOWNLOAD = re.compile(r"^junodownload\.com$")
-
 # A SoundCloud track page is '/<user>/<track>', optionally with a secret-link token; the
 # names below are site sections and profile tabs, not users and tracks. Sets ('/<user>/sets/')
 # are albums or playlists, which only the resolver can tell apart.
@@ -111,7 +108,6 @@ _URL_RULES = (
         EntityKind.ALBUM,
         IdKind.BEATPORT_RELEASE,
     ),
-    _UrlRule(_JUNO_DOWNLOAD, re.compile(r"^/products/"), EntityKind.ALBUM),
     _UrlRule(_BANDCAMP, re.compile(r"^/album/"), EntityKind.ALBUM),
     _UrlRule(_BANDCAMP, re.compile(r"^/track/"), EntityKind.TRACK),
     _UrlRule(

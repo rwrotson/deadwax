@@ -7,13 +7,19 @@ from deadwax.sources.beatport import parse as p
 
 
 class BeatportAdapter(SearchPageAdapter):
-    """Tempo, key, genres, mix name, ISRC, and remixers of the record's Beatport page."""
+    """Tempo, key, genres, mix name, ISRC, remixers, and DJ charts of the record's Beatport page."""
 
     name = "beatport"
     group = SourceGroup.STREAMING
     pass_ = Pass.ENRICH
     capabilities = frozenset(
-        {Capability.IDENTITY, Capability.TAGS, Capability.CREDITS, Capability.LINKS},
+        {
+            Capability.IDENTITY,
+            Capability.TAGS,
+            Capability.CREDITS,
+            Capability.RELATIONS,
+            Capability.LINKS,
+        },
     )
     service = p.SERVICE
 
@@ -24,10 +30,10 @@ class BeatportAdapter(SearchPageAdapter):
 
     def search_hits(self, content: bytes, url: str) -> list[SearchHit]:
         """Results from the search page's state."""
-        state = p.next_data(content, url)
+        props = p.page_props(content, url)
         if urlsplit(url).path.rstrip("/").endswith("/releases"):
-            return p.release_hits(state)
-        return p.track_hits(state)
+            return p.release_hits(props)
+        return p.track_hits(props)
 
     def read_page(self, content: bytes, url: str, key: RecordKey | None) -> Partial:  # noqa: ARG002 -- the URL tells tracks from releases
         """Read a track or release page."""

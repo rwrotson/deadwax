@@ -290,7 +290,7 @@ type = "layers"
 containers = ["deadwax.sources"]
 layers = [
     "lookup",
-    "musicbrainz | itunes | deezer | odesli | discogs | bandcamp | lastfm | wikipedia | listenbrainz | secondhandsongs | kexp | spotify | youtube | soundcloud | beatport | junodownload",
+    "musicbrainz | itunes | deezer | odesli | discogs | bandcamp | lastfm | wikipedia | listenbrainz | secondhandsongs | kexp | spotify | youtube | soundcloud | beatport",
     "_base | _html",
     "_http",
     "config",
@@ -360,12 +360,6 @@ layers = ["adapter", "parse", "models"]
 name = "R8: Beatport adapter modules"
 type = "layers"
 containers = ["deadwax.sources.beatport"]
-layers = ["adapter", "parse", "models"]
-
-[[tool.importlinter.contracts]]
-name = "R8: Juno Download adapter modules"
-type = "layers"
-containers = ["deadwax.sources.junodownload"]
 layers = ["adapter", "parse", "models"]
 
 [[tool.importlinter.contracts]]

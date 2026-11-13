@@ -20,7 +20,7 @@ _DETAILED_KINDS = frozenset({VersionKind.REMIX, VersionKind.LIVE})
 _DETAIL_THRESHOLD = 0.6
 
 # Words that make one remixer's version another cut of it, such as 'Extended Remix'.
-_CUTS = frozenset({"extended", "radio", "dub", "instrumental"})
+_CUTS = frozenset({"extended", "radio", "dub", "instrumental", "intro"})
 
 logger = logging.getLogger(__name__)
 

@@ -86,6 +86,10 @@ class RelationKind(StrEnum):
     SAMPLES = "samples"
     SAMPLED_BY = "sampled_by"
     REPOSTED_BY = "reposted_by"
+
+    # A DJ's chart that lists the record; the target's artist is the DJ.
+    CHARTED_BY = "charted_by"
+
     SIMILAR = "similar"
     OTHER_VERSION = "other_version"
 
@@ -112,6 +116,7 @@ class EntityType(StrEnum):
     WORK = "work"
     MIX = "mix"
     BROADCAST = "broadcast"
+    CHART = "chart"
 
 
 class LinkTarget(StrEnum):

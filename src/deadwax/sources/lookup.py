@@ -11,7 +11,6 @@ from deadwax.sources.config import SourcesConfig
 from deadwax.sources.deezer import DeezerAdapter
 from deadwax.sources.discogs import DiscogsAdapter
 from deadwax.sources.itunes import ItunesAdapter
-from deadwax.sources.junodownload import JunoDownloadAdapter
 from deadwax.sources.kexp import KexpAdapter
 from deadwax.sources.lastfm import LastfmAdapter
 from deadwax.sources.listenbrainz import ListenBrainzAdapter
@@ -41,7 +40,6 @@ ADAPTERS: tuple[type[HttpAdapter], ...] = (
     YouTubeAdapter,
     SoundCloudAdapter,
     BeatportAdapter,
-    JunoDownloadAdapter,
 )
 
 

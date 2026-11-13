@@ -497,7 +497,7 @@ def test_metrics_stay_per_source() -> None:
 def test_bpm_and_key_agree_or_disagree_across_sources() -> None:
     partials = [
         partial("beatport", candidate(bpm=124, key="A Minor")),
-        partial("junodownload", candidate(bpm=124.2, key="8A")),
+        partial("discogs", candidate(bpm=124.2, key="8A")),
         partial("other", candidate(bpm=125, key="Am")),
     ]
 
@@ -509,7 +509,7 @@ def test_bpm_and_key_agree_or_disagree_across_sources() -> None:
     assert (identity.key.value, len(identity.key.sources)) == ("A Minor", 3)
     [bpm_conflict] = [d for d in identity.discrepancies if d.field == "bpm"]
     assert [(v.value, [p.source for p in v.sources]) for v in bpm_conflict.values] == [
-        ("124", ["beatport", "junodownload"]),
+        ("124", ["beatport", "discogs"]),
         ("125", ["other"]),
     ]
 

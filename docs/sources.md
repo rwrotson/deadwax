@@ -12,7 +12,7 @@ Without `--sources`, a lookup runs the sources named by `DEADWAX_DEFAULT_SOURCES
 
 ## How a lookup runs
 
-1. **URL resolution.** For a URL query, the first ready source that recognises the URL reads it alone. Its record becomes the reference, and for a URL that does not reveal its kind it sets the kind. The order is Spotify, MusicBrainz, Odesli, iTunes, Deezer, Discogs, Bandcamp, SoundCloud, Beatport, Juno Download: Spotify reads Spotify URLs when it has credentials, MusicBrainz otherwise.
+1. **URL resolution.** For a URL query, the first ready source that recognises the URL reads it alone. Its record becomes the reference, and for a URL that does not reveal its kind it sets the kind. The order is Spotify, MusicBrainz, Odesli, iTunes, Deezer, Discogs, Bandcamp, SoundCloud, Beatport: Spotify reads Spotify URLs when it has credentials, MusicBrainz otherwise.
 2. **Identity pass.** MusicBrainz finds the recording or release group and gives later sources its IDs and links: ISRCs, barcodes, Discogs, Wikidata, Bandcamp, and streaming URLs.
 3. **Enrichment pass.** All other sources except Odesli run concurrently, at most `concurrency` at once. Each one uses the IDs and links from the identity pass first and falls back to its own search.
 4. **Links pass.** Odesli opens the song.link page of a streaming URL found by any earlier source, such as the Apple Music link from iTunes. YouTube searches uploads of the record.
@@ -24,7 +24,7 @@ Each source runs under `adapter_timeout` (`--timeout`). Every candidate passes t
 | Tier | Sources | Role |
 |------|---------|------|
 | 1, identity and links | MusicBrainz, iTunes Search, Deezer, Odesli | Which exact recording or release this is; listening links |
-| 2, enrichment | Discogs, Bandcamp, Last.fm, Wikipedia/Wikidata, ListenBrainz, SecondHandSongs, KEXP, Spotify, SoundCloud, Beatport, Juno Download | Tags, credits, texts, relations, metrics |
+| 2, enrichment | Discogs, Bandcamp, Last.fm, Wikipedia/Wikidata, ListenBrainz, SecondHandSongs, KEXP, Spotify, SoundCloud, Beatport | Tags, credits, texts, relations, metrics |
 | 3, links | Odesli, YouTube | Listening links |
 
 The README lists sources planned for later versions and those deadwax will not use.
@@ -136,18 +136,11 @@ The README lists sources planned for later versions and those deadwax will not u
 - **Group:** `streaming`; opt-in.
 - **Access:** scraped pages; the record lives in the Next.js state (`__NEXT_DATA__`) of search, track, and release pages. Beatport answers plain requests with a Cloudflare challenge, so it needs the escalation ladder (`deadwax[stealth]` or `deadwax[browser]`); otherwise it reports `blocked`.
 - **Finds the record by:** a Beatport track or release URL in the query or from an earlier source, else a track or release search through the matching gate. Each result's mix name is part of its title, so an Extended Mix found for an Original Mix query becomes an `other_version` relation.
-- **Contributes:** artist, title with mix name and the version it denotes, date, tempo, key, ISRC or barcode, label and catalog number; genre and sub-genre as `genre` and `style` tags; remixers as credits; the page's link.
-
-## Juno Download
-
-- **Group:** `streaming`; opt-in.
-- **Access:** scraped pages. The site refuses connections from some regions; set `DEADWAX_JUNODOWNLOAD__PROXY` there.
-- **Finds the record by:** a Juno Download product URL in the query or from an earlier source, else a search whose results list releases and their tracks. A track is read from the tracklist of the release that lists it.
-- **Contributes:** artist, title, release date, label and catalog number, the track's tempo, the release's genres as `genre` tags, and the release page's link.
+- **Contributes:** for a track: artist (remixers apart), title with mix name and the version it denotes, the release's date, tempo, key, ISRC, label and catalog number; genre and sub-genre as `genre` and `style` tags; remixers as credits; the DJ charts that list it as `charted_by` relations; the page's link. For a release: artist, title, date, barcode, label and catalog number, remixers, and the link; release pages list no genres or tempos.
 
 ## Escalation ladder
 
-Bandcamp, Beatport, and Juno Download pages, the song.link page, and Discogs review pages use browser-like headers, HTTP/2, and cookies. When the response is a challenge page (Cloudflare, Akamai, DataDome, PerimeterX, Fastly, or a captcha on 403/429/503), the client switches to a stronger transport and keeps using it for that source:
+Bandcamp and Beatport pages, the song.link page, and Discogs review pages use browser-like headers, HTTP/2, and cookies. When the response is a challenge page (Cloudflare, Akamai, DataDome, PerimeterX, Fastly, or a captcha on 403/429/503), the client switches to a stronger transport and keeps using it for that source:
 
 | Step | Requires |
 |------|----------|

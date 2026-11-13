@@ -205,7 +205,6 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
         "youtube": "missing_credential",
         "soundcloud": "missing_credential",
         "beatport": "ready",
-        "junodownload": "ready",
     }
     assert "DEADWAX_DISCOGS__TOKEN" in table.stdout
     assert "DEADWAX_LASTFM__API_KEY" in table.stdout

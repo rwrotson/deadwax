@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–10 done; Stage 11 implemented and mock-tested, awaiting the user's live recording of Beatport and Juno Download.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–10 done; Stage 11 implemented (Beatport; Juno Download dropped), awaiting the user's live Beatport run.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -25,7 +25,7 @@ This is the active specification and multi-session handoff for deadwax. deadwax 
 
 deadwax is general-purpose: output is equally useful to a person in a terminal (`--format pretty|markdown`) and to a program reading JSON. Every fact carries `source` (adapter) and `url`. Nothing is invented or "completed": no data means an empty field. A candidate with a different version is never merged into the main record; it goes to relations or is dropped, and the disagreement is recorded in identity. A failing adapter never breaks the others; it appears in `errors`.
 
-Never used: Every Noise at Once, direct Metacritic scraping (ratings come from Wikipedia), Spotify audio features.
+Never used: Juno Download (shut down), Every Noise at Once, direct Metacritic scraping (ratings come from Wikipedia), Spotify audio features.
 
 ## v1 baseline
 
@@ -87,7 +87,7 @@ Scope agreed with the user on 2026-11-13 after reviewing what each planned sourc
 | Streaming | SoundCloud | uploader descriptions; tags; counts; reposters → relations; uploads absent elsewhere (edits, bootlegs) | no new API apps; web client |
 | Streaming | YouTube | links only | Data API key |
 | Streaming | Beatport | BPM; key; subgenre; mix name (version identity); ISRC; remixers; DJ charts → relations | `__NEXT_DATA__` JSON |
-| Streaming | Juno Download | BPM; genre; label | HTML |
+| Streaming | Juno Download (dropped: shut down) | BPM; genre; label | HTML |
 | Samples | WhoSampled | samples used and sampled by, with timestamp and element; covers; remixes → relations | no API; ToS forbids scraping |
 
 Not planned: Rough Trade, Apple Music, Traxsource, Mixcloud, BBC Sounds.
@@ -107,7 +107,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 8 | Done | Foundation: source groups, default source set, per-lookup concurrency cap, shared search → page helper. |
 | 9 | Done | ListenBrainz, SecondHandSongs, KEXP. |
 | 10 | Done | Spotify, YouTube (links only), SoundCloud. |
-| 11 | Implemented, awaiting live verification | Beatport, Juno Download; BPM and key. |
+| 11 | Implemented, awaiting live verification | Beatport (Juno Download dropped: shut down); BPM and key. |
 | 12 | Not started | Shops I: Juno, Hard Wax, Phonica, Soundohm; shop-text deduplication. |
 | 13 | Not started | Shops II: Boomkat, Norman Records, Forced Exposure, Bleep. |
 | 14 | Not started | Genius. |
@@ -158,8 +158,8 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 - [x] Model: BPM and key as sourced identity values with discrepancies.
 - [x] Version detection: mix names (Original, Extended, Dub, Radio Edit…) mapped to versions.
-- [ ] Beatport from `__NEXT_DATA__`: BPM, key, subgenre, mix name, ISRC, remixers (done, mock-tested); DJ charts as relations (deferred until a recorded page shows them).
-- [ ] Juno Download: BPM, genre, label (done, mock-tested).
+- [x] Beatport from `__NEXT_DATA__`: BPM, key, subgenre, mix name, ISRC, remixers, DJ charts as relations (tested on pages saved from a browser; live run pending).
+- [x] ~~Juno Download: BPM, genre, label.~~ Dropped: the store shut down.
 
 **Acceptance:** an Extended Mix is not merged into the Original Mix; a BPM disagreement is a discrepancy. **Suggested message:** `feat(sources): add Beatport and Juno Download adapters with BPM and key`.
 
@@ -285,6 +285,11 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-13 | `junodownload.com` is service `junodownload` (was `juno`), adapter and settings `junodownload`; `juno` is left for the Stage 12 shop at juno.co.uk. `IdKind.BEATPORT_TRACK`/`BEATPORT_RELEASE` and URL rules for Beatport track and release pages and Juno Download product pages (albums). | Two Juno sources with different pages. | 11, 12 |
 | 2026-11-13 | DJ charts (`charted_by` relations) are not added in Stage 11. | They are probably fetched by the page after load, not in `__NEXT_DATA__`; without a recorded page their shape is unknown. Revisit after the user's recording, or with Resident Advisor in Stage 16. | 11, 16 |
 | 2026-11-13 | Beatport and Juno Download join collaborators with " & ". | `artist_similarity` normalizes away commas before `split_artists` looks for them, so "Burial, Kode9" does not match "Burial" (0.67); " & " does (0.9). The comma case is a core bug, not fixed in this stage. | 11 |
+| 2026-11-13 | Juno Download is dropped: its adapter, settings, URL rule and docs are removed; `junodownload.com` stays in `_SERVICES` so old links name their service. | The store has shut down (user report, with a Reddit thread on r/DJs). User choice. | 11 |
+| 2026-11-13 | Beatport fixtures are pages the user saved from a browser, trimmed by `scripts/beatport_pages.py`: the anonymous session (it holds an access token) and translations are dropped, query lists cut to 12 items, and the script refuses output that still holds a token. | The agent cannot fetch Beatport; saved pages are the only real data. | 11 |
+| 2026-11-13 | Beatport reads fixed places of the page state, not a walk over it: `pageProps.track` with the `track-<id>-charts` query, `pageProps.release`, and the `search-tracks`/`search-releases` queries. Remixers are the `artists` of type Remixer; the sub-genre sits in `genre.sub_genre`; the track's date is its release's `release_date`. URLs are built as `/track/<slug of name>/<id>` (search results carry no slug). | Real pages hold up to 173 recommended tracks and releases, which a walk would mistake for the record. | 11 |
+| 2026-11-13 | DJ charts are `charted_by` relations (`EntityType.CHART`, the DJ as the target's artist, the publish date). Supersedes the earlier deferral. | Track pages prefetch the charts that list the track. | 11, 16 |
+| 2026-11-13 | "intro" is a cut word too: "Todd Terry Remix - Intro" is not the Todd Terry Remix. | Seen in Beatport's search results. | 11 |
 
 
 Changed:
@@ -396,9 +401,21 @@ Commands and outcomes:
 
 Observed, not changed: SoundCloud accepts "Missing (Todd Terry Lite Mix)" for the Todd Terry Remix (remix details similar enough; "lite" is not a cut word). Collaboration credits joined with ", " (Spotify) are not split by the matching gate (decision row above).
 
-Remains for Stage 11: the fixture recorder replays through plain httpx with escalation off, and its transport bypasses proxy settings, so it cannot record Beatport (Cloudflare) or Juno Download (regional block) as it is. The user saves, from a browser, the HTML of one Beatport track search, track page, release search and release page, and one Juno Download search and product page (for example for "Everything but the Girl - Missing (Todd Terry Remix)" and "Burial - Untrue"); the agent fits the parsers to them, turns them into fixtures and replayed tests, decides on DJ charts, and the user runs `deadwax --track "…" --sources core,beatport,junodownload --no-cache` with the `stealth` extra (and `DEADWAX_JUNODOWNLOAD__PROXY` where needed) on the five v1 check records and a dance record. Then the stage is marked Done.
+### 2026-11-13 — Stage 11: Beatport on saved pages, Juno Download dropped
 
-**Current task:** Stage 11 live verification. **Next action:** the user saves Beatport and Juno Download pages from a browser; the agent fits the parsers to them.
+Juno Download has shut down (user report); its adapter and references were removed. The user saved six Beatport pages from a browser (view-source tab): track and release search for "Everything but the Girl Missing", two track pages (1331132, 27201133), two release pages (4075859, 7657829). Their state differed from the hand-made guess in every structural point (decision rows above), so the models and parser were rewritten against them, and DJ charts were added.
+
+Commands and outcomes:
+
+- `uv run python scripts/beatport_pages.py --name … <saved pages>`: six fixtures in `tests/fixtures/beatport/pages/` (13–66 KB); a scan for `access_token` and `eyJ` finds nothing.
+- `uv run poe check`: format, lint, 24 import contracts kept, mypy strict clean, 774 passed, 99.10% branch coverage.
+- `uv run --group docs properdocs build --strict`: built without warnings.
+- Tested on the saved pages: track search → "Todd Terry Remix - Radio Edit" with 124 BPM, A Minor, ISRC, Virgin Records 542 6165, Pop, two `charted_by` relations (Pete Tong, Thomas Bogdan); a query for the Todd Terry Remix reads another mix, which `merge` keeps out as `other_version` with a version discrepancy; CL McSpadden as a remixer credit, not an artist; release search → "Nothing Left To Lose" with barcode and Four Tet as remixer; release URL; earlier-pass link; no match; empty search; challenge → `blocked`; malformed pages.
+- Not live-verified: deadwax has not fetched Beatport itself (Cloudflare; the agent may not run the escalation ladder against it).
+
+Remains for Stage 11 (user): `uv sync --all-groups --all-extras`, then `uv run --env-file .env deadwax --track "Everything but the Girl - Missing (Todd Terry Remix)" --sources core,beatport --no-cache` and the five v1 check records with `--sources core,beatport`. If Beatport is `blocked` with curl_cffi too, decide whether it needs the browser step. Then the stage is marked Done.
+
+**Current task:** Stage 11 live verification. **Next action:** the user runs deadwax with `--sources core,beatport` and reports the result.
 
 ## Resume instructions
 
