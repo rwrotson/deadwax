@@ -19,9 +19,12 @@ deadwax https://open.spotify.com/track/6LgJvl0Xdtc73RJ1mmpotq
 deadwax --album "Burial - Untrue" --sources musicbrainz,itunes --format json
 deadwax --album "Burial - Untrue" --sources core --exclude bandcamp
 deadwax sources
+deadwax runs --failed
 ```
 
 A text query must state `--album` or `--track`; a URL implies its kind. `--sources` and `--exclude` take source and group names (`core`, `shops`, `press`, `catalogues`, `radio`, `streaming`, `samples`); without `--sources`, the sources of `DEADWAX_DEFAULT_SOURCES` (default `core,listenbrainz,secondhandsongs,kexp`) run. Other options: `--exclude`, `--format pretty|json|markdown`, `--no-cache`, `--timeout`, `--config`, `--verbose`. Exit codes: 0 found, 1 unexpected error, 2 usage or configuration error, 3 nothing matched.
+
+Every `lookup` and `sources` call is journaled in the user log directory: one JSON Lines file of trace events per run (HTTP requests, every comparison with its scores and failed checks, search picks, each source's outcome, the merge's verdicts) and a summary line per run. `deadwax runs` lists runs (`--failed`, `--no-match`, `--source`, `--kind`, `--query`), and `deadwax runs ID` shows one run's timeline; see [the run journal](https://rwrotson.github.io/deadwax/runs/). `DEADWAX_RUNS__ENABLED=false` turns it off.
 
 ```python
 import asyncio
@@ -39,7 +42,7 @@ print(dossier.model_dump_json(indent=2))
 | Install | Adds |
 |---------|------|
 | `deadwax` | The library: Pydantic, httpx, selectolax |
-| `deadwax[logs]` | `deadwax.logs`: `LogSettings` and `setup_logging()` (structlog) |
+| `deadwax[logs]` | `deadwax.logs`: `LogSettings`, `setup_logging()`, and the run journal (structlog) |
 | `deadwax[cli]` | The `deadwax` command (Typer, Pydantic Settings, rich, platformdirs) and `logs` |
 | `deadwax[stealth]` | curl_cffi browser TLS impersonation for pages behind bot protection |
 | `deadwax[browser]` | Playwright fallback for pages that need a real browser (`playwright install chromium`) |
@@ -117,7 +120,7 @@ src/
     ├── py.typed             # PEP 561 marker
     ├── main.py              # deadwax console script; reports a missing cli extra
     ├── cli/                 # deadwax[cli]: Typer app, DEADWAX_* settings, rendering
-    ├── logs/                # deadwax[logs]: LogSettings, setup_logging()
+    ├── logs/                # deadwax[logs]: LogSettings, setup_logging(), run_journal()
     ├── sources/             # adapters, HTTP stack, lookup()
     │   ├── musicbrainz/     # MusicBrainz models, parsers, adapter
     │   ├── discogs/         # Discogs models, parsers, adapter

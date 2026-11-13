@@ -1,5 +1,7 @@
 import asyncio
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
 from importlib.metadata import version
 from pathlib import Path
 from typing import Annotated
@@ -17,9 +19,19 @@ from deadwax import (
     lookup,
     parse_query,
 )
-from deadwax.cli.render import OutputFormat, print_dossier, print_sources
+from deadwax.cli.render import OutputFormat, print_dossier, print_run, print_runs, print_sources
 from deadwax.cli.settings import Settings, load_settings
-from deadwax.logs import setup_logging
+from deadwax.logs import (
+    RunJournal,
+    RunNotFoundError,
+    RunOutcome,
+    RunRecord,
+    find_run,
+    read_events,
+    read_runs,
+    run_journal,
+    setup_logging,
+)
 
 EXIT_USAGE = 2
 EXIT_NOTHING_MATCHED = 3
@@ -27,12 +39,25 @@ EXIT_NOTHING_MATCHED = 3
 # Root options handled by the group itself; anything else starts a lookup.
 _ROOT_OPTIONS = frozenset({"--help", "-h", "--version"})
 
+# Key of the command-line arguments, as typed, in the shared click context metadata.
+_ARGV_KEY = "deadwax.argv"
+
+_OUTCOMES = {
+    0: RunOutcome.OK,
+    EXIT_USAGE: RunOutcome.USAGE_ERROR,
+    EXIT_NOTHING_MATCHED: RunOutcome.NOTHING_MATCHED,
+}
+
+# Outcomes that `runs --failed` lists.
+_FAILED = frozenset(RunOutcome) - {RunOutcome.OK}
+
 
 class _LookupByDefault(TyperGroup):
     """Run `lookup` when the first argument is not a subcommand, so `deadwax QUERY` works."""
 
     # typer.Context subclasses the click Context Typer vendors in a private module.
     def parse_args(self, ctx: typer.Context, args: list[str]) -> list[str]:  # type: ignore[override]
+        ctx.meta[_ARGV_KEY] = list(args)
         if args and args[0] not in self.commands and args[0] not in _ROOT_OPTIONS:
             args = ["lookup", *args]
         return super().parse_args(ctx, args)
@@ -92,6 +117,21 @@ def _settings(config: Path | None, verbose: bool, **overrides: object) -> Settin
     return settings
 
 
+@contextmanager
+def _journal(ctx: typer.Context, settings: Settings, command: str) -> Iterator[RunJournal]:
+    """Journal one command run; its exit code gives the outcome."""
+    argv = list(ctx.meta.get(_ARGV_KEY, []))
+    with run_journal(settings.run_log(), command=command, argv=argv) as journal:
+        journal.event("run.settings", settings=settings.model_dump(mode="json"))
+        try:
+            yield journal
+        except typer.Exit as exit_:
+            outcome = _OUTCOMES.get(exit_.exit_code, RunOutcome.CRASH)
+            journal.set_outcome(outcome, exit_.exit_code)
+            raise
+        journal.set_outcome(RunOutcome.OK, 0)
+
+
 def _names(value: str | None) -> list[str] | None:
     return [name.strip() for name in value.split(",") if name.strip()] if value else None
 
@@ -106,6 +146,7 @@ FormatOption = Annotated[OutputFormat, typer.Option("--format", "-f", help="Outp
 
 @app.command("lookup")
 def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
+    ctx: typer.Context,
     query: Annotated[str, typer.Argument(help="'Artist - Title' or a record page URL.")],
     *,
     album: Annotated[bool, typer.Option("--album", help="The query names an album.")] = False,
@@ -131,10 +172,6 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
     verbose: VerboseOption = False,
 ) -> None:
     """Look up a track or album (the default command)."""
-    if album and track:
-        raise _usage_error("--album and --track are mutually exclusive")
-
-    kind = EntityKind.ALBUM if album else EntityKind.TRACK if track else None
     overrides: dict[str, object] = {}
     if no_cache:
         overrides["cache"] = {"enabled": False}
@@ -142,34 +179,129 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
         overrides["adapter_timeout"] = timeout
     settings = _settings(config, verbose, **overrides)
 
-    try:
-        parsed = parse_query(query, kind)
-        dossier: Dossier = asyncio.run(
-            lookup(
-                parsed,
-                settings.sources_config(),
-                include=_names(sources),
-                exclude=_names(exclude) or (),
-            ),
-        )
-    except (InvalidQueryError, ConfigurationError) as error:
-        raise _usage_error(str(error)) from error
+    with _journal(ctx, settings, "lookup") as journal:
+        if album and track:
+            raise _usage_error("--album and --track are mutually exclusive")
+        kind = EntityKind.ALBUM if album else EntityKind.TRACK if track else None
+        try:
+            parsed = parse_query(query, kind)
+            journal.event("query.parsed", query=parsed.model_dump(mode="json"))
+            dossier: Dossier = asyncio.run(
+                lookup(
+                    parsed,
+                    settings.sources_config(),
+                    include=_names(sources),
+                    exclude=_names(exclude) or (),
+                ),
+            )
+        except (InvalidQueryError, ConfigurationError) as error:
+            raise _usage_error(str(error)) from error
 
-    print_dossier(dossier, output)
-    if not dossier.found:
-        raise typer.Exit(EXIT_NOTHING_MATCHED)
+        journal.record(dossier)
+        print_dossier(dossier, output)
+        if not dossier.found:
+            raise typer.Exit(EXIT_NOTHING_MATCHED)
 
 
 @app.command("sources")
 def sources_command(
+    ctx: typer.Context,
     output: FormatOption = OutputFormat.PRETTY,
     config: ConfigOption = None,
     verbose: VerboseOption = False,
 ) -> None:
     """List the sources, their groups, what they contribute, and whether they can run."""
     settings = _settings(config, verbose)
-    try:
-        infos = describe_sources(settings.sources_config())
-    except ConfigurationError as error:
-        raise _usage_error(str(error)) from error
-    print_sources(infos, output)
+    with _journal(ctx, settings, "sources"):
+        try:
+            infos = describe_sources(settings.sources_config())
+        except ConfigurationError as error:
+            raise _usage_error(str(error)) from error
+        print_sources(infos, output)
+
+
+def select_runs(  # noqa: PLR0913 -- one parameter per filter
+    records: list[RunRecord],
+    *,
+    failed: bool = False,
+    no_match: bool = False,
+    source: str | None = None,
+    kind: str | None = None,
+    text: str | None = None,
+) -> list[RunRecord]:
+    """Return the runs that pass every given filter, newest first."""
+    selected = []
+    for record in reversed(records):
+        statuses = record.sources
+        if failed and record.outcome not in _FAILED:
+            continue
+        if no_match and record.found is not False and "no_match" not in statuses.values():
+            continue
+        if source is not None and statuses.get(source, "ok") == "ok":
+            continue
+        if kind is not None and kind not in statuses.values():
+            continue
+        searched = " ".join([record.query or "", record.identity or "", *record.argv])
+        if text is not None and text.casefold() not in searched.casefold():
+            continue
+        selected.append(record)
+    return selected
+
+
+@app.command("runs")
+def runs_command(  # noqa: PLR0913 -- one parameter per command-line option
+    run_id: Annotated[
+        str | None,
+        typer.Argument(help="Show one run: the start of its id or of its random suffix."),
+    ] = None,
+    *,
+    limit: Annotated[int, typer.Option("--limit", "-n", min=1, help="Runs listed.")] = 20,
+    failed: Annotated[
+        bool,
+        typer.Option("--failed", help="Only runs that did not end with a match."),
+    ] = False,
+    no_match: Annotated[
+        bool,
+        typer.Option("--no-match", help="Only runs where a source's candidate was rejected."),
+    ] = False,
+    source: Annotated[
+        str | None,
+        typer.Option("--source", help="Only runs where this source did not answer 'ok'."),
+    ] = None,
+    kind: Annotated[
+        str | None,
+        typer.Option("--kind", help="Only runs with a source status such as blocked or timeout."),
+    ] = None,
+    query: Annotated[
+        str | None,
+        typer.Option("--query", "-q", help="Only runs whose query or identity contains this."),
+    ] = None,
+    full: Annotated[
+        bool,
+        typer.Option("--full", help="Also show the merges run between passes."),
+    ] = False,
+    output: FormatOption = OutputFormat.PRETTY,
+    config: ConfigOption = None,
+    verbose: VerboseOption = False,
+) -> None:
+    """List journaled runs, or show the events of one run."""
+    root = _settings(config, verbose).run_log().dir
+    assert root is not None  # noqa: S101 -- run_log() always sets the directory
+
+    if run_id is not None:
+        try:
+            path = find_run(root, run_id)
+        except RunNotFoundError as error:
+            raise _usage_error(str(error)) from error
+        print_run(read_events(path), output, full=full)
+        return
+
+    records = select_runs(
+        read_runs(root),
+        failed=failed,
+        no_match=no_match,
+        source=source,
+        kind=kind,
+        text=query,
+    )
+    print_runs(records[:limit], output, root)

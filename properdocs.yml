@@ -15,6 +15,7 @@ nav:
   - Getting Started: getting_started.md
   - Sources: sources.md
   - Output: output.md
+  - Run Journal: runs.md
   - Architecture: architecture.md
   - Configuration: configuration.md
   - Schema: schema.md

@@ -46,7 +46,8 @@ class RunLogSettings(BaseModel):
     enabled: bool = Field(default=True, description="Write a journal entry for every run")
     dir: Path | None = Field(
         default=None,
-        description="Journal directory; required when the journal is enabled",
+        description="Journal directory; run_journal() requires one, the deadwax command "
+        "uses the user log directory when unset",
     )
     retention_days: int = Field(
         default=90,

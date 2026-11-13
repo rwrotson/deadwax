@@ -30,6 +30,7 @@ deadwax https://open.spotify.com/track/6LgJvl0Xdtc73RJ1mmpotq
 deadwax --album "Huerco S. - For Those of You Who Have Never (And Also Those Who Have)" --format json
 deadwax --track "Кино - Группа крови" --sources musicbrainz --no-cache
 deadwax sources                                          # what each source contributes and whether it can run
+deadwax runs                                             # journaled runs; deadwax runs ID shows one run's timeline
 ```
 
 A text query must state `--album` or `--track`; a URL implies its kind. Options: `--sources` and `--exclude` (comma-separated names), `--format pretty|json|markdown`, `--no-cache`, `--timeout SECONDS` per source, `--config PATH` (TOML), `--verbose`. Settings come from flags, `DEADWAX_*` variables, `.env`, and a TOML file, in that order of precedence; see [Configuration](configuration.md).

@@ -17,7 +17,8 @@ from deadwax import (
     SourcesConfig,
 )
 from deadwax.cli import app as app_module
-from deadwax.cli.app import EXIT_NOTHING_MATCHED, EXIT_USAGE, app
+from deadwax.cli.app import EXIT_NOTHING_MATCHED, EXIT_USAGE, app, select_runs
+from deadwax.logs import RunOutcome, RunRecord, read_events, read_runs
 
 runner = CliRunner()
 
@@ -262,3 +263,170 @@ def test_invalid_configuration_is_a_usage_error(monkeypatch: pytest.MonkeyPatch)
 
     assert result.exit_code == EXIT_USAGE
     assert result.stderr.startswith("Invalid configuration:")
+
+
+def journal(tmp_path: Path) -> Path:
+    return tmp_path / "user-logs"
+
+
+def only_run(tmp_path: Path) -> RunRecord:
+    [record] = read_runs(journal(tmp_path))
+    return record
+
+
+def test_a_lookup_is_journaled(
+    fake: FakeLookup,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DEADWAX_LASTFM__API_KEY", "secret-key")
+
+    result = runner.invoke(app, ["--track", "Everything but the Girl - Missing"])
+
+    assert result.exit_code == 0, result.output
+    record = only_run(tmp_path)
+    assert record.argv == ["--track", "Everything but the Girl - Missing"]
+    assert (record.command, record.outcome, record.exit_code) == ("lookup", RunOutcome.OK, 0)
+    assert record.query == "Everything but the Girl - Missing"
+    assert record.sources == {"deezer": "blocked"}
+    events = {event["event"]: event for event in read_events(journal(tmp_path) / record.file)}
+    assert events["query.parsed"]["query"]["artist"] == "Everything but the Girl"  # type: ignore[index]
+    settings = json.dumps(events["run.settings"])
+    assert "secret-key" not in settings
+    assert "**********" in settings
+    assert "dossier" in events["run.end"]
+
+
+@pytest.mark.parametrize(
+    ("args", "outcome", "exit_code"),
+    [
+        (["--track", "a - b"], RunOutcome.NOTHING_MATCHED, EXIT_NOTHING_MATCHED),
+        (["--album", "--track", "a - b"], RunOutcome.USAGE_ERROR, EXIT_USAGE),
+        (["--track", "no separator"], RunOutcome.USAGE_ERROR, EXIT_USAGE),
+    ],
+)
+def test_exit_codes_give_the_outcome(
+    fake: FakeLookup,
+    tmp_path: Path,
+    args: list[str],
+    outcome: RunOutcome,
+    exit_code: int,
+) -> None:
+    fake.dossier = fake.dossier.model_copy(update={"identity": Identity()})
+
+    result = runner.invoke(app, args)
+
+    assert result.exit_code == exit_code
+    assert (only_run(tmp_path).outcome, only_run(tmp_path).exit_code) == (outcome, exit_code)
+
+
+def test_a_crash_is_journaled(fake: FakeLookup, tmp_path: Path) -> None:
+    fake.error = RuntimeError("boom")
+
+    runner.invoke(app, ["--track", "a - b"])
+
+    record = only_run(tmp_path)
+    assert record.outcome is RunOutcome.CRASH
+    events = read_events(journal(tmp_path) / record.file)
+    assert "boom" in str(next(e for e in events if e["event"] == "run.crash")["exception"])
+
+
+def test_the_journal_can_be_disabled(
+    fake: FakeLookup,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DEADWAX_RUNS__ENABLED", "false")
+
+    runner.invoke(app, ["--track", "a - b"])
+
+    assert not journal(tmp_path).exists()
+
+
+def test_the_journal_directory_can_be_set(
+    fake: FakeLookup,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DEADWAX_RUNS__DIR", str(tmp_path / "elsewhere"))
+
+    runner.invoke(app, ["--track", "a - b"])
+
+    assert len(read_runs(tmp_path / "elsewhere")) == 1
+    assert not journal(tmp_path).exists()
+
+
+def test_the_sources_command_is_journaled(tmp_path: Path) -> None:
+    runner.invoke(app, ["sources"])
+
+    assert only_run(tmp_path).command == "sources"
+
+
+def test_runs_lists_and_shows_runs(
+    fake: FakeLookup,
+    dossier: Dossier,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("COLUMNS", "300")
+    runner.invoke(app, ["--track", "Everything but the Girl - Missing"])
+    fake.dossier = dossier.model_copy(update={"identity": Identity()})
+    runner.invoke(app, ["--track", "Nobody - Nothing"])
+
+    listed = runner.invoke(app, ["runs"])
+    failed = runner.invoke(app, ["runs", "--failed", "--format", "json"])
+    shown = runner.invoke(app, ["runs", json.loads(failed.stdout)[0]["run_id"][-6:]])
+
+    assert listed.exit_code == 0, listed.output
+    assert "nothing_matched" in listed.stdout
+    assert "deezer:blocked" in listed.stdout
+    assert [run["outcome"] for run in json.loads(failed.stdout)] == ["nothing_matched"]
+    assert shown.exit_code == 0, shown.output
+    assert "query: Nobody - Nothing (track)" in shown.stdout
+    assert "nothing_matched" in shown.stdout
+
+
+@pytest.mark.parametrize("run_id", ["missing", "2"])
+def test_runs_rejects_unknown_or_ambiguous_ids(fake: FakeLookup, run_id: str) -> None:
+    runner.invoke(app, ["--track", "a - b"])
+    runner.invoke(app, ["--track", "a - b"])
+
+    result = runner.invoke(app, ["runs", run_id])
+
+    assert result.exit_code == EXIT_USAGE
+    assert "run" in result.stderr
+
+
+def test_runs_without_a_journal(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["runs"])
+
+    assert result.exit_code == 0
+    assert "No runs journaled" in result.stdout
+
+
+def record(**fields: object) -> RunRecord:
+    values: dict[str, object] = {
+        "run_id": "20261113T100000Z-aaa111",
+        "started_at": "2026-11-13T10:00:00Z",
+        "duration_ms": 1000,
+        "command": "lookup",
+        "version": "1",
+        "outcome": "ok",
+        "file": "runs/x.jsonl",
+    }
+    return RunRecord.model_validate(values | fields)
+
+
+def test_select_runs_applies_every_filter() -> None:
+    ok = record(query="A - B", sources={"itunes": "ok"}, found=True)
+    blocked = record(query="C - D", sources={"deezer": "blocked"}, found=True)
+    rejected = record(query="E - F", sources={"discogs": "no_match"}, found=True)
+    unmatched = record(query="G - H", outcome="nothing_matched", found=False)
+    records = [ok, blocked, rejected, unmatched]
+
+    assert select_runs(records) == [unmatched, rejected, blocked, ok]
+    assert select_runs(records, failed=True) == [unmatched]
+    assert select_runs(records, no_match=True) == [unmatched, rejected]
+    assert select_runs(records, source="deezer") == [blocked]
+    assert select_runs(records, source="itunes") == []
+    assert select_runs(records, kind="blocked") == [blocked]
+    assert select_runs(records, text="e - f") == [rejected]

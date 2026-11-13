@@ -4,7 +4,7 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Annotated
 
-from platformdirs import user_cache_path, user_config_path
+from platformdirs import user_cache_path, user_config_path, user_log_path
 from pydantic import BaseModel, BeforeValidator, Field
 from pydantic.fields import FieldInfo
 from pydantic_settings import (
@@ -25,7 +25,7 @@ from deadwax import (
     SourcesConfig,
     SourceSettings,
 )
-from deadwax.logs import LogSettings
+from deadwax.logs import LogSettings, RunLogSettings
 
 APP_NAME = "deadwax"
 CONFIG_FILE_VARIABLE = "DEADWAX_CONFIG_FILE"
@@ -69,6 +69,7 @@ class Settings(BaseSettings):
 
     concurrency: int = Field(default=8, ge=1, description="Sources queried at once in a lookup")
     log: LogSettings = Field(default_factory=LogSettings)
+    runs: RunLogSettings = Field(default_factory=RunLogSettings)
     http: HttpSettings = Field(default_factory=HttpSettings)
     cache: CacheSettings = Field(default_factory=CacheSettings)
     musicbrainz: SourceSettings = Field(default_factory=SourceSettings)
@@ -107,6 +108,12 @@ class Settings(BaseSettings):
         fields = {name: getattr(self, name) for name in SourcesConfig.model_fields}
         return SourcesConfig.model_validate(fields | {"cache": cache})
 
+    def run_log(self) -> RunLogSettings:
+        """Build the run journal settings; the journal lives in the user log directory."""
+        if self.runs.dir is not None:
+            return self.runs
+        return self.runs.model_copy(update={"dir": default_log_dir()})
+
 
 def default_config_file() -> Path:
     """Return config.toml in the user configuration directory."""
@@ -116,6 +123,11 @@ def default_config_file() -> Path:
 def default_cache_file() -> Path:
     """Return the response cache in the user cache directory."""
     return user_cache_path(APP_NAME) / "responses.sqlite"
+
+
+def default_log_dir() -> Path:
+    """Return the user log directory, which holds the run journal."""
+    return user_log_path(APP_NAME)
 
 
 def nested_model(field: FieldInfo) -> type[BaseModel] | None:

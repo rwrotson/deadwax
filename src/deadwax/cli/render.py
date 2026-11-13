@@ -1,6 +1,7 @@
 import json
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from enum import StrEnum
+from pathlib import Path
 
 from rich.console import Console, Group
 from rich.table import Table
@@ -17,6 +18,7 @@ from deadwax import (
     Tag,
     to_markdown,
 )
+from deadwax.logs import RunRecord
 
 # Longest text body shown in the terminal; JSON and Markdown keep the whole text.
 _TEXT_LIMIT = 600
@@ -312,3 +314,331 @@ def print_sources(
             _status(info),
         )
     console.print(table)
+
+
+def _outcome_style(outcome: str) -> str:
+    return {"ok": "green", "nothing_matched": "yellow"}.get(outcome, "red")
+
+
+def _problems(record: RunRecord) -> str:
+    return ", ".join(f"{s}:{status}" for s, status in record.sources.items() if status != "ok")
+
+
+def _run_row(record: RunRecord) -> tuple[str, str, str, str, str, str, str]:
+    query = record.query or " ".join(record.argv)
+    return (
+        record.run_id,
+        f"{record.started_at:%Y-%m-%d %H:%M}",
+        record.command,
+        query,
+        record.outcome.value,
+        _problems(record),
+        f"{record.duration_ms / 1000:.1f}",
+    )
+
+
+def print_runs(
+    records: Sequence[RunRecord],
+    output: OutputFormat,
+    root: Path,
+    console: Console | None = None,
+) -> None:
+    """Print journaled runs with their outcome and the sources that did not answer 'ok'."""
+    console = console or Console()
+    if output is OutputFormat.JSON:
+        payload = [record.model_dump(mode="json") for record in records]
+        console.out(json.dumps(payload, indent=2, ensure_ascii=False), highlight=False)
+        return
+    if not records:
+        console.print(f"No runs journaled in {root}.")
+        return
+
+    columns = ("run", "started (UTC)", "command", "query", "outcome", "problems", "seconds")
+    if output is OutputFormat.MARKDOWN:
+        lines = [f"| {' | '.join(columns)} |", f"|{' --- |' * len(columns)}"]
+        lines += [f"| {' | '.join(_run_row(record))} |" for record in records]
+        console.out("\n".join(lines), highlight=False)
+        return
+
+    table = _table(*columns)
+    for index in (0, 1, 4, 6):
+        table.columns[index].no_wrap = True
+    for record in records:
+        *cells, outcome, problems, seconds = _run_row(record)
+        table.add_row(
+            *cells,
+            Text(outcome, style=_outcome_style(outcome)),
+            Text(problems, style="yellow"),
+            seconds,
+        )
+    console.print(table)
+
+
+def _field(event: object, *path: str) -> object:
+    value: object = event
+    for key in path:
+        value = value.get(key) if isinstance(value, Mapping) else None
+    return value
+
+
+def _items(value: object) -> list[object]:
+    return value if isinstance(value, list) else []
+
+
+def _key(value: object) -> str:
+    """Describe a record key or candidate of a trace event."""
+    artist, title = _field(value, "artist"), _field(value, "title")
+    version = _field(value, "version")
+    described = f"{artist} - {title}"
+    if isinstance(version, str) and version != "original":
+        described += f" [{version}]"
+    return described
+
+
+def _score(value: object) -> str:
+    return f"{value:.2f}" if isinstance(value, float | int) else "?"
+
+
+def _seconds(milliseconds: object) -> str:
+    return f"{milliseconds / 1000:.2f} s" if isinstance(milliseconds, int | float) else "? s"
+
+
+def _run_start(event: Mapping[str, object]) -> Text:
+    argv = " ".join(str(arg) for arg in _items(event.get("argv")))
+    return Text.assemble(
+        ("deadwax ", "bold"),
+        (argv, "bold"),
+        (f"  deadwax {event.get('version')}, Python {event.get('python')}", "dim"),
+    )
+
+
+def _query(event: Mapping[str, object]) -> Text:
+    query = event.get("query")
+    target = _field(query, "url") or f"{_field(query, 'artist')} - {_field(query, 'title')}"
+    return Text(f"query: {target} ({_field(query, 'kind') or 'kind unknown'})")
+
+
+def _selected(event: Mapping[str, object]) -> Text:
+    ready = ", ".join(str(name) for name in _items(event.get("ready")))
+    text = Text(f"sources: {ready}")
+    skipped = event.get("skipped")
+    if isinstance(skipped, Mapping) and skipped:
+        reasons = "; ".join(f"{source} ({reason})" for source, reason in skipped.items())
+        text.append(f"\nskipped: {reasons}", style="yellow")
+    return text
+
+
+def _pass(event: Mapping[str, object]) -> Text:
+    sources = ", ".join(str(name) for name in _items(event.get("sources")))
+    text = Text(f"\npass {event.get('pass')}: {sources}", style="bold underline")
+    identity = event.get("identity")
+    if _field(identity, "title") is not None:
+        text.append(f"\n  context: {_key(identity)}, {event.get('links')} links", style="dim")
+    return text
+
+
+def _request(event: Mapping[str, object]) -> Text:
+    status = event.get("status")
+    error = event.get("error")
+    result = f"→ {status}" if status is not None else f"→ {_field(error, 'type')}"
+    details = [
+        f"cache {event.get('cache')}",
+        f"{event.get('attempts')} attempts",
+        _seconds(event.get("duration_ms")),
+    ]
+    if isinstance(event.get("bytes"), int):
+        details.append(f"{event.get('bytes')} B")
+    if error is not None:
+        details.append(str(_field(error, "message")))
+    style = "" if isinstance(status, int) and status < 400 else "red"  # noqa: PLR2004 -- HTTP
+    return Text.assemble(
+        f"{event.get('method')} {event.get('url')} ",
+        (result, style),
+        (f" ({', '.join(details)})", "dim"),
+    )
+
+
+def _compare(event: Mapping[str, object]) -> Text:
+    verdict = str(event.get("verdict"))
+    failed = ", ".join(str(check) for check in _items(event.get("failed")))
+    style = {"match": "green", "other_version": "yellow"}.get(verdict, "red")
+    return Text.assemble(
+        f"compare {_key(event.get('candidate'))} ",
+        (f"→ {verdict}", style),
+        (
+            f" (artist {_score(event.get('artist_score'))}, "
+            f"title {_score(event.get('title_score'))}"
+            + (f"; failed {failed}" if failed else "")
+            + ")",
+            "dim",
+        ),
+    )
+
+
+def _retry(event: Mapping[str, object]) -> Text:
+    cause = f"HTTP {event['status']}" if "status" in event else str(event.get("error"))
+    delay = event.get("delay_s")
+    wait = f", waiting {delay:.1f} s" if isinstance(delay, float | int) else ""
+    return Text(f"retry {event.get('url')} after {cause}{wait}", style="yellow")
+
+
+def _challenge(event: Mapping[str, object]) -> Text:
+    return Text(
+        f"{event.get('challenge')} via {event.get('fetcher')}: {event.get('url')}",
+        style="yellow",
+    )
+
+
+def _pick(event: Mapping[str, object]) -> Text:
+    hits = len(_items(event.get("hits")) or _items(event.get("matched")))
+    picked = event.get("picked")
+    query = f" for {event['query']}" if "query" in event else ""
+    return Text(f"search{query}: {hits} kept, picked {picked or 'nothing'}")
+
+
+def _adapter_end(event: Mapping[str, object]) -> Text:
+    errors = _items(event.get("errors"))
+    duration = _seconds(event.get("duration_ms"))
+    if errors:
+        first = errors[0]
+        url = _field(first, "url")
+        return Text.assemble(
+            (f"{_field(first, 'kind')}: {_field(first, 'reason')}", "red"),
+            (f" ({duration}{', ' + str(url) if url else ''})", "dim"),
+        )
+    facts = event.get("facts")
+    counts = ", ".join(
+        f"{count} {name}"
+        for name, count in (facts.items() if isinstance(facts, Mapping) else ())
+        if count
+    )
+    candidate = event.get("candidate")
+    found = _key(candidate) if candidate is not None else "no candidate"
+    return Text.assemble(
+        ("ok", "green"),
+        f": {found}",
+        (f" ({duration}; {counts or 'no facts'})", "dim"),
+    )
+
+
+def _merge_reference(event: Mapping[str, object]) -> Text:
+    reference = event.get("reference")
+    described = _key(reference) if reference is not None else "the first candidate"
+    return Text(f"\nmerge of {event.get('partials')} results against {described}", style="bold")
+
+
+def _reference(event: Mapping[str, object]) -> Text:
+    return Text(f"compared with {event.get('reference')}", style="bold")
+
+
+def _judge(event: Mapping[str, object]) -> Text:
+    verdict = str(event.get("verdict"))
+    style = {"match": "green", "other_version": "yellow"}.get(verdict, "red")
+    return Text.assemble(
+        "merge: ",
+        (verdict, style),
+        (
+            f" (artist {_score(event.get('artist_score'))}, "
+            f"title {_score(event.get('title_score'))})",
+            "dim",
+        ),
+    )
+
+
+def _run_end(event: Mapping[str, object]) -> Text:
+    summary = event.get("summary")
+    outcome = str(_field(summary, "outcome"))
+    text = Text("\n")
+    text.append(f"{outcome}", style=f"bold {_outcome_style(outcome)}")
+    text.append(f" in {_seconds(_field(summary, 'duration_ms'))}")
+    if (identity := _field(summary, "identity")) is not None:
+        text.append(f": {identity}")
+    for error in _items(_field(summary, "errors")):
+        source, kind = _field(error, "source"), _field(error, "kind")
+        text.append(f"\n  {source}: {kind} — {_field(error, 'reason')}", style="yellow")
+    return text
+
+
+_EVENT_RENDERERS: dict[str, Callable[[Mapping[str, object]], Text]] = {
+    "run.start": _run_start,
+    "query.parsed": _query,
+    "lookup.selected": _selected,
+    "pass.start": _pass,
+    "http.request": _request,
+    "http.retry": _retry,
+    "http.challenge": _challenge,
+    "match.compare": _compare,
+    "reference": _reference,
+    "search.pick": _pick,
+    "search.ranked": _pick,
+    "adapter.end": _adapter_end,
+    "merge.reference": _merge_reference,
+    "merge.judge": _judge,
+    "run.end": _run_end,
+}
+
+# Events that the timeline leaves to --format json.
+_QUIET_EVENTS = frozenset({"run.settings"})
+
+
+def _event_line(event: Mapping[str, object]) -> Text:
+    name = str(event.get("event"))
+    renderer = _EVENT_RENDERERS.get(name)
+    if renderer is not None:
+        text = renderer(event)
+    else:
+        fields = {
+            key: value
+            for key, value in event.items()
+            if key not in {"event", "level", "logger", "timestamp", "run_id", "source", "pass"}
+        }
+        logger = event.get("logger")
+        if isinstance(logger, str) and not logger.startswith("deadwax"):
+            fields = {"logger": logger, **fields}
+        text = Text(name, style="yellow" if event.get("level") in {"warning", "error"} else "")
+        if fields:
+            text.append(f" {json.dumps(fields, ensure_ascii=False, default=str)}", style="dim")
+        if isinstance(exception := event.get("exception"), str):
+            text = Text(f"{name}\n{exception}", style="red")
+    source = event.get("source")
+    if isinstance(source, str) and name not in {"pass.start", "lookup.selected"}:
+        return Text.assemble("  ", (f"[{source}] ", "cyan"), text)
+    return text
+
+
+def print_run(
+    events: Sequence[Mapping[str, object]],
+    output: OutputFormat,
+    console: Console | None = None,
+    *,
+    full: bool = False,
+) -> None:
+    """Print one run's events as a timeline; JSON prints them as recorded."""
+    console = console or Console()
+    if output is OutputFormat.JSON:
+        console.out(json.dumps(list(events), indent=2, ensure_ascii=False), highlight=False)
+        return
+
+    shown = [event for event in events if event.get("event") not in _QUIET_EVENTS]
+    if not full:
+        # merge.judge repeats the scores of the final merge's comparisons.
+        shown = [
+            event
+            for event in shown
+            if event.get("stage") != "context"
+            and not (event.get("stage") == "final" and event.get("event") == "match.compare")
+        ]
+    lines: list[Text] = []
+    references: dict[object, str] = {}
+    for event in shown:
+        if event.get("event") == "match.compare":
+            source, reference = event.get("source"), _key(event.get("reference"))
+            if references.get(source) != reference:
+                references[source] = reference
+                lines.append(_event_line({**event, "event": "reference", "reference": reference}))
+        lines.append(_event_line(event))
+    if output is OutputFormat.MARKDOWN:
+        body = "\n".join(line.plain for line in lines)
+        console.out(f"```\n{body}\n```", highlight=False)
+        return
+    console.print(Group(*lines))

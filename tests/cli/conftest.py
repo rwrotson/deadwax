@@ -8,10 +8,11 @@ from deadwax.cli import settings
 
 @pytest.fixture(autouse=True)
 def isolated_user_dirs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    """Point the default config file and cache into the test directory."""
+    """Point the default config file, cache, and run journal into the test directory."""
     config = tmp_path / "user-config" / "config.toml"
     monkeypatch.setattr(settings, "default_config_file", lambda: config)
     monkeypatch.setattr(settings, "default_cache_file", lambda: tmp_path / "cache.sqlite")
+    monkeypatch.setattr(settings, "default_log_dir", lambda: tmp_path / "user-logs")
     return config
 
 
