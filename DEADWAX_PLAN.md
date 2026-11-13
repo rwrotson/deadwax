@@ -321,8 +321,15 @@ Update the stage table only after its acceptance gate passes. Append dated evide
 | 2026-11-13 | Blocked results are cached: a marker entry (status 403, reserved header `x-deadwax-blocked` with the reason) for `cache.blocked_ttl` (default 1 day, `0` disables); a hit raises `BlockedError("… (cached)")` without a request. Supersedes "errors never cached" for blocks only. | Every cached run climbed the Discogs review ladder again (7–10 s instead of about 1 s); fewer requests to sites that refuse us. User choice. | 2, 7 |
 | 2026-11-13 | `poe test-live` loads `.env` (`envfile = { optional = [".env"] }`); the live tests pass the Last.fm key as well as the Discogs token. | Last.fm was `skipped` in every live test. User choice. | 7 |
 | 2026-11-12 | Tracks from the user's library are not fixtures but opt-in live integration tests (`tests/integration`, collected only with `--live`, `poe test-live`) that check invariants and print a report. | ~25–30 MB of fixtures otherwise; live data changes; user choice. | 5, 7 |
+| 2026-11-13 | Odesli runs in a third pass, `Pass.LINKS`, after enrichment. | Its seed is a streaming URL; when MusicBrainz has none, the Apple Music or Deezer link comes from iTunes or Deezer in the enrichment pass, which Odesli used to run beside. Live: "Billie Ray Martin - Planet of the Blue" gave `odesli not_found`. | post-v1 |
 
-**Current task:** Stage 7 complete; v1 qualified. **Next action:** user review and commit; later work is chosen by the user (planned sources in README).
+**Current task:** post-v1 work chosen by the user: Odesli links pass (done), then a per-source `proxy` setting. **Next action:** user review and commit of the links pass; then the proxy setting.
+
+### 2026-11-13 — Post-v1: Odesli links pass
+
+`Pass.LINKS` added to `core.adapter`; `orchestrator.run` runs it after the enrichment pass; `OdesliAdapter.pass_` is `LINKS`. Odesli fixtures recorded live for `huerco_s`, `missing_remix`, `bandcamp_url`, `discogs_url` (`scripts/record_fixtures.py --live odesli`; other sources replayed, existing fixtures unchanged). Tests: orchestrator links pass sees enrichment links; Odesli adapter pass; the Huerco S. lookup has Odesli links and no Odesli error. Docs: lookup flow in `docs/sources.md`, README Odesli caveat, reference index.
+
+Live, "Billie Ray Martin - Planet of the Blue" `--no-cache`: Odesli seeded from the iTunes track URL added Deezer, Tidal, Amazon, Pandora, Napster, and store links; remaining errors Deezer and Discogs reviews `blocked` (network), Wikipedia `not_found` (no item). Observation: song.link's page for Apple track 5027215 (original) links Apple track 5027223 ("Planet of the Blue - Instrum"); the upstream page mixes versions and Odesli links carry only its provenance.
 
 ### 2026-11-13 — Stage 7 follow-up
 

@@ -6,7 +6,8 @@
 
 1. **URL resolution.** For a URL query, the first ready source that recognises the URL reads it alone. Its record becomes the reference, and for a URL that does not reveal its kind it sets the kind. The order is MusicBrainz, Odesli, iTunes, Deezer, Discogs, Bandcamp.
 2. **Identity pass.** MusicBrainz finds the recording or release group and gives later sources its IDs and links: ISRCs, barcodes, Discogs, Wikidata, Bandcamp, and streaming URLs.
-3. **Enrichment pass.** All other sources run concurrently. Each one uses the IDs and links from the identity pass first and falls back to its own search.
+3. **Enrichment pass.** All other sources except Odesli run concurrently. Each one uses the IDs and links from the identity pass first and falls back to its own search.
+4. **Links pass.** Odesli opens the song.link page of a streaming URL found by any earlier source, such as the Apple Music link from iTunes.
 
 Each source runs under `adapter_timeout` (`--timeout`). Every candidate passes the version-aware matching gate described in [Output](output.md).
 
@@ -44,7 +45,7 @@ The README lists sources planned for later versions and those deadwax will not u
 ## Odesli (song.link)
 
 - **Access:** the song.link web page of a streaming link, fetched with the browser profile and the escalation ladder. Odesli has had no public API since 2026-07-31.
-- **Finds the record by:** the query URL, or a Spotify, Apple Music, Deezer, Tidal or YouTube link from the identity pass. Without one it reports `not_found`.
+- **Finds the record by:** the query URL, or a Spotify, Apple Music, Deezer, Tidal or YouTube link found by an earlier source. Without one it reports `not_found`.
 - **Contributes:** links on every platform Odesli matches, plus the title, artist, and ISRC or UPC of the record.
 - **Limits:** a platform that spells the artist differently gives `no_match`.
 

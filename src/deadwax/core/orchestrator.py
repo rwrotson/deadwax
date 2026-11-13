@@ -138,7 +138,7 @@ async def run(
     *,
     now: Callable[[], datetime] = _now,
 ) -> Dossier:
-    """Look the query up with adapters in two passes and merge their results into a dossier."""
+    """Look the query up with adapters pass by pass and merge their results into a dossier."""
     options = options or LookupOptions()
     ready, skipped = _select(adapters, options)
     lookup = _Run(query, options, now)
@@ -153,4 +153,5 @@ async def run(
     remaining = [adapter for adapter in ready if adapter is not resolver]
     await lookup.run([adapter for adapter in remaining if adapter.pass_ is Pass.IDENTITY])
     await lookup.run([adapter for adapter in remaining if adapter.pass_ is Pass.ENRICH])
+    await lookup.run([adapter for adapter in remaining if adapter.pass_ is Pass.LINKS])
     return merge(query, lookup.partials, skipped, generated_at=now())

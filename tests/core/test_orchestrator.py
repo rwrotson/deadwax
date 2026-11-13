@@ -129,6 +129,28 @@ async def test_identity_pass_runs_before_enrichment_and_feeds_its_context() -> N
     assert dossier.generated_at == NOW
 
 
+async def test_links_pass_runs_after_enrichment_and_sees_its_links() -> None:
+    itunes_partial = found("itunes").model_copy(
+        update={
+            "links": [
+                Link(
+                    service="apple_music",
+                    url="https://music.apple.com/us/album/x/1?i=2",
+                    target=LinkTarget.TRACK,
+                    sources=[Provenance(source="itunes")],
+                ),
+            ],
+        },
+    )
+    itunes = FakeAdapter("itunes", Pass.ENRICH, returning(itunes_partial))
+    odesli = FakeAdapter("odesli", Pass.LINKS)
+
+    await run(TRACK, [odesli, itunes], now=lambda: NOW)
+
+    [(_, context)] = odesli.calls
+    assert context.urls("apple_music") == ["https://music.apple.com/us/album/x/1?i=2"]
+
+
 async def test_other_version_found_in_identity_pass_gives_no_context() -> None:
     remix = found("musicbrainz", "Missing (Todd Terry Remix)", ids={IdKind.WIKIDATA: "Q2"})
     musicbrainz = FakeAdapter("musicbrainz", Pass.IDENTITY, returning(remix))

@@ -147,7 +147,7 @@ class OdesliAdapter(HttpAdapter):
     """Links on every streaming platform from the song.link page of a streaming link."""
 
     name = "odesli"
-    pass_ = Pass.ENRICH
+    pass_ = Pass.LINKS
     capabilities = frozenset({Capability.LINKS})
     profile = Profile.BROWSER
 

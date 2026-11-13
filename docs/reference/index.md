@@ -13,7 +13,7 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.core.merge` | Combine adapter results into a dossier with discrepancies |
 | `deadwax.core.markdown` | Render a dossier as Markdown |
 | `deadwax.core.adapter` | Define the adapter protocol, source status, and lookup context |
-| `deadwax.core.orchestrator` | Run adapters in two passes and merge their results |
+| `deadwax.core.orchestrator` | Run adapters pass by pass and merge their results |
 | `deadwax.sources.config` | Define HTTP, cache, and per-source settings |
 | `deadwax.sources.lookup` | Build the adapters and look a query up |
 | `deadwax.sources.musicbrainz.adapter` | Find recordings and release groups in MusicBrainz |

@@ -10,6 +10,7 @@ from deadwax.core import (
     LinkTarget,
     LookupContext,
     NotFoundError,
+    Pass,
     Provenance,
     SourceError,
     SourceState,
@@ -151,6 +152,7 @@ def test_page_without_entity_has_links_only() -> None:
 
 def test_ready_without_a_key() -> None:
     assert adapter([]).status().state is SourceState.READY
+    assert adapter([]).pass_ is Pass.LINKS
     query = parse_query(SPOTIFY)
     assert adapter([]).resolves(query)
     assert not adapter([]).resolves(parse_query("Radiohead - Creep", EntityKind.TRACK))

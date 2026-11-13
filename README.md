@@ -54,7 +54,7 @@ Every source is described in detail in [the sources guide](https://rwrotson.gith
 | MusicBrainz | implemented | identity, ISRCs, labels, credits, tags and genres, members, covers, remixes, samples, appearances on releases and compilations, streaming links, Discogs and Wikidata IDs; resolves MusicBrainz and Spotify URLs | the only identity-pass source; the public server is often busy (retried) |
 | iTunes Search | implemented | Apple Music links and previews, release date, genre; resolves Apple Music URLs | about 20 requests a minute |
 | Deezer | implemented | Deezer links and previews, ISRC, barcode, label, genres; resolves Deezer URLs | Akamai refuses some networks (`blocked`) |
-| Odesli (song.link) | implemented | links on every platform Odesli matches, with the title and ISRC or UPC; resolves streaming URLs | no public API since 2026-07-31: reads the song.link page of a streaming link from the query or MusicBrainz, else `not_found` |
+| Odesli (song.link) | implemented | links on every platform Odesli matches, with the title and ISRC or UPC; resolves streaming URLs | no public API since 2026-07-31: reads the song.link page of a streaming link from the query or an earlier source (MusicBrainz, iTunes, Deezer), else `not_found` |
 
 ### Tier 2: enrichment
 

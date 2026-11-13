@@ -146,6 +146,9 @@ async def test_album_on_a_small_label(replay: Replay, config: SourcesConfig) -> 
     }
     assert RelationKind.SIMILAR in relation_kinds(dossier)
     assert RelationKind.LABEL_RELEASE in relation_kinds(dossier)
+    # Odesli starts from the Apple Music link that iTunes found in the enrichment pass.
+    assert "odesli" not in errors(dossier)
+    assert any(link.sources[0].source == "odesli" for link in dossier.links)
 
 
 @pytest.mark.asyncio

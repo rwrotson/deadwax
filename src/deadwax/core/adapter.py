@@ -17,6 +17,9 @@ class Pass(StrEnum):
     IDENTITY = "identity"
     ENRICH = "enrich"
 
+    # Runs after enrichment and starts from the links it found.
+    LINKS = "links"
+
 
 class Capability(StrEnum):
     """Kind of facts an adapter can contribute."""
