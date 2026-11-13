@@ -127,15 +127,18 @@ class DiscogsAdapter(HttpAdapter):
         if target is None:
             error = AdapterError(source=self.name, kind=ErrorKind.SKIPPED, reason=SKIPPED_SEARCH)
             return Partial(source=self.name, errors=[error])
+
         master_id, release_id = target
         master = await self._get(models.Master, f"masters/{master_id}") if master_id else None
         if release_id is None and master is not None and master.main_release is not None:
             release_id = str(master.main_release)
         if release_id is None:
             raise NotFoundError("the Discogs master names no main release")
+
         release = await self._get(models.Release, f"releases/{release_id}")
         if master is None and release.master_id:
             master = await self._get(models.Master, f"masters/{release.master_id}")
+
         return await self._partial(release, master, kind, key)
 
     async def _target(
@@ -153,12 +156,14 @@ class DiscogsAdapter(HttpAdapter):
         master_id = (
             None if IdKind.DISCOGS_RELEASE in query.ids else context.id(IdKind.DISCOGS_MASTER)
         )
+
         if master_id is not None or release_id is not None:
             return master_id, release_id
         if key is None:
             raise NotFoundError("neither the query nor earlier sources name the record")
         if self.token is None:
             return None
+
         found = await self._search(key)
         if found is None:
             raise NotFoundError("no matching Discogs release")
@@ -171,10 +176,12 @@ class DiscogsAdapter(HttpAdapter):
             params |= {"track": key.title, "type": "release"}
         else:
             params |= {"release_title": key.title, "type": "master"}
+
         found = p.pick_result(
             key,
             (await self._get(models.Search, "database/search", **params)).results,
         )
+
         if found is None:
             return None
         if found.type == "master":
@@ -191,15 +198,18 @@ class DiscogsAdapter(HttpAdapter):
         release_url = p.page("release", release.id)
         group_url = p.page("master", master.id) if master is not None else release_url
         group_scope = Scope.RELEASE_GROUP if master is not None else Scope.RELEASE
+
         texts = p.notes(release.notes, "Release notes", Scope.RELEASE, release_url)
         if master is not None:
             texts = p.notes(master.notes, "Master notes", Scope.RELEASE_GROUP, group_url) + texts
+
         tags = p.tags(
             master.genres if master is not None else release.genres,
             master.styles if master is not None else release.styles,
             group_scope,
             group_url,
         )
+
         relations = p.label_relations(release)
         if kind is EntityKind.TRACK:
             track = p.find_track(release, key) if key is not None else None
@@ -215,6 +225,7 @@ class DiscogsAdapter(HttpAdapter):
         relations += await self._versions(master, release)
         relations += await self._artist(release)
         relations += await self._label_releases(release, candidate.title)
+
         reviews, errors = await self._reviews(release)
         return Partial(
             source=self.name,
@@ -267,6 +278,7 @@ class DiscogsAdapter(HttpAdapter):
         """Search compilations with the track; the search needs the token."""
         if self.token is None:
             return []
+
         artist = p.credit_name(track.artists or release.artists)
         found = await self._get(
             models.Search,
@@ -277,6 +289,7 @@ class DiscogsAdapter(HttpAdapter):
             type="release",
             per_page=PAGE_SIZE,
         )
+
         exclude = {release.id, *([master.id] if master is not None else [])}
         return p.compilation_relations(found.results, exclude)
 

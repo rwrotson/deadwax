@@ -124,6 +124,7 @@ def quoted(text: str) -> str:
 def track_partial(track: Track) -> Partial:
     """Describe a track with its Deezer, album and artist links."""
     sources = [Provenance(source=DeezerAdapter.name, url=track.link)]
+
     links = []
     if track.link:
         links.append(
@@ -148,6 +149,7 @@ def track_partial(track: Track) -> Partial:
                 sources=sources,
             ),
         )
+
     return Partial(
         source=DeezerAdapter.name,
         candidate=RecordCandidate(
@@ -166,6 +168,7 @@ def track_partial(track: Track) -> Partial:
 def album_partial(album: Album) -> Partial:
     """Describe an album with its label, barcode, genres and links."""
     sources = [Provenance(source=DeezerAdapter.name, url=album.link)]
+
     links = []
     if album.link:
         links.append(
@@ -180,11 +183,13 @@ def album_partial(album: Album) -> Partial:
                 sources=sources,
             ),
         )
+
     tags = [
         Tag(name=genre.name, kind=TagKind.GENRE, scope=Scope.RELEASE, sources=sources)
         for genre in album.genres.data
         if genre.name
     ]
+
     return Partial(
         source=DeezerAdapter.name,
         candidate=RecordCandidate(
@@ -227,6 +232,7 @@ class DeezerAdapter(HttpAdapter):
         """Look up by Deezer ID, then ISRC or barcode from earlier passes, then search."""
         key = search_key(query, context)
         kind = (key.kind if key is not None else None) or query.kind or EntityKind.TRACK
+
         if deezer_id := query.ids.get(IdKind.DEEZER):
             if kind is EntityKind.ALBUM:
                 return album_partial(await self._get(Album, f"album/{deezer_id}"))
@@ -237,6 +243,7 @@ class DeezerAdapter(HttpAdapter):
         if kind is EntityKind.ALBUM and context.identity.upcs:
             upc = context.identity.upcs[0].value
             return album_partial(await self._get(Album, f"album/upc:{upc}"))
+
         if key is None:
             raise NotFoundError("neither the query nor earlier sources name the record")
         return await self._search(key, kind)
@@ -252,6 +259,7 @@ class DeezerAdapter(HttpAdapter):
             if album is None:
                 raise NotFoundError("no matching Deezer album")
             return album_partial(await self._get(Album, f"album/{album.id}"))
+
         q = f"artist:{quoted(key.artist)} track:{quoted(key.title)}"
         tracks = await self._get(TrackSearch, "search/track", q=q, limit=_SEARCH_LIMIT)
         track = next((t for t in tracks.data if _matches(key, t.artist.name, t.title, kind)), None)

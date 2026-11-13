@@ -114,6 +114,7 @@ def partial(data: PageData) -> Partial:
     kind = EntityKind.ALBUM if entity is not None and entity.type == "album" else EntityKind.TRACK
     target = LinkTarget.ALBUM if kind is EntityKind.ALBUM else LinkTarget.TRACK
     sources = [Provenance(source=OdesliAdapter.name, url=data.page_url)]
+
     candidate = None
     if entity is not None and entity.title and entity.artist_name:
         candidate = RecordCandidate(
@@ -124,12 +125,14 @@ def partial(data: PageData) -> Partial:
             upcs=[entity.upc] if entity.upc else [],
             url=data.page_url,
         )
+
     found = {
         link.url: link
         for section in data.sections
         for link in section.links
         if link.url and link.show and re.match(r"^https?://", link.url)
     }
+
     return Partial(
         source=OdesliAdapter.name,
         candidate=candidate,

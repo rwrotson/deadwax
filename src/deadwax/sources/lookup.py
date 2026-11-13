@@ -68,6 +68,7 @@ async def lookup(
         include=frozenset(include) if include is not None else None,
         exclude=frozenset(exclude),
     )
+
     try:
         return await run(query, adapters, options)
     finally:

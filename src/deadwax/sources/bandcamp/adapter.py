@@ -70,9 +70,11 @@ class BandcampAdapter(HttpAdapter):
     ) -> tuple[p.Record, models.MobileDetails | None] | None:
         if self.resolves(query) and query.url is not None:
             return await self._open(query.url, key, kind)
+
         pages = _known_pages(context, kind)
         if pages:
             return await self._open(pages[0], key, kind)
+
         if key is None:
             raise NotFoundError("neither the query nor earlier sources name the record")
         result = await self._search(key)
@@ -106,6 +108,7 @@ class BandcampAdapter(HttpAdapter):
             if record.album is None or record.album.url is None:
                 raise NotFoundError("the Bandcamp track page names no album", url=url)
             record = await self._page(record.album.url)
+
         details = None
         if record.band_id is not None and record.id is not None:
             item_type = "t" if record.kind is EntityKind.TRACK else "a"
@@ -143,6 +146,7 @@ class BandcampAdapter(HttpAdapter):
             "full_page": False,
             "fan_id": None,
         }
+
         try:
             response = await self.client.request(
                 "POST",
@@ -155,6 +159,7 @@ class BandcampAdapter(HttpAdapter):
             logger.debug("bandcamp search endpoint failed", exc_info=True)
         else:
             return p.pick_result(key, results)
+
         response = await self.client.get(
             SEARCH_PAGE,
             params={"q": f"{key.artist} {key.title}", "item_type": item_type},

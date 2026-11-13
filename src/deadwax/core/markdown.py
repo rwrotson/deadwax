@@ -40,6 +40,7 @@ def _identity(identity: Identity) -> list[str]:
         detail = f" ({identity.version.detail})" if identity.version.detail else ""
         lines.append(f"- **Version:** {identity.version.kind}{detail}")
     lines += _sourced("Date", identity.date)
+
     lines += [
         f"- **Label:** {label.name}"
         + (f", {label.catalog_number}" if label.catalog_number else "")
@@ -52,6 +53,7 @@ def _identity(identity: Identity) -> list[str]:
         f"- **{item.kind}:** {item.value} ({_sources(item.sources)})"
         for item in identity.external_ids
     ]
+
     for discrepancy in identity.discrepancies:
         values = "; ".join(
             f"{value.value} ({_sources(value.sources)})" for value in discrepancy.values

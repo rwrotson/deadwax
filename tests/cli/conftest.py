@@ -24,6 +24,7 @@ def dossier() -> Dossier:
     """A dossier with every kind of fact, a discrepancy and an error."""
     mb = _provenance("musicbrainz", "https://musicbrainz.org/recording/r1")
     itunes = _provenance("itunes", "https://music.apple.com/us/song/1")
+
     return Dossier.model_validate(
         {
             "query": {"kind": "track", "artist": "Everything but the Girl", "title": "Missing"},

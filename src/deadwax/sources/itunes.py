@@ -100,8 +100,10 @@ def partial(item: Item) -> Partial:
         own_url, own_id, target = item.track_view_url, item.track_id, LinkTarget.TRACK
     else:
         own_url, own_id, target = item.collection_view_url, item.collection_id, LinkTarget.ALBUM
+
     url = clean_url(own_url) if own_url else None
     sources = [Provenance(source=ItunesAdapter.name, url=url)]
+
     links = []
     if url is not None:
         links.append(
@@ -121,6 +123,7 @@ def partial(item: Item) -> Partial:
         links.append(
             Link(service=SERVICE, url=artist_url, target=LinkTarget.ARTIST, sources=sources),
         )
+
     tags = []
     if item.primary_genre_name:
         tags.append(
@@ -131,6 +134,7 @@ def partial(item: Item) -> Partial:
                 sources=sources,
             ),
         )
+
     return Partial(
         source=ItunesAdapter.name,
         candidate=RecordCandidate(
@@ -169,9 +173,11 @@ class ItunesAdapter(HttpAdapter):
             if not items:
                 raise NotFoundError(f"no iTunes item {apple_id}")
             return partial(items[0])
+
         reference = search_key(query, context)
         if reference is None:
             raise NotFoundError("neither the query nor earlier sources name the record")
+
         kind = reference.kind or EntityKind.TRACK
         entity = "song" if kind is EntityKind.TRACK else "album"
         items = await self._get(
@@ -181,6 +187,7 @@ class ItunesAdapter(HttpAdapter):
             entity=entity,
             limit=_SEARCH_LIMIT,
         )
+
         item = pick(RecordKey(reference.artist, reference.title, kind, reference.version), items)
         if item is None:
             raise NotFoundError("no matching iTunes item")

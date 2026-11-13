@@ -101,6 +101,7 @@ def test_roles_and_track_ranges() -> None:
         ("written", None),
     ]
     assert p.roles("") == []
+
     positions = ["A1", "A2", "B1", "B2"]
     assert p.covers("A1, B1", "B1", positions)
     assert p.covers("A2 to B2", "B1", positions)

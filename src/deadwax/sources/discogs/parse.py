@@ -136,6 +136,7 @@ def _credits_of(
 def release_credits(release: models.Release, track: models.Track | None = None) -> list[Credit]:
     """Credits of the release; for a track, only release-wide ones and those of that track."""
     sources = [Provenance(source=SOURCE, url=page("release", release.id))]
+
     if track is None:
         result = []
         for artist in release.extraartists:
@@ -145,6 +146,7 @@ def release_credits(release: models.Release, track: models.Track | None = None) 
             note = f"track {entry.position}" if entry.position else entry.title
             result += _credits_of(entry.extraartists, Scope.RECORDING, sources, note)
         return result
+
     positions = _positions(release.tracklist)
     release_wide = [a for a in release.extraartists if not a.tracks]
     for_track = [
@@ -216,6 +218,7 @@ def label_relations(release: models.Release) -> list[Relation]:
             scope=Scope.RELEASE,
             sources=sources,
         )
+
     return list(seen.values())
 
 
@@ -335,6 +338,7 @@ def version_relations(versions: Iterable[models.Version], exclude: int) -> list[
         )
         if len(result) >= VERSIONS_LIMIT:
             break
+
     return result
 
 
@@ -411,6 +415,7 @@ def label_release_relations(
         )
         if len(result) >= LABEL_RELEASES_LIMIT:
             break
+
     return result
 
 
@@ -456,6 +461,7 @@ def compilation_relations(
         )
         if len(result) >= COMPILATIONS_LIMIT:
             break
+
     return result
 
 
@@ -491,6 +497,7 @@ def links(release: models.Release, master: models.Master | None) -> list[Link]:
                 sources=sources,
             ),
         )
+
     result.append(
         Link(
             service=SOURCE,
@@ -499,11 +506,13 @@ def links(release: models.Release, master: models.Master | None) -> list[Link]:
             sources=sources,
         ),
     )
+
     result += [
         Link(service=SOURCE, url=page("artist", a.id), target=LinkTarget.ARTIST, sources=sources)
         for a in release.artists
         if a.id is not None
     ]
+
     return result
 
 
@@ -518,8 +527,10 @@ def _review(item: JsonObject, url: str) -> Text | None:
     body = item.get("reviewBody") or item.get("description")
     if not isinstance(body, str) or not body.strip():
         return None
+
     author = item.get("author")
     author_name = author.get("name") if isinstance(author, dict) else author
+
     rating = item.get("reviewRating")
     score = None
     if isinstance(rating, dict):

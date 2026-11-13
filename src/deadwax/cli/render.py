@@ -71,12 +71,14 @@ def _identity_rows(dossier: Dossier) -> list[tuple[str, str, Text]]:
         rows.append(("kind", identity.kind.value, Text()))
     named = (("artist", identity.artist), ("title", identity.title))
     rows += [(name, *_sourced(value)) for name, value in named if value is not None]
+
     version = identity.version.kind.value
     if identity.version.detail:
         version = f"{version} ({identity.version.detail})"
     rows.append(("version", version, Text()))
     if identity.date is not None:
         rows.append(("date", *_sourced(identity.date)))
+
     for ref in identity.labels:
         name = f"{ref.name}, {ref.catalog_number}" if ref.catalog_number else ref.name
         rows.append(("label", name, _sources(ref.sources)))
@@ -112,6 +114,7 @@ def _tags(dossier: Dossier) -> list[Text | Table]:
     groups: dict[tuple[str, str], list[Tag]] = {}
     for tag in dossier.tags:
         groups.setdefault((tag.scope.value, tag.kind.value), []).append(tag)
+
     parts: list[Text | Table] = [_heading("Tags")]
     for (scope, kind), tags in groups.items():
         line = Text(f"{scope.replace('_', ' ')} {kind}s: ", style="bold")
@@ -198,9 +201,11 @@ def pretty_dossier(dossier: Dossier) -> Group:
         title = Text(f"{artist}{identity.title.value}", style="bold")
     else:
         title = Text("Nothing matched the query", style="bold red")
+
     parts: list[Text | Table] = [title]
     if dossier.found:
         parts += _identity(dossier)
+
     sections = (
         (dossier.tags, _tags),
         (dossier.credits, _credits),
@@ -251,6 +256,7 @@ def print_sources(
         payload = [info.model_dump(mode="json") for info in infos]
         console.out(json.dumps(payload, indent=2), highlight=False)
         return
+
     if output is OutputFormat.MARKDOWN:
         lines = ["| Source | Pass | Contributes | Status |", "| --- | --- | --- | --- |"]
         for info in infos:
@@ -259,6 +265,7 @@ def print_sources(
             lines.append(row)
         console.out("\n".join(lines), highlight=False)
         return
+
     table = _table("source", "pass", "contributes", "status")
     for info in infos:
         capabilities = ", ".join(capability.value for capability in info.capabilities)

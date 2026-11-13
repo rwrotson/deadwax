@@ -84,6 +84,7 @@ class MusicBrainzAdapter(HttpAdapter):
             target = await self._find_by_text(query, context)
         if target is None:
             raise NotFoundError("no matching record in MusicBrainz")
+
         kind, mbid = target
         if kind is EntityKind.TRACK:
             return self._track_partial(await self._track_sources(mbid))
@@ -194,12 +195,14 @@ class MusicBrainzAdapter(HttpAdapter):
             if main.release_group is not None:
                 group_path = f"release-group/{main.release_group.id}"
                 group = await self._get(models.ReleaseGroup, group_path, inc=_GROUP_INC)
+
         performance = next(
             (r for r in recording.relations if r.type == "performance" and r.work is not None),
             None,
         )
         if performance is not None and performance.work is not None:
             work = await self._get(models.Work, f"work/{performance.work.id}", inc=_WORK_INC)
+
         return _TrackSources(
             recording=recording,
             release=release,
@@ -215,11 +218,13 @@ class MusicBrainzAdapter(HttpAdapter):
         people = p.artist_credits(recording.relations, Scope.RECORDING, url)
         tags = p.tags(recording.tags, recording.genres, Scope.RECORDING, url)
         links = p.links(recording.relations, LinkTarget.TRACK, url)
+
         relations = [
             *p.recording_relations(recording.relations, Scope.RECORDING, url),
             *p.appearances(recording.releases, None, url),
             *found.members,
         ]
+
         if release is not None:
             relations += p.label_relations(release)
         if work is not None:
@@ -230,6 +235,7 @@ class MusicBrainzAdapter(HttpAdapter):
             group_url = p.page("release-group", group.id)
             tags += p.tags(group.tags, group.genres, Scope.RELEASE_GROUP, group_url)
             links += p.links(group.relations, LinkTarget.ALBUM, group_url)
+
         return Partial(
             source=self.name,
             candidate=_track_candidate(found),
@@ -246,6 +252,7 @@ class MusicBrainzAdapter(HttpAdapter):
         release = None
         if main is not None:
             release = await self._get(models.Release, f"release/{main.id}", inc=_ALBUM_RELEASE_INC)
+
         people = p.artist_credits(group.relations, Scope.RELEASE_GROUP, url)
         relations = await self._members(group.artist_credit)
         links = p.links(group.relations, LinkTarget.ALBUM, url)
@@ -255,6 +262,7 @@ class MusicBrainzAdapter(HttpAdapter):
             people += p.track_credits(release)
             relations += p.label_relations(release)
             links += p.links(release.relations, LinkTarget.ALBUM, release_url)
+
         return Partial(
             source=self.name,
             candidate=_album_candidate(group, release),
@@ -280,6 +288,7 @@ def _track_candidate(found: _TrackSources) -> RecordCandidate:
     if found.work is not None:
         ids[IdKind.MUSICBRAINZ_WORK] = found.work.id
         ids.update(p.url_ids(found.work.relations))
+
     return RecordCandidate(
         kind=EntityKind.TRACK,
         artist=p.credit_name(recording.artist_credit),
@@ -303,6 +312,7 @@ def _album_candidate(group: models.ReleaseGroup, release: models.Release | None)
         ids[IdKind.MUSICBRAINZ_ARTIST] = group.artist_credit[0].artist.id
     if release is not None:
         ids[IdKind.MUSICBRAINZ_RELEASE] = release.id
+
     return RecordCandidate(
         kind=EntityKind.ALBUM,
         artist=p.credit_name(group.artist_credit),

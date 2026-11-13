@@ -75,12 +75,14 @@ class WikipediaAdapter(HttpAdapter):
             if key is None:
                 raise NotFoundError("neither the query nor earlier sources name the record")
             qid = await self._search(key)
+
         item = (await self._entities([qid], "labels|claims|sitelinks")).get(qid)
         if item is None or not item.claims:
             raise NotFoundError("no such Wikidata item", url=p.entity_url(qid))
         kind = (key.kind if key is not None else None) or (
             EntityKind.ALBUM if p.fits(item, EntityKind.ALBUM) else EntityKind.TRACK
         )
+
         original = await self._original_language(item)
         referenced = await self._entities(
             p.referenced(item),
@@ -88,13 +90,16 @@ class WikipediaAdapter(HttpAdapter):
             p.languages(original),
         )
         labels = p.Labels(referenced, original)
+
         parts = await self._entities(item.items(p.PART_OF), "claims")
         albums = {qid for qid, part in parts.items() if p.fits(part, EntityKind.ALBUM)}
+
         scope = Scope.RELEASE_GROUP if kind is EntityKind.ALBUM else Scope.RECORDING
         artist = key.artist if key is not None else None
         candidate = p.candidate(item, kind, labels, original, artist)
         texts = await self._articles(item, original, scope)
         known = {normalize_text(t.publication) for t in texts if t.publication and t.rating}
+
         return Partial(
             source=self.name,
             candidate=candidate,
@@ -116,9 +121,11 @@ class WikipediaAdapter(HttpAdapter):
             srsearch=f"{key.title}{type_filter}",
             srlimit=SEARCH_LIMIT,
         )
+
         ids = [hit.title for hit in found.query.search]
         if not ids:
             raise NotFoundError("no Wikidata item with this title")
+
         items = await self._entities(ids, "labels|aliases|claims", p.languages(language))
         ordered = [items[qid] for qid in ids if qid in items]
         performers = await self._entities(
@@ -126,6 +133,7 @@ class WikipediaAdapter(HttpAdapter):
             "labels|aliases",
             p.languages(language),
         )
+
         qid = p.pick(key, ordered, performers, language)
         if qid is None:
             raise NotFoundError("no matching Wikidata item")
@@ -173,4 +181,5 @@ class WikipediaAdapter(HttpAdapter):
             url = p.article_url(language, page.parse.title)
             texts += p.sections(page.parse.text, page.parse.title, language, scope, url)
             texts += p.ratings(page.parse.wikitext, language, scope, url)
+
         return texts

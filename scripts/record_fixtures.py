@@ -129,12 +129,14 @@ class RecordingTransport(httpx.AsyncBaseTransport):
         """Serve a replayed response, or send the request uncompressed and store the response."""
         # Requests that follow a redirect arrive with an unread body stream.
         await request.aread()
+
         source = source_of(request.url.host)
         key = fixture_key(request)
         replayed = self._replayed(source, key)
         if replayed is not None:
             sys.stdout.write(f"  replay {replayed.status_code} {key}\n")
             return replayed
+
         request.headers["accept-encoding"] = "identity"
         response = await self.inner.handle_async_request(request)
         body = await response.aread()
@@ -181,6 +183,7 @@ async def record(name: str, query: Query, live: frozenset[str]) -> Dossier:
         dossier = await lookup(query, config(live), transport=transport)
     finally:
         await transport.aclose()
+
     recorded_at = datetime.now(UTC).isoformat(timespec="seconds")
     for source, interactions in transport.recorded.items():
         path = FIXTURES / source / f"{name}.json"
@@ -199,10 +202,12 @@ async def main() -> None:
         default=",".join(LIVE_DEFAULT),
         help="comma-separated sources to record live, or 'all' (default: %(default)s)",
     )
+
     args = parser.parse_args()
     unknown = sorted(set(args.scenarios) - set(SCENARIOS))
     if unknown:
         parser.error(f"unknown scenarios: {', '.join(unknown)}")
+
     live = frozenset(HOSTS.values()) if args.live == "all" else frozenset(args.live.split(","))
     for name in args.scenarios or list(SCENARIOS):
         sys.stdout.write(f"{name}\n")

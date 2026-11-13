@@ -128,6 +128,7 @@ def untrue_dossier() -> str:
     )
     second = Partial(source="discogs", candidate=other)
     error = AdapterError(source="lastfm", kind=ErrorKind.SKIPPED, reason="no API key")
+
     return to_markdown(merge(query, [partial, second], [error], generated_at=NOW))
 
 

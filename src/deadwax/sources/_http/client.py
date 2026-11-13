@@ -119,11 +119,13 @@ class HttpClient:
         self._config = config
         self._settings = config.http
         self._resources = resources
+
         self._policy = RetryPolicy(
             retries=self._settings.retries,
             base=self._settings.retry_base,
             max_wait=self._settings.max_retry_wait,
         )
+
         profile_headers = (
             api_headers(self._settings.contact)
             if spec.profile is Profile.API
@@ -135,6 +137,7 @@ class HttpClient:
             max_bytes=self._settings.max_response_bytes,
             transport=resources.transport,
         )
+
         self._steps: list[Escalation] = (
             escalation_steps(self._settings.escalation, resources.installed)
             if spec.profile is Profile.BROWSER
@@ -259,6 +262,7 @@ class HttpClient:
         limiter = self._resources.limiters.get(host, self._config.rate(self.spec.source))
         rng = self._resources.rng
         attempt = 0
+
         while True:
             await limiter.acquire()
             try:

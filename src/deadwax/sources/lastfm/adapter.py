@@ -75,6 +75,7 @@ class LastfmAdapter(HttpAdapter):
     async def _track(self, key: RecordKey) -> Partial:
         names = {"artist": key.artist, "track": key.title, "autocorrect": "1"}
         track = (await self._call(models.TrackInfoResponse, "track.getInfo", **names)).track
+
         names = {"artist": track.artist.name, "track": track.name}
         top = await self._call(models.TopTagsResponse, "track.getTopTags", **names)
         similar = await self._call(
@@ -83,6 +84,7 @@ class LastfmAdapter(HttpAdapter):
             **names,
             limit=SIMILAR_TRACKS,
         )
+
         artist_page = track.artist.url or _artist_page(track.url)
         return Partial(
             source=self.name,
@@ -96,6 +98,7 @@ class LastfmAdapter(HttpAdapter):
     async def _album(self, key: RecordKey) -> Partial:
         names = {"artist": key.artist, "album": key.title, "autocorrect": "1"}
         album = (await self._call(models.AlbumInfoResponse, "album.getInfo", **names)).album
+
         names = {"artist": album.artist, "album": album.name}
         top = await self._call(models.TopTagsResponse, "album.getTopTags", **names)
         similar = await self._call(
@@ -104,6 +107,7 @@ class LastfmAdapter(HttpAdapter):
             artist=album.artist,
             limit=SIMILAR_ARTISTS,
         )
+
         artist_page = _artist_page(album.url)
         return Partial(
             source=self.name,

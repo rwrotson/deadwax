@@ -137,6 +137,7 @@ def _judge(reference: RecordKey | None, partials: Iterable[Partial]) -> _Judgeme
                     url=candidate.url,
                 ),
             )
+
     return judgement
 
 
@@ -197,6 +198,7 @@ def _version_discrepancy(
     ]
     if not others:
         return None
+
     sources = title.sources if title is not None else [Provenance(source=QUERY_SOURCE)]
     label = _version_label(version)
     observations = [(label, label, source) for source in sources]
@@ -247,6 +249,7 @@ def _external_ids(
                 value=value,
                 sources=_union(known.sources if known else [], [provenance]),
             )
+
     discrepancies = []
     for kind in dict.fromkeys(external_id.kind for external_id in ids.values()):
         values = [
@@ -270,6 +273,7 @@ def build_identity(
         for partial in accepted
         if partial.candidate is not None
     ]
+
     artist, artist_conflict = _consensus(
         "artist",
         ((c.artist, normalize_artist(c.artist), p) for c, p in matched),
@@ -286,11 +290,13 @@ def build_identity(
         ((c.date, c.date[:4], p) for c, p in matched if c.date),
         _most_precise,
     )
+
     version = _version([candidate for candidate, _ in matched])
     version_conflict = _version_discrepancy(version, title, other_versions)
     external_ids, id_conflicts = _external_ids(matched)
     conflicts = [artist_conflict, title_conflict, version_conflict, date_conflict, *id_conflicts]
     kinds = [candidate.kind for candidate, _ in matched if candidate.kind is not None]
+
     return Identity(
         kind=query.kind or (kinds[0] if kinds else None),
         artist=artist,
@@ -374,11 +380,13 @@ def _text_key(text: Text) -> tuple[object, ...]:
 
 def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Partial]) -> _Facts:
     scope_rank = _scope_rank(kind)
+
     tags = _dedupe(
         (tag for p in accepted for tag in p.tags),
         lambda t: normalize_text(t.name),
         _combine_tags,
     )
+
     credit_facts = _dedupe(
         (credit for p in accepted for credit in p.credits),
         lambda c: (
@@ -387,7 +395,9 @@ def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Parti
             normalize_text(c.detail or ""),
         ),
     )
+
     texts = _dedupe((text for p in accepted for text in p.texts), _text_key)
+
     found_relations = (relation for p in accepted for relation in p.relations)
     version_relations = (
         _other_version_relation(p, p.candidate) for p in other_versions if p.candidate is not None
@@ -401,6 +411,7 @@ def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Parti
             normalize_text(r.target.name),
         ),
     )
+
     links = _dedupe((link for p in accepted for link in p.links), lambda link: _url_key(link.url))
     link_order = _LINK_ORDER[kind]
     return _Facts(

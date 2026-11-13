@@ -150,6 +150,7 @@ def rank_recordings(
         ).verdict
         is Verdict.MATCH
     ]
+
     return sorted(
         matching,
         key=lambda r: (
@@ -179,6 +180,7 @@ def rank_release_groups(
         ).verdict
         is Verdict.MATCH
     ]
+
     return sorted(
         matching,
         key=lambda g: (bool(g.secondary_types), _date_key(g.first_release_date)),
@@ -204,6 +206,7 @@ def tags(
     voted = [tag for tag in [*genres, *folksonomy] if tag.count > 0]
     if not voted:
         return []
+
     top = max(tag.count for tag in voted)
     genre_names = {genre.name for genre in genres}
     result: list[Tag] = []
@@ -308,6 +311,7 @@ def appearances(
                 sources=[Provenance(source=SOURCE, url=url)],
             ),
         )
+
     return result
 
 
@@ -404,6 +408,7 @@ def member_relations(artist: models.Artist) -> list[Relation]:
                 sources=[Provenance(source=SOURCE, url=url)],
             ),
         )
+
     return result
 
 
@@ -421,6 +426,7 @@ def work_relations(
     """
     url = page("work", work.id)
     sources = [Provenance(source=SOURCE, url=url)]
+
     if is_cover or version.kind is not VersionKind.ORIGINAL:
         if is_cover:
             kind = RelationKind.COVER_OF
@@ -436,6 +442,7 @@ def work_relations(
         )
         note = "the song this recording performs"
         return [Relation(kind=kind, target=target, note=note, scope=Scope.WORK, sources=sources)]
+
     covers = [
         relation.recording
         for relation in work.relations
@@ -471,6 +478,7 @@ def track_credits(release: models.Release) -> list[Credit]:
                 titles = grouped.setdefault(key, [])
                 if track.title not in titles:
                     titles.append(track.title)
+
     return [
         Credit(
             role=role,

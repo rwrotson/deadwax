@@ -82,6 +82,7 @@ def _settings(config: Path | None, verbose: bool, **overrides: object) -> Settin
         raise typer.Exit(EXIT_USAGE) from error
     except ConfigurationError as error:
         raise _usage_error(str(error)) from error
+
     log = settings.log.model_copy(update={"level": "DEBUG"}) if verbose else settings.log
     setup_logging(log)
     if not verbose:
@@ -129,6 +130,7 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
     """Look up a track or album (the default command)."""
     if album and track:
         raise _usage_error("--album and --track are mutually exclusive")
+
     kind = EntityKind.ALBUM if album else EntityKind.TRACK if track else None
     overrides: dict[str, object] = {}
     if no_cache:
@@ -136,6 +138,7 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
     if timeout is not None:
         overrides["adapter_timeout"] = timeout
     settings = _settings(config, verbose, **overrides)
+
     try:
         parsed = parse_query(query, kind)
         dossier: Dossier = asyncio.run(
@@ -148,6 +151,7 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
         )
     except (InvalidQueryError, ConfigurationError) as error:
         raise _usage_error(str(error)) from error
+
     print_dossier(dossier, output)
     if not dossier.found:
         raise typer.Exit(EXIT_NOTHING_MATCHED)

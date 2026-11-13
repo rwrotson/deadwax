@@ -202,6 +202,7 @@ def pick(
                 found = RecordKey(artist=artist, title=title, kind=key.kind)
                 if compare(key, found).verdict is not Verdict.NO_MATCH:
                     return item.id
+
     return None
 
 
@@ -229,6 +230,7 @@ def _date(item: models.Item) -> str | None:
             dates.append(f"{year}-{month}")
         else:
             dates.append(f"{year}-{month}-{day}")
+
     return min(dates, default=None)
 
 
@@ -281,10 +283,12 @@ def candidate(
     title = item.label(languages(original))
     if not performers or title is None:
         raise NotFoundError("the Wikidata item names no performer or title", url=url)
+
     ids = {IdKind.WIKIDATA: item.id}
     for prop, id_kind in (_ALBUM_IDS if kind is EntityKind.ALBUM else _TRACK_IDS).items():
         if values := item.texts(prop):
             ids[id_kind] = values[0]
+
     return RecordCandidate(
         kind=kind,
         artist=", ".join(performers),
@@ -379,6 +383,7 @@ def claim_ratings(item: models.Item, labels: Labels, scope: Scope, known: set[st
                 sources=sources,
             ),
         )
+
     return result
 
 
@@ -442,6 +447,7 @@ def parameters(body: str) -> dict[str, str]:
             current.append(body[index])
         index += 1
     parts.append("".join(current))
+
     result = {}
     for part in parts:
         name, sep, value = part.partition("=")
@@ -480,6 +486,7 @@ def ratings(wikitext: str, language: str, scope: Scope, url: str) -> list[Text]:
                     sources=sources,
                 ),
             )
+
     return result
 
 

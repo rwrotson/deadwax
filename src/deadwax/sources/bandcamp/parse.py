@@ -201,6 +201,7 @@ def recommendations(document: Document) -> list[Relation]:
                 sources=[],
             ),
         )
+
     return result
 
 
@@ -237,6 +238,7 @@ def _comments(ld: JsonObject) -> tuple[Text, ...]:
                     sources=[],
                 ),
             )
+
     return tuple(result)
 
 
@@ -258,6 +260,7 @@ def page_record(page: Page) -> Record | None:
     """Combine what the page's data attributes and JSON-LD say about the release or track."""
     if not page.found:
         return None
+
     tralbum, ld = page.tralbum, page.ld or {}
     current = tralbum.current if tralbum is not None else models.Current()
     title = current.title or _string(ld.get("name"))
@@ -269,6 +272,7 @@ def page_record(page: Page) -> Record | None:
     )
     if not title or not artist:
         return None
+
     is_track = (
         (tralbum.item_type == "track")
         if tralbum is not None
@@ -277,6 +281,7 @@ def page_record(page: Page) -> Record | None:
     url = page_url(
         (tralbum.url if tralbum is not None else None) or _string(ld.get("@id")) or page.url,
     )
+
     publisher = ld.get("publisher")
     return Record(
         kind=EntityKind.TRACK if is_track else EntityKind.ALBUM,
@@ -392,6 +397,7 @@ def partial(record: Record, label_releases: Sequence[Relation] = ()) -> Partial:
     sources = [Provenance(source=SOURCE, url=record.url)]
     scope = Scope.RECORDING if record.kind is EntityKind.TRACK else Scope.RELEASE
     id_kind = IdKind.BANDCAMP_TRACK if record.kind is EntityKind.TRACK else IdKind.BANDCAMP_ALBUM
+
     texts = [
         Text(
             kind=TextKind.LABEL,
@@ -404,6 +410,7 @@ def partial(record: Record, label_releases: Sequence[Relation] = ()) -> Partial:
         if body and body.strip()
     ]
     texts += [t.model_copy(update={"scope": scope}) for t in _sourced(record.comments, sources)]
+
     relations = _sourced(record.recommendations, sources) + list(label_releases)
     if record.label:
         relations.append(
@@ -417,6 +424,7 @@ def partial(record: Record, label_releases: Sequence[Relation] = ()) -> Partial:
     if record.album is not None:
         kind = RelationKind.COMPILATION if on_compilation(record) else RelationKind.APPEARS_ON
         relations.append(Relation(kind=kind, target=record.album, scope=scope, sources=sources))
+
     links = [
         Link(
             service=SOURCE,
@@ -433,6 +441,7 @@ def partial(record: Record, label_releases: Sequence[Relation] = ()) -> Partial:
         links.append(
             Link(service=SOURCE, url=record.seller_url, target=LinkTarget.ARTIST, sources=sources),
         )
+
     return Partial(
         source=SOURCE,
         candidate=RecordCandidate(
@@ -512,6 +521,7 @@ def html_search(content: bytes) -> list[models.SearchResult]:
                 item_url_path=page_url(href),
             ),
         )
+
     return result
 
 
@@ -537,10 +547,12 @@ def label_releases(
         override = item.css_first(".artist-override")
         artist = text_of(override)
         title = text_of(title_node)
+
         if title and artist and title.endswith(artist):
             title = title.removesuffix(artist).strip()
         if not title or not href or (exclude is not None and number == str(exclude)):
             continue
+
         ids = {IdKind.BANDCAMP_ALBUM: number} if kind == "album" and number else {}
         result.append(
             Relation(
@@ -559,4 +571,5 @@ def label_releases(
         )
         if len(result) >= LABEL_RELEASES_LIMIT:
             break
+
     return result

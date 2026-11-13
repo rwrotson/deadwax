@@ -81,6 +81,7 @@ def _select(
         raise ConfigurationError(
             f"unknown sources: {', '.join(unknown)}; known: {', '.join(names)}",
         )
+
     ready: list[Adapter] = []
     skipped: list[AdapterError] = []
     for adapter in adapters:
