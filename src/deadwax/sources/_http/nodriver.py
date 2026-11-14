@@ -42,7 +42,10 @@ class _Tab(Protocol):
 
 
 class _Browser(Protocol):
+    _process: asyncio.subprocess.Process | None
+
     async def get(self, url: str, *, new_tab: bool) -> _Tab: ...
+    async def aclose(self) -> None: ...
     def stop(self) -> None: ...
 
 
@@ -171,5 +174,11 @@ class NodriverFetcher:
     async def aclose(self) -> None:
         """Stop the browser and discard its temporary profile."""
         if self._browser is not None:
-            self._browser.stop()
+            browser = self._browser
+            process = browser._process
+            await browser.aclose()
+            browser.stop()
+            if process is not None:
+                await process.wait()
+            await asyncio.sleep(0)
             self._browser = None

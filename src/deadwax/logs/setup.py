@@ -36,14 +36,16 @@ def _prepare_handlers(
     console_formatter: logging.Formatter,
     json_processors: list[structlog.types.Processor],
     shared_processors: list[structlog.types.Processor],
+    console: bool,
 ) -> list[logging.Handler]:
     """Create all handlers before touching the root logger, closing them if one fails."""
     handlers: list[logging.Handler] = []
     try:
-        sh = _AppConsoleHandler(sys.stderr)
-        sh.setLevel(config.console_level)
-        sh.setFormatter(console_formatter)
-        handlers.append(sh)
+        if console:
+            sh = _AppConsoleHandler(sys.stderr)
+            sh.setLevel(config.console_level)
+            sh.setFormatter(console_formatter)
+            handlers.append(sh)
 
         if config.dir is not None:
             logs_dir_path = config.dir.resolve()
@@ -68,7 +70,7 @@ def _prepare_handlers(
     return handlers
 
 
-def setup_logging(config: LogSettings | None = None) -> None:
+def setup_logging(config: LogSettings | None = None, *, console: bool = True) -> None:
     """Configure structlog and stdlib handlers for an application that uses the library."""
     if config is None:
         config = LogSettings()
@@ -98,7 +100,13 @@ def setup_logging(config: LogSettings | None = None) -> None:
         foreign_pre_chain=shared_processors,
     )
 
-    handlers = _prepare_handlers(config, console_formatter, json_processors, shared_processors)
+    handlers = _prepare_handlers(
+        config,
+        console_formatter,
+        json_processors,
+        shared_processors,
+        console,
+    )
 
     root_logger = logging.getLogger()
     for handler in root_logger.handlers[:]:

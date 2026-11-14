@@ -54,17 +54,33 @@ class FakeTab:
 
 
 @dataclass
+class FakeProcess:
+    """Record whether shutdown waited for the subprocess."""
+
+    waited: bool = False
+
+    async def wait(self) -> int:
+        self.waited = True
+        return 0
+
+
+@dataclass
 class FakeBrowser:
     """Provide a new tab and track shutdown."""
 
     tab: FakeTab
     stopped: bool = False
+    closed: bool = False
+    _process: FakeProcess = field(default_factory=FakeProcess)
 
     async def get(self, url: str, *, new_tab: bool) -> FakeTab:
         return self.tab
 
     def stop(self) -> None:
         self.stopped = True
+
+    async def aclose(self) -> None:
+        self.closed = True
 
 
 @dataclass
@@ -108,6 +124,8 @@ async def test_fetch_returns_final_document(scenario: Scenario) -> None:
     assert scenario.tab.closed
     assert scenario.browser is not None
     assert scenario.browser.stopped
+    assert scenario.browser.closed
+    assert scenario.browser._process.waited
 
 
 @pytest.mark.asyncio

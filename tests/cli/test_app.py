@@ -251,6 +251,11 @@ def test_settings_configure_logging(
 
     assert clean_root_logger.level == logging.ERROR
     assert logging.getLogger("httpx").level == logging.WARNING
+    assert not any(
+        isinstance(handler, logging.StreamHandler)
+        and type(handler).__name__ == "_AppConsoleHandler"
+        for handler in clean_root_logger.handlers
+    )
 
 
 def test_verbose_enables_debug_logging(
@@ -260,7 +265,7 @@ def test_verbose_enables_debug_logging(
     monkeypatch.setenv("DEADWAX_LOG__LEVEL", "ERROR")
     logging.getLogger("httpx").setLevel(logging.NOTSET)
 
-    runner.invoke(app, ["sources", "--verbose"])
+    runner.invoke(app, ["sources", "--debug"])
 
     assert clean_root_logger.level == logging.DEBUG
     assert logging.getLogger("httpx").level == logging.NOTSET

@@ -109,7 +109,7 @@ def _settings(config: Path | None, verbose: bool, **overrides: object) -> Settin
         raise _usage_error(str(error)) from error
 
     log = settings.log.model_copy(update={"level": "DEBUG"}) if verbose else settings.log
-    setup_logging(log)
+    setup_logging(log, console=verbose)
     if not verbose:
         # httpx logs every request at INFO; deadwax reports failures in the dossier instead.
         for name in ("httpx", "httpcore"):
@@ -140,7 +140,10 @@ ConfigOption = Annotated[
     Path | None,
     typer.Option("--config", help="TOML settings file.", dir_okay=False, show_default=False),
 ]
-VerboseOption = Annotated[bool, typer.Option("--verbose", "-V", help="Log debug messages.")]
+VerboseOption = Annotated[
+    bool,
+    typer.Option("--verbose", "--debug", "-V", help="Log debug messages to stderr."),
+]
 FormatOption = Annotated[OutputFormat, typer.Option("--format", "-f", help="Output format.")]
 
 
