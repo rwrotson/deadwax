@@ -9,6 +9,7 @@ from deadwax.core.models import (
     Metric,
     Provenance,
     Relation,
+    ReviewLink,
     Sourced,
     Tag,
     Text,
@@ -139,6 +140,10 @@ def _link(link: Link) -> list[str]:
     return [f"- {link.service} ({link.target}): {link.url} — {_sources(link.sources)}"]
 
 
+def _review_link(link: ReviewLink) -> list[str]:
+    return [f"- {link.publication or 'Review'}: {link.url} — {_sources(link.sources)}"]
+
+
 def _error(error: AdapterError) -> list[str]:
     return [f"- {error.source}: {error.kind} — {error.reason}"]
 
@@ -156,6 +161,7 @@ def to_markdown(dossier: Dossier) -> str:
         *_section("Relations", dossier.relations, _relation),
         *_section("Metrics", dossier.metrics, _metric),
         *_section("Links", dossier.links, _link),
+        *_section("Review links", dossier.review_links, _review_link),
         *_section("Errors", dossier.errors, _error),
     ]
     return "\n".join(lines).rstrip() + "\n"

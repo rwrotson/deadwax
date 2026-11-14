@@ -146,6 +146,8 @@ _SERVICES = (
     ("soundohm.com", "soundohm"),
     ("bleep.com", "bleep"),
     ("forcedexposure.com", "forcedexposure"),
+    ("allmusic.com", "allmusic"),
+    ("albumoftheyear.org", "albumoftheyear"),
     ("7digital.com", "7digital"),
 )
 

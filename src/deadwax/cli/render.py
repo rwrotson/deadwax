@@ -214,6 +214,17 @@ def _links(dossier: Dossier) -> list[Text | Table]:
     return [_heading("Links"), table]
 
 
+def _review_links(dossier: Dossier) -> list[Text | Table]:
+    table = _table("publication", "url", "sources")
+    for link in dossier.review_links:
+        table.add_row(
+            link.publication or "Review",
+            Text(link.url, style=f"link {link.url}"),
+            _sources(link.sources),
+        )
+    return [_heading("Review links"), table]
+
+
 def _errors(dossier: Dossier) -> list[Text | Table]:
     table = _table("source", "problem", "reason")
     for error in dossier.errors:
@@ -241,6 +252,7 @@ def pretty_dossier(dossier: Dossier) -> Group:
         (dossier.relations, _relations),
         (dossier.metrics, _metrics),
         (dossier.links, _links),
+        (dossier.review_links, _review_links),
         (dossier.errors, _errors),
     )
     for items, section in sections:

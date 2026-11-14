@@ -72,6 +72,7 @@ def _nodriver(settings: HttpSettings, proxy: str | None) -> Fetcher:
         headless=settings.browser_headless,
         browser_path=settings.nodriver_browser_path,
         sandbox=settings.nodriver_sandbox,
+        challenge_wait=settings.browser_challenge_wait,
     )
 
 
@@ -81,6 +82,8 @@ def _browser(settings: HttpSettings, proxy: str | None) -> Fetcher:
         max_bytes=settings.max_response_bytes,
         proxy=proxy,
         headless=settings.browser_headless,
+        channel=settings.patchright_channel,
+        challenge_wait=settings.browser_challenge_wait,
     )
 
 
@@ -263,6 +266,7 @@ class HttpClient:
             params=tuple((params or {}).items()),
             headers=tuple((headers or {}).items()),
             body=body,
+            required_marker=self.spec.required_marker,
         )
         exchange = _Exchange(cache="off" if self._resources.cache is None else "miss")
         started = time.monotonic()

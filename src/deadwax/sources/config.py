@@ -101,6 +101,16 @@ class HttpSettings(_Model):
         default=True,
         description="Run Patchright and Nodriver without a visible browser window",
     )
+    patchright_channel: str = Field(
+        default="chromium",
+        pattern="^(chromium|chrome)$",
+        description="Patchright browser: bundled Chromium or installed Chrome with a temporary profile",
+    )
+    browser_challenge_wait: float = Field(
+        default=5.0,
+        ge=0,
+        description="Seconds to wait for a challenge or required page state in a browser",
+    )
     nodriver_browser_path: Path | None = Field(
         default=None,
         description="Chrome executable for Nodriver; unset uses its system discovery",
@@ -256,6 +266,8 @@ DEFAULT_RATES: dict[str, float] = {
     "bleep": 0.5,
     "forcedexposure": 0.5,
     "genius": 1.0,
+    "allmusic": 0.5,
+    "albumoftheyear": 0.5,
 }
 
 DEFAULT_HTML_TRANSPORTS: tuple[Escalation, ...] = (
@@ -320,6 +332,8 @@ class SourcesConfig(_Model):
     juno: SourceSettings = SourceSettings()
     bleep: SourceSettings = SourceSettings()
     forcedexposure: SourceSettings = SourceSettings()
+    allmusic: SourceSettings = SourceSettings()
+    albumoftheyear: SourceSettings = SourceSettings()
 
     def rate(self, source: str) -> float:
         """Return the request rate of a source in requests per second."""

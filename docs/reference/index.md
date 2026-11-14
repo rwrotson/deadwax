@@ -49,6 +49,8 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.sources.spotify.models` | Model Spotify Web API responses |
 | `deadwax.sources.youtube` | Find links to uploads of a record on YouTube (API key) |
 | `deadwax.sources.genius` | Read Genius song descriptions, annotations, credits, relations, and lyrics |
+| `deadwax.sources.allmusic` | Read AllMusic reviews, tags, credits, and similar albums |
+| `deadwax.sources.albumoftheyear` | Read Album of the Year scores, genres, and review links |
 | `deadwax.sources.soundcloud.adapter` | Read uploads and their reposters from SoundCloud (client ID) |
 | `deadwax.sources.soundcloud.parse` | Turn SoundCloud uploads into identity, tags, texts, metrics, relations, and links |
 | `deadwax.sources.soundcloud.models` | Model SoundCloud API responses |

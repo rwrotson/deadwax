@@ -107,6 +107,7 @@ class MetricKind(StrEnum):
 
     # Score a service computes from its own plays, such as Spotify's 0-100 popularity.
     POPULARITY = "popularity"
+    USER_SCORE = "user_score"
 
 
 class EntityType(StrEnum):
@@ -297,6 +298,13 @@ class Link(Attributed):
     preview_url: str | None = None
 
 
+class ReviewLink(Attributed):
+    """Page containing a review of the record."""
+
+    publication: str | None = None
+    url: str
+
+
 class AdapterError(_Model):
     """Adapter that did not answer, or answered only in part, and why."""
 
@@ -345,6 +353,7 @@ class Partial(_Model):
     relations: list[Relation] = []
     metrics: list[Metric] = []
     links: list[Link] = []
+    review_links: list[ReviewLink] = []
     errors: list[AdapterError] = []
 
 
@@ -359,6 +368,7 @@ class Dossier(_Model):
     relations: list[Relation] = []
     metrics: list[Metric] = []
     links: list[Link] = []
+    review_links: list[ReviewLink] = []
     errors: list[AdapterError] = []
     generated_at: AwareDatetime
 

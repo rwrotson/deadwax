@@ -40,8 +40,9 @@ Facts have a `scope`: `recording`, `work`, `release`, `release_group`, `artist`,
 | `credits` | `role`, `name`, `detail` (instruments or tracks the credit covers) |
 | `texts` | `kind` (`review`, `editorial`, `label`, `shop`, `wiki`, `user`, `broadcast`), `body`, `title`, `author`, `publication`, `date`, `rating` (`value`, `scale`, `text`), `language` |
 | `relations` | `kind`, `target` (`type`, `name`, `artist`, `date`, `url`, `ids`), `note` |
-| `metrics` | `kind` (`listens`, `listeners`, `likes`, `reposts`, `popularity`), `value`, `scale` (highest possible value, when bounded) |
+| `metrics` | `kind` (`listens`, `listeners`, `likes`, `reposts`, `popularity`, `user_score`), `value`, `scale` (highest possible value, when bounded) |
 | `links` | `service`, `url`, `target` (`track`, `album`, `artist`, `label`, `other`), `preview_url` |
+| `review_links` | `publication`, `url`, `sources`; review pages passed to later press lookups |
 
 A `broadcast` text is a radio host's note on a play, with the host as `author` and the station and program as `publication`. Metrics are counts or scores one source reports, such as Spotify's `popularity` on a scale of 100; they are never combined across sources. A `label` text is also what the uploader of a SoundCloud upload wrote about it, with the uploader as `author`.
 

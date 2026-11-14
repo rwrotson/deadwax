@@ -190,7 +190,12 @@ class _Run:
     def context(self) -> LookupContext:
         with trace_scope(stage="context"):
             dossier = merge(self.query, self.partials, generated_at=self.now())
-        return LookupContext(query=self.query, identity=dossier.identity, links=dossier.links)
+        return LookupContext(
+            query=self.query,
+            identity=dossier.identity,
+            links=dossier.links,
+            review_links=dossier.review_links,
+        )
 
     async def run(self, adapters: Sequence[Adapter], pass_: str) -> None:
         if not adapters:

@@ -24,6 +24,7 @@ class Request:
     params: tuple[tuple[str, str], ...] = ()
     headers: tuple[tuple[str, str], ...] = ()
     body: bytes | None = None
+    required_marker: bytes | None = None
 
     @property
     def full_url(self) -> str:

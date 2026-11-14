@@ -169,6 +169,18 @@ Both are opt-in `shops` sources and search release titles through the matching g
 - **Finds the record by:** track search through the matching gate. Album queries contribute no facts.
 - **Contributes:** description and annotations as texts, writers and producers as credits, samples, covers, remixes and interpolations as directional relations, a song link, and full lyrics when present in the page HTML. A blocked page leaves API facts available and records an error.
 
+## AllMusic
+
+- **Pass:** enrichment; opt-in; group `press`.
+- **Contributes:** review text, score and critic; styles, moods, themes, credits, and similar albums.
+- **Limits:** direct requests currently meet Cloudflare 403 from the development network. The extraction selectors require verification against a saved page.
+
+## Album of the Year
+
+- **Pass:** enrichment; opt-in; group `catalogues`.
+- **Contributes:** critic scores by publication, user score as a metric, genres, and links to original reviews for the later press pass.
+- **Limits:** direct requests currently meet Cloudflare 403 from the development network. The extraction selectors require verification against a saved page.
+
 ## Escalation ladder
 
 Bandcamp, Beatport, Hard Wax, Soundohm, and Juno pages, the song.link page, and Discogs review pages use browser-like headers, HTTP/2, and cookies. When the response is a challenge page (Cloudflare, Akamai, DataDome, PerimeterX, Fastly, Sucuri, or a captcha on 403/429/503), the client switches to a stronger transport and keeps using it for that source:

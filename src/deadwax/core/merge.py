@@ -26,6 +26,7 @@ from deadwax.core.models import (
     RecordCandidate,
     Relation,
     RelationKind,
+    ReviewLink,
     Scope,
     Sourced,
     Tag,
@@ -451,6 +452,7 @@ class _Facts:
     relations: list[Relation]
     metrics: list[Metric]
     links: list[Link]
+    review_links: list[ReviewLink]
 
 
 # Shop and label texts often reprint one press release.
@@ -461,6 +463,7 @@ _COPY_MIN_WORDS = 20
 
 # Share of the shorter copy's five-word sequences found in the other copy.
 _COPY_OVERLAP = 0.8
+_RATING_TOLERANCE = 0.001
 
 
 def _text_key(text: Text) -> tuple[object, ...]:
@@ -527,6 +530,43 @@ def _merge_copies(texts: Iterable[Text]) -> list[Text]:
     return merged
 
 
+def _merge_review_scores(texts: Iterable[Text]) -> list[Text]:
+    """Attach a secondary score citation to its matching review text."""
+    merged: list[Text] = []
+    for text in texts:
+        index = next(
+            (
+                i
+                for i, known in enumerate(merged)
+                if text.kind is known.kind is TextKind.REVIEW
+                and bool(text.body) != bool(known.body)
+                and normalize_text(text.publication or "")
+                == normalize_text(known.publication or "")
+                and text.scope is known.scope
+                and text.rating is not None
+                and known.rating is not None
+                and text.rating.value is not None
+                and known.rating.value is not None
+                and text.rating.scale is not None
+                and known.rating.scale is not None
+                and abs(
+                    text.rating.value / text.rating.scale - known.rating.value / known.rating.scale,
+                )
+                < _RATING_TOLERANCE
+            ),
+            None,
+        )
+        if index is None:
+            merged.append(text)
+        else:
+            full = text if text.body else merged[index]
+            empty = merged[index] if text.body else text
+            merged[index] = full.model_copy(
+                update={"sources": _union(full.sources, empty.sources)},
+            )
+    return merged
+
+
 def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Partial]) -> _Facts:
     scope_rank = _scope_rank(kind)
 
@@ -545,9 +585,8 @@ def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Parti
         ),
     )
 
-    texts = _merge_copies(
-        _dedupe((text for p in accepted for text in p.texts), _text_key, _combine_texts),
-    )
+    deduped_texts = _dedupe((text for p in accepted for text in p.texts), _text_key, _combine_texts)
+    texts = _merge_review_scores(_merge_copies(deduped_texts))
 
     found_relations = (relation for p in accepted for relation in p.relations)
     version_relations = (
@@ -557,6 +596,10 @@ def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Parti
     metrics = _dedupe((metric for p in accepted for metric in p.metrics), _metric_key)
 
     links = _dedupe((link for p in accepted for link in p.links), lambda link: _url_key(link.url))
+    review_links = _dedupe(
+        (link for p in accepted for link in p.review_links),
+        lambda link: _url_key(link.url),
+    )
     link_order = _LINK_ORDER[kind]
     return _Facts(
         tags=sorted(tags, key=lambda t: (scope_rank(t), -len(t.sources), -(t.weight or 0.0))),
@@ -565,6 +608,7 @@ def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Parti
         relations=sorted(relations, key=lambda r: (_RELATION_ORDER.index(r.kind), scope_rank(r))),
         metrics=sorted(metrics, key=scope_rank),
         links=sorted(links, key=lambda link: link_order.index(link.target)),
+        review_links=review_links,
     )
 
 
@@ -595,6 +639,7 @@ def merge(
         relations=facts.relations,
         metrics=facts.metrics,
         links=facts.links,
+        review_links=facts.review_links,
         errors=[*errors, *judgement.errors],
         generated_at=generated_at,
     )

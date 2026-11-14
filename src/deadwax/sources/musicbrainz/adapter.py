@@ -245,6 +245,7 @@ class MusicBrainzAdapter(HttpAdapter):
         people = p.artist_credits(recording.relations, Scope.RECORDING, url)
         tags = p.tags(recording.tags, recording.genres, Scope.RECORDING, url)
         links = p.links(recording.relations, LinkTarget.TRACK, url)
+        review_links = p.review_links(recording.relations, url)
 
         relations = [
             *p.recording_relations(recording.relations, Scope.RECORDING, url),
@@ -262,6 +263,7 @@ class MusicBrainzAdapter(HttpAdapter):
             group_url = p.page("release-group", group.id)
             tags += p.tags(group.tags, group.genres, Scope.RELEASE_GROUP, group_url)
             links += p.links(group.relations, LinkTarget.ALBUM, group_url)
+            review_links += p.review_links(group.relations, group_url)
 
         return Partial(
             source=self.name,
@@ -270,6 +272,7 @@ class MusicBrainzAdapter(HttpAdapter):
             credits=people,
             relations=relations,
             links=links,
+            review_links=review_links,
         )
 
     async def _album(self, group_id: str) -> Partial:
@@ -283,12 +286,14 @@ class MusicBrainzAdapter(HttpAdapter):
         people = p.artist_credits(group.relations, Scope.RELEASE_GROUP, url)
         relations = await self._members(group.artist_credit)
         links = p.links(group.relations, LinkTarget.ALBUM, url)
+        review_links = p.review_links(group.relations, url)
         if release is not None:
             release_url = p.page("release", release.id)
             people += p.artist_credits(release.relations, Scope.RELEASE, release_url)
             people += p.track_credits(release)
             relations += p.label_relations(release)
             links += p.links(release.relations, LinkTarget.ALBUM, release_url)
+            review_links += p.review_links(release.relations, release_url)
 
         return Partial(
             source=self.name,
@@ -297,6 +302,7 @@ class MusicBrainzAdapter(HttpAdapter):
             credits=people,
             relations=relations,
             links=links,
+            review_links=review_links,
         )
 
 

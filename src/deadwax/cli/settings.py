@@ -97,6 +97,8 @@ class Settings(BaseSettings):
     juno: SourceSettings = Field(default_factory=SourceSettings)
     bleep: SourceSettings = Field(default_factory=SourceSettings)
     forcedexposure: SourceSettings = Field(default_factory=SourceSettings)
+    allmusic: SourceSettings = Field(default_factory=SourceSettings)
+    albumoftheyear: SourceSettings = Field(default_factory=SourceSettings)
 
     @classmethod
     def settings_customise_sources(

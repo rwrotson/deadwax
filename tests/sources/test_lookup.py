@@ -409,6 +409,7 @@ def test_describe_sources_marks_groups_and_the_default_set() -> None:
         SourceGroup.RADIO,
         SourceGroup.STREAMING,
         SourceGroup.SHOPS,
+        SourceGroup.PRESS,
     }
     assert [info.source for info in infos if info.default] == ["musicbrainz", "deezer"]
     assert [info.source for info in describe_sources() if not info.default] == [
@@ -419,6 +420,8 @@ def test_describe_sources_marks_groups_and_the_default_set() -> None:
         "juno",
         "forcedexposure",
         "bleep",
+        "allmusic",
+        "albumoftheyear",
     ]
 
 
@@ -433,6 +436,7 @@ def test_describe_sources() -> None:
         "spotify", "musicbrainz", "odesli", "itunes", "deezer", "discogs", "bandcamp", "lastfm",
         "wikipedia", "listenbrainz", "secondhandsongs", "kexp", "youtube", "soundcloud",
         "beatport", "hardwax", "soundohm", "juno", "forcedexposure", "bleep", "genius",
+        "allmusic", "albumoftheyear",
     ]  # fmt: skip
     assert sources["musicbrainz"].pass_ is Pass.IDENTITY
     assert sources["odesli"].status.ready

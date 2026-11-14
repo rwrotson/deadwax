@@ -170,7 +170,7 @@ async def test_album_contributes_nothing() -> None:
 
     assert partial.model_dump(exclude={"source"}) == {
         "candidate": None, "tags": [], "credits": [], "texts": [], "relations": [],
-        "metrics": [], "links": [], "errors": [],
+        "metrics": [], "links": [], "review_links": [], "errors": [],
     }  # fmt: skip
     assert seen == []
 

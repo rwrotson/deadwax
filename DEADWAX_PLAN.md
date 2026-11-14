@@ -111,7 +111,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 12 | Done (Juno live-verified once by the agent) | Shops I: Juno, Hard Wax, Soundohm; shop-text deduplication (Phonica moved to the unscheduled blocking item). |
 | 13 | Done | Shops II: Forced Exposure and Bleep; Nodriver repair. Boomkat and Norman Records deferred after retry. |
 | 14 | Done | Genius. |
-| 15 | Not started | Reviews I: AllMusic, Album of the Year. |
+| 15 | In progress (page verification pending) | Reviews I: AllMusic, Album of the Year. |
 | 16 | Not started | Reviews II: press adapter with per-site rules, Resident Advisor. |
 | 17 | Not started | Radio: NTS, WFMU; context tags. |
 | 18 | Not started | Rate Your Music; browser-first fetching. |
@@ -584,6 +584,17 @@ The user added `DEADWAX_GENIUS__TOKEN` to the untracked `.env`. Live lookups wit
 Added the Genius token to the opt-in integration configuration and a live invariant test. The targeted live test passed (one test, 11.68 s). `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (840 offline tests, 98.17% branch coverage; format, lint, import contracts, strict mypy). The full `poe test-live` suite was not run; the live check was limited to the new source and the five acceptance records.
 
 ## Resume instructions
+
+### 2026-11-14 — Stage 15 in progress
+
+The worktree was clean at the start. Added opt-in AllMusic and Album of the Year adapters, review links as a separate sourced field on partials, dossiers, and lookup context, MusicBrainz review URL relations, user-score metrics, and score-to-review deduplication. Updated settings, URL recognition, CLI and Markdown rendering, README and source documentation. Synthetic page tests cover the modeled extraction paths, version rejection and review-link isolation; they do not verify either site's real markup.
+
+Direct public-page requests from this environment returned Cloudflare HTTP 403 for AllMusic's *OK Computer* and Album of the Year's *OK Computer*. A live lookup of that album with both new sources and `--no-cache` returned no identity: AllMusic timed out after 30 seconds; Album of the Year's search failed because Chrome could not load it. Saved search and product pages have been requested from the user. Live source facts and real-page parser behavior remain unverified. Do not mark Stage 15 Done until real saved pages are checked and the stage's live-run acceptance is recorded.
+
+`UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed: format, lint, 30 import contracts, strict mypy, 843 tests, and 97.61% branch coverage. `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run --group docs properdocs build --strict` passed. `git diff --check` passed. The five check-record live runs were not performed because both source pages were inaccessible in the strong album check.
+
+Nodriver-only follow-up (2026-11-14, user request): used Chrome for Testing 156, `nodriver_sandbox=false`, `html_transports=["nodriver"]`, `http.escalation=["nodriver"]`, and `--no-cache`. The *OK Computer* search was blocked by a Cloudflare challenge on AllMusic (run `20261114T145611Z-a66b8c`, one Nodriver attempt, 4.6 s) and Album of the Year (run `20261114T145626Z-489db3`, one Nodriver attempt, 3.6 s). Neither site yielded a page or facts. The HTTP status of Nodriver's response was not recorded because the challenge is reported as `BlockedError`.
+
 
 > Read `AGENTS.md`, `docs/architecture.md`, and `DEADWAX_PLAN.md`. Inspect the branch, worktree, stage table, and latest evidence. Implement the first incomplete stage only, preserving accepted and standing decisions and import rules. Run the stage checks, append dated evidence, update the status only when acceptance passes, report an English commit message, stop at the stage boundary, and do not create commits.
 

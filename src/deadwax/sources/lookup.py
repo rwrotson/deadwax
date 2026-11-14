@@ -5,6 +5,8 @@ import httpx
 from deadwax.core import Dossier, LookupOptions, Query, SourceInfo, expand_names, run
 from deadwax.sources._base import HttpAdapter
 from deadwax.sources._http import HttpResources, open_cache
+from deadwax.sources.albumoftheyear import AlbumOfTheYearAdapter
+from deadwax.sources.allmusic import AllMusicAdapter
 from deadwax.sources.bandcamp import BandcampAdapter
 from deadwax.sources.beatport import BeatportAdapter
 from deadwax.sources.bleep import BleepAdapter
@@ -52,6 +54,8 @@ ADAPTERS: tuple[type[HttpAdapter], ...] = (
     ForcedExposureAdapter,
     BleepAdapter,
     GeniusAdapter,
+    AllMusicAdapter,
+    AlbumOfTheYearAdapter,
 )
 
 

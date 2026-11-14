@@ -82,6 +82,8 @@ Every source is described in detail in [the sources guide](https://rwrotson.gith
 | Bleep | implemented, opt-in | editorial description, genres, release date, label, catalog number, tracklist | Patchright first |
 | SoundCloud | implemented, opt-in, needs `soundcloud.client_id` | uploader descriptions, genre and tags, plays, likes and reposts, notable reposting accounts, uploads absent elsewhere (edits, bootlegs) as other versions; resolves SoundCloud URLs | no new API apps: the web client's ID changes now and then and must be replaced by hand |
 | Genius | implemented, default, needs `genius.token` | song description, annotations, credits, song relations, full lyrics when available | API facts remain when the HTML page is blocked |
+| AllMusic | experimental, opt-in | review, rating, critic, styles, moods, themes, credits, similar albums | Live pages currently return Cloudflare 403 from the development network; extraction awaits saved-page verification |
+| Album of the Year | experimental, opt-in | critic scores, user score, genres, links to critic reviews | Live pages currently return Cloudflare 403 from the development network; extraction awaits saved-page verification |
 
 Names written in a non-Latin script are compared as written: a store that lists "Кино" as "Kino" is reported as `no_match`.
 
@@ -90,8 +92,8 @@ Names written in a non-Latin script are compared as written: a store that lists 
 | Group | Sources | Caveats |
 |-------|---------|---------|
 | Shops | Boomkat, Norman | access blocked by Cloudflare |
-| Reviews and press | AllMusic, Resident Advisor (GraphQL), press reviews through one adapter with per-site rules | |
-| Catalogues and communities | Rate Your Music, Album of the Year | Rate Your Music only through a browser |
+| Reviews and press | Resident Advisor (GraphQL), press reviews through one adapter with per-site rules | |
+| Catalogues and communities | Rate Your Music | Rate Your Music only through a browser |
 | Radio and mixes | NTS, 1001Tracklists, WFMU | |
 | Samples | WhoSampled | needs a separate decision on its terms of service |
 

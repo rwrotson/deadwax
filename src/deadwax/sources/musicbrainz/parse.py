@@ -14,6 +14,7 @@ from deadwax.core import (
     RecordKey,
     Relation,
     RelationKind,
+    ReviewLink,
     Scope,
     Tag,
     TagKind,
@@ -333,6 +334,15 @@ def links(relations: Iterable[models.Relation], default: LinkTarget, url: str) -
             ),
         )
     return result
+
+
+def review_links(relations: Iterable[models.Relation], url: str) -> list[ReviewLink]:
+    """Keep MusicBrainz URL relations to reviews for later press lookups."""
+    return [
+        ReviewLink(url=relation.url.resource, sources=[Provenance(source=SOURCE, url=url)])
+        for relation in relations
+        if relation.url is not None and "review" in relation.type.casefold()
+    ]
 
 
 _WIKIDATA = re.compile(r"^https?://(?:www\.)?wikidata\.org/wiki/(Q\d+)$")

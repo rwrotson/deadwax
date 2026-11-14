@@ -3,7 +3,7 @@ from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict
 
-from deadwax.core.models import Identity, Link, Partial
+from deadwax.core.models import Identity, Link, Partial, ReviewLink
 from deadwax.core.query import IdKind, Query
 
 
@@ -96,6 +96,7 @@ class LookupContext(_Model):
     query: Query
     identity: Identity = Identity()
     links: list[Link] = []
+    review_links: list[ReviewLink] = []
 
     def id(self, kind: IdKind) -> str | None:
         """Return the first known identifier of a kind, from the query or earlier passes."""
