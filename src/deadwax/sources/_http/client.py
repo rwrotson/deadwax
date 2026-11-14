@@ -73,6 +73,7 @@ def _nodriver(settings: HttpSettings, proxy: str | None) -> Fetcher:
         browser_path=settings.nodriver_browser_path,
         sandbox=settings.nodriver_sandbox,
         challenge_wait=settings.browser_challenge_wait,
+        profile_dir=settings.nodriver_profile_dir,
     )
 
 
@@ -84,6 +85,7 @@ def _browser(settings: HttpSettings, proxy: str | None) -> Fetcher:
         headless=settings.browser_headless,
         channel=settings.patchright_channel,
         challenge_wait=settings.browser_challenge_wait,
+        profile_dir=settings.patchright_profile_dir,
     )
 
 
@@ -205,7 +207,13 @@ class HttpClient:
             if spec.profile is Profile.BROWSER
             else [Escalation.HTTPX]
         )
-        self._policy_signature = ",".join(self._steps)
+        profile_policy = (
+            f"{self._settings.patchright_channel}|{self._settings.browser_headless}|"
+            f"{self._settings.patchright_profile_dir}|{self._settings.nodriver_profile_dir}"
+        )
+        self._policy_signature = (
+            f"{','.join(self._steps)}:{hashlib.sha256(profile_policy.encode()).hexdigest()}"
+        )
         self._escalated: dict[Escalation, Fetcher] = {}
         self._level = 0
         self._unavailable = (

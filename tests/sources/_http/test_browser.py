@@ -262,6 +262,23 @@ async def test_chrome_uses_a_temporary_profile_without_identity_overrides(
 
 
 @pytest.mark.asyncio
+async def test_chrome_retains_an_explicit_profile(scenario: Scenario, tmp_path: Path) -> None:
+    profile = tmp_path / "browser-profile"
+    fetcher = BrowserFetcher(
+        timeout=5,
+        max_bytes=100,
+        channel="chrome",
+        profile_dir=profile,
+    )
+
+    await fetcher.fetch(PAGE)
+    await fetcher.aclose()
+
+    assert scenario.launches[0]["user_data_dir"] == str(profile)
+    assert fetcher._profile is None
+
+
+@pytest.mark.asyncio
 async def test_browser_waits_for_required_page_state(scenario: Scenario) -> None:
     scenario.html_sequence = ["<html>loading</html>", "<html>READY</html>"]
     fetcher = BrowserFetcher(timeout=5, max_bytes=100, challenge_wait=1)

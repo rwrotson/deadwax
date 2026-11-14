@@ -1,6 +1,6 @@
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Self
 from urllib.parse import urlsplit
 
 from pydantic import (
@@ -10,6 +10,7 @@ from pydantic import (
     ConfigDict,
     Field,
     SecretStr,
+    model_validator,
 )
 
 DEFAULT_CONTACT = "https://github.com/rwrotson/deadwax"
@@ -108,6 +109,10 @@ class HttpSettings(_Model):
             "Patchright browser: bundled Chromium or installed Chrome with a temporary profile"
         ),
     )
+    patchright_profile_dir: Path | None = Field(
+        default=None,
+        description="Optional dedicated Chrome profile for Patchright, retained between lookups",
+    )
     browser_challenge_wait: float = Field(
         default=5.0,
         ge=0,
@@ -116,6 +121,10 @@ class HttpSettings(_Model):
     nodriver_browser_path: Path | None = Field(
         default=None,
         description="Chrome executable for Nodriver; unset uses its system discovery",
+    )
+    nodriver_profile_dir: Path | None = Field(
+        default=None,
+        description="Optional dedicated Chrome profile for Nodriver, retained between lookups",
     )
     nodriver_sandbox: bool = Field(
         default=True,
@@ -133,6 +142,18 @@ class HttpSettings(_Model):
             "unset: HTTP(S)_PROXY, ALL_PROXY and NO_PROXY from the environment"
         ),
     )
+
+    @model_validator(mode="after")
+    def distinct_browser_profiles(self) -> Self:
+        """Keep the two browser transports from sharing one writable profile."""
+        if (
+            self.patchright_profile_dir is not None
+            and self.nodriver_profile_dir is not None
+            and self.patchright_profile_dir.expanduser().resolve()
+            == self.nodriver_profile_dir.expanduser().resolve()
+        ):
+            raise ValueError("Patchright and Nodriver must use separate profile directories")
+        return self
 
 
 class CacheSettings(_Model):

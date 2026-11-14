@@ -66,6 +66,18 @@ _MIN_HTTP_STATUS = 100
 _POLL_SECONDS = 0.25
 
 
+def _proxy_args(proxy: str | None) -> list[str]:
+    if proxy == DIRECT:
+        return ["--no-proxy-server"]
+    if proxy is None:
+        return []
+    parts = urlsplit(proxy)
+    if parts.username is not None:
+        raise ConfigurationError("Nodriver does not support an authenticated HTTP proxy")
+    server = urlunsplit(parts._replace(netloc=parts.netloc.rpartition("@")[2]))
+    return [f"--proxy-server={server}"]
+
+
 def _chrome_error_page(content: bytes) -> bool:
     """Whether Chrome rendered its own network error instead of the requested page."""
     return bool(
@@ -131,6 +143,7 @@ class NodriverFetcher:
         browser_path: Path | None = None,
         sandbox: bool = True,
         challenge_wait: float = 5.0,
+        profile_dir: Path | None = None,
     ) -> None:
         try:
             _module()
@@ -143,28 +156,21 @@ class NodriverFetcher:
         self._browser_path = browser_path
         self._sandbox = sandbox
         self._challenge_wait = challenge_wait
+        self._profile_dir = profile_dir
         self._browser: _Browser | None = None
 
     async def _open(self) -> _Browser:
         module = _module()
 
         if self._browser is None:
-            args: list[str] = []
-            if self._proxy == DIRECT:
-                args.append("--no-proxy-server")
-            elif self._proxy is not None:
-                parts = urlsplit(self._proxy)
-                if parts.username is not None:
-                    raise ConfigurationError(
-                        "Nodriver does not support an authenticated HTTP proxy",
-                    )
-                server = urlunsplit(parts._replace(netloc=parts.netloc.rpartition("@")[2]))
-                args.append(f"--proxy-server={server}")
+            args = _proxy_args(self._proxy)
             try:
                 start = cast(Callable[..., Awaitable[_Browser]], vars(module)["start"])
                 options: dict[str, object] = {"headless": self._headless, "browser_args": args}
                 if self._browser_path is not None:
                     options["browser_executable_path"] = str(self._browser_path)
+                if self._profile_dir is not None:
+                    options["user_data_dir"] = str(self._profile_dir)
                 if not self._sandbox:
                     options["sandbox"] = False
                 self._browser = await start(**options)

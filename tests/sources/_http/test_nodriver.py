@@ -187,6 +187,17 @@ async def test_explicit_browser_and_sandbox_settings(scenario: Scenario) -> None
 
 
 @pytest.mark.asyncio
+async def test_explicit_profile_is_passed_to_nodriver(scenario: Scenario, tmp_path: Path) -> None:
+    profile = tmp_path / "nodriver-profile"
+    fetcher = NodriverFetcher(timeout=5, max_bytes=100, profile_dir=profile)
+
+    await fetcher.fetch(Request("GET", "https://example.test/page"))
+    await fetcher.aclose()
+
+    assert scenario.launched[0]["user_data_dir"] == str(profile)
+
+
+@pytest.mark.asyncio
 async def test_waits_for_required_page_state(scenario: Scenario) -> None:
     scenario.tab.content_sequence = ["<html>loading</html>", "<html>READY</html>"]
     fetcher = NodriverFetcher(timeout=5, max_bytes=100, challenge_wait=1)

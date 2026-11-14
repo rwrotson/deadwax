@@ -1,5 +1,6 @@
 import asyncio
 import tempfile
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urlsplit, urlunsplit
 
@@ -57,6 +58,7 @@ class BrowserFetcher:
         headless: bool = True,
         channel: str = "chromium",
         challenge_wait: float = 5.0,
+        profile_dir: Path | None = None,
     ) -> None:
         try:
             import patchright.async_api  # noqa: F401, PLC0415 -- optional extra (R7)
@@ -69,6 +71,7 @@ class BrowserFetcher:
         self._headless = headless
         self._channel = channel
         self._challenge_wait = challenge_wait
+        self._profile_dir = profile_dir
         self._profile: tempfile.TemporaryDirectory[str] | None = None
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
@@ -80,11 +83,18 @@ class BrowserFetcher:
         if self._context is None:
             self._playwright = await async_playwright().start()
             try:
-                if self._channel == "chrome":
-                    self._profile = tempfile.TemporaryDirectory(prefix="deadwax-patchright-")
+                if self._channel == "chrome" or self._profile_dir is not None:
+                    if self._profile_dir is None:
+                        temporary_profile = tempfile.TemporaryDirectory(
+                            prefix="deadwax-patchright-",
+                        )
+                        self._profile = temporary_profile
+                        profile_path = temporary_profile.name
+                    else:
+                        profile_path = str(self._profile_dir)
                     self._context = await self._playwright.chromium.launch_persistent_context(
-                        user_data_dir=self._profile.name,
-                        channel="chrome",
+                        user_data_dir=profile_path,
+                        channel=self._channel,
                         headless=self._headless,
                         no_viewport=True,
                         **launch_proxy(self._proxy),

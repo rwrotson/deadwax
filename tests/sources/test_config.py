@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from pydantic import SecretStr, ValidationError
 
@@ -102,3 +104,11 @@ def test_default_set_and_concurrency() -> None:
     )
     with pytest.raises(ValidationError):
         SourcesConfig(concurrency=0)
+
+
+def test_browser_profiles_must_be_distinct(tmp_path: Path) -> None:
+    with pytest.raises(ValidationError, match="separate profile directories"):
+        HttpSettings(
+            patchright_profile_dir=tmp_path / "profile",
+            nodriver_profile_dir=tmp_path / "profile",
+        )
