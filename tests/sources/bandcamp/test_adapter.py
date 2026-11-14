@@ -218,6 +218,41 @@ async def test_html_search_when_the_endpoint_fails() -> None:
 
 
 @pytest.mark.asyncio
+async def test_direct_page_when_both_search_routes_return_503() -> None:
+    query = parse_query("Band - Record", EntityKind.ALBUM)
+    seen: list[str] = []
+    found = adapter(
+        {
+            SEARCH_API: (503, b"temporary failure"),
+            SEARCH_PAGE: (503, b"temporary failure"),
+            ALBUM: (200, ALBUM_PAGE),
+        },
+        seen,
+    )
+
+    partial = await found.lookup(query, context(query))
+
+    assert partial.candidate is not None
+    assert partial.candidate.url == ALBUM
+    assert f"GET {ALBUM}" in seen
+
+
+@pytest.mark.asyncio
+async def test_direct_page_must_match_the_query() -> None:
+    query = parse_query("Band - Record", EntityKind.ALBUM)
+    found = adapter(
+        {
+            SEARCH_API: (503, b"temporary failure"),
+            SEARCH_PAGE: (503, b"temporary failure"),
+            ALBUM: (200, page("album", 1, "Other")),
+        },
+    )
+
+    with pytest.raises(SourceError, match="HTTP 503"):
+        await found.lookup(query, context(query))
+
+
+@pytest.mark.asyncio
 async def test_blocked_page_falls_back_to_the_mobile_api() -> None:
     query = parse_query("Band - Record", EntityKind.ALBUM)
     found = adapter(

@@ -69,7 +69,7 @@ The README lists sources planned for later versions and those deadwax will not u
 ## Bandcamp
 
 - **Access:** no API. The album or track page (`data-tralbum`, `data-embed`, JSON-LD), the mobile `tralbum_details` API, and the search endpoint are read with the browser profile and the escalation ladder.
-- **Finds the record by:** the query URL, a Bandcamp link from MusicBrainz, else a search. The HTML search page (behind a Fastly challenge) is tried only when the search endpoint fails.
+- **Finds the record by:** the query URL, a Bandcamp link from MusicBrainz, else a search. The HTML search page is tried when the search endpoint fails. If both search routes fail, a direct artist-subdomain URL is accepted only after its page confirms the requested artist, title, and kind.
 - **Contributes:** tags, About and Credits texts, simple credits, fan comments, recommendations as `similar`, the label from the mobile API, and the label's other releases when the label is the selling account.
 - **Limits:** a track found on another artist's album (a compilation or third-party upload) contributes only its identity, links, own notes, and a `compilation` relation.
 

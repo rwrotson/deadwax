@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 
 from deadwax.core import (
     BlockedError,
@@ -14,6 +15,8 @@ from deadwax.core import (
     Relation,
     SourceError,
     SourceGroup,
+    Verdict,
+    compare,
     recognize_url,
 )
 from deadwax.sources._base import HttpAdapter, search_key, service_for_url
@@ -102,7 +105,17 @@ class BandcampAdapter(HttpAdapter):
 
         if key is None:
             raise NotFoundError("neither the query nor earlier sources name the record")
-        result = await self._search(key)
+        return await self._from_search(key, kind)
+
+    async def _from_search(
+        self,
+        key: RecordKey,
+        kind: EntityKind | None,
+    ) -> tuple[p.Record, models.MobileDetails | None] | None:
+        try:
+            result = await self._search(key)
+        except SourceError as search_error:
+            return await self._direct(key, kind, search_error)
         if result is None or result.item_url_path is None:
             return None
         try:
@@ -115,6 +128,25 @@ class BandcampAdapter(HttpAdapter):
             if details is None:
                 raise
             return p.details_record(details), None
+
+    async def _direct(
+        self,
+        key: RecordKey,
+        kind: EntityKind | None,
+        search_error: SourceError,
+    ) -> tuple[p.Record, models.MobileDetails | None]:
+        """Try a verified artist-subdomain page when both search routes fail."""
+        direct_url = _direct_url(key)
+        if direct_url is not None:
+            try:
+                record, details = await self._open(direct_url, key, kind)
+            except SourceError:
+                pass
+            else:
+                candidate = RecordKey(record.artist, record.title, record.kind)
+                if compare(key, candidate).verdict is Verdict.MATCH:
+                    return record, details
+        raise search_error
 
     async def _open(
         self,
@@ -207,3 +239,12 @@ def _known_pages(context: LookupContext, kind: EntityKind | None) -> list[str]:
     """Bandcamp pages earlier passes found, the queried kind first."""
     pages = [url for url in context.urls("bandcamp") if recognize_url(url)[0] is not None]
     return sorted(pages, key=lambda url: recognize_url(url)[0] is not kind)
+
+
+def _direct_url(key: RecordKey) -> str | None:
+    artist = "-".join(re.findall(r"[a-z0-9]+", key.artist.lower()))
+    title = "-".join(re.findall(r"[a-z0-9]+", key.title.lower()))
+    if not artist or not title:
+        return None
+    kind = "album" if key.kind is EntityKind.ALBUM else "track"
+    return f"https://{artist}.bandcamp.com/{kind}/{title}"
