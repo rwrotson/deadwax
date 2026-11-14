@@ -5,170 +5,154 @@ import pytest
 
 from deadwax.core import (
     EntityKind,
-    Identity,
-    IdKind,
+    Link,
+    LinkTarget,
     LookupContext,
     NotFoundError,
-    Provenance,
     Query,
-    RateLimitedError,
-    Sourced,
     SourceError,
     parse_query,
 )
-from deadwax.sources import SourcesConfig, SourceSettings
+from deadwax.sources import SourcesConfig
 from deadwax.sources._http import HttpResources
-from deadwax.sources.deezer import DeezerAdapter, check
+from deadwax.sources.deezer import DeezerAdapter
 
-# Hand-written responses in the shape Deezer documents; the API refused our network, so none
-# could be recorded.
-ARTIST = {"id": 399, "name": "Radiohead", "link": "https://www.deezer.com/artist/399"}
-TRACK = {
-    "id": 138539973,
-    "title": "Paranoid Android",
-    "isrc": "GBAYE9701376",
-    "link": "https://www.deezer.com/track/138539973",
-    "preview": "https://cdn-preview.dzcdn.net/stream/x.mp3",
-    "release_date": "1997-05-21",
-    "artist": ARTIST,
-    "album": {
-        "id": 14880539,
-        "title": "OK Computer",
-        "link": "https://www.deezer.com/album/14880539",
-    },
-}
-ALBUM = {
-    "id": 14880539,
-    "title": "OK Computer",
-    "upc": "634904078164",
-    "link": "https://www.deezer.com/album/14880539",
-    "label": "XL Recordings",
-    "release_date": "1997-05-21",
-    "artist": ARTIST,
-    "genres": {"data": [{"id": 152, "name": "Rock"}]},
-}
-SOURCES = [Provenance(source="musicbrainz")]
+ALBUM_URL = "https://www.deezer.com/album/14880539"
+TRACK_URL = "https://www.deezer.com/track/138539973"
 
 
-def serve(routes: dict[str, object]) -> httpx.MockTransport:
+def page(data: dict[str, object]) -> bytes:
+    return f"<script>window.__DZR_APP_STATE__ = {json.dumps({'DATA': data})};</script>".encode()
+
+
+def adapter(routes: dict[str, tuple[int, bytes]], seen: list[str] | None = None) -> DeezerAdapter:
     def handler(request: httpx.Request) -> httpx.Response:
-        body = routes.get(
-            request.url.path,
-            {"error": {"type": "DataException", "message": "no data", "code": 800}},
-        )
-        return httpx.Response(200, json=body)
+        if seen is not None:
+            seen.append(str(request.url))
+        status, body = routes.get(str(request.url), (404, b"missing"))
+        return httpx.Response(status, content=body)
 
-    return httpx.MockTransport(handler)
-
-
-def adapter(routes: dict[str, object]) -> DeezerAdapter:
-    config = SourcesConfig(deezer=SourceSettings(rate=1000))
-    return DeezerAdapter(config, HttpResources(transport=serve(routes)))
+    config = SourcesConfig.model_validate(
+        {"deezer": {"rate": 1000}, "http": {"retries": 0, "escalation": []}},
+    )
+    return DeezerAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 
 
-def context(query: Query, **identity: object) -> LookupContext:
-    return LookupContext(query=query, identity=Identity.model_validate(identity))
+def context(query: Query) -> LookupContext:
+    return LookupContext(query=query)
+
+
+def album_page(title: str = "OK Computer") -> bytes:
+    return page(
+        {
+            "ALB_TITLE": title,
+            "ART_NAME": "Radiohead",
+            "ART_ID": "399",
+            "UPC": "634904078164",
+            "LABEL_NAME": "XL Recordings",
+            "DIGITAL_RELEASE_DATE": "1997-05-21",
+            "GENRES": {"data": [{"name": "Rock"}]},
+        },
+    )
+
+
+def track_page(title: str = "Paranoid Android") -> bytes:
+    return page(
+        {
+            "SNG_TITLE": title,
+            "ART_NAME": "Radiohead",
+            "ART_ID": "399",
+            "ALB_ID": "14880539",
+            "ALB_TITLE": "OK Computer",
+            "ISRC": "GBAYE9701376",
+        },
+    )
 
 
 @pytest.mark.asyncio
-async def test_track_by_isrc_from_an_earlier_pass() -> None:
-    query = parse_query("Radiohead - Paranoid Android", EntityKind.TRACK)
-    isrcs = [Sourced(value="GBAYE9701376", sources=SOURCES)]
+async def test_album_url_reads_html_identity_and_tags() -> None:
+    query = parse_query(ALBUM_URL)
+    seen: list[str] = []
 
-    partial = await adapter({"/track/isrc:GBAYE9701376": TRACK}).lookup(
-        query,
-        context(query, isrcs=isrcs),
-    )
+    partial = await adapter({ALBUM_URL: (200, album_page())}, seen).lookup(query, context(query))
+
+    assert partial.candidate is not None
+    assert partial.candidate.title == "OK Computer"
+    assert partial.candidate.upcs == ["634904078164"]
+    assert [tag.name for tag in partial.tags] == ["Rock"]
+    assert seen == [ALBUM_URL]
+
+
+@pytest.mark.asyncio
+async def test_track_url_reads_html_identity_and_links() -> None:
+    query = parse_query(TRACK_URL)
+
+    partial = await adapter({TRACK_URL: (200, track_page())}).lookup(query, context(query))
 
     assert partial.candidate is not None
     assert partial.candidate.isrcs == ["GBAYE9701376"]
-    assert partial.candidate.ids == {IdKind.DEEZER: "138539973"}
-    assert [(link.target, link.preview_url is not None) for link in partial.links] == [
-        ("track", True),
-        ("album", False),
-        ("artist", False),
-    ]
-
-
-@pytest.mark.asyncio
-async def test_track_search_skips_other_versions() -> None:
-    query = parse_query("Radiohead - Paranoid Android", EntityKind.TRACK)
-    live = TRACK | {"id": 1, "title": "Paranoid Android (Live)"}
-    routes = {"/search/track": {"data": [live, TRACK]}, "/track/138539973": TRACK}
-
-    partial = await adapter(routes).lookup(query, context(query))
-
-    assert partial.candidate is not None
-    assert partial.candidate.url == TRACK["link"]
-
-
-@pytest.mark.asyncio
-async def test_album_by_barcode_and_by_search() -> None:
-    query = parse_query("Radiohead - OK Computer", EntityKind.ALBUM)
-    upcs = [Sourced(value="634904078164", sources=SOURCES)]
-    routes = {
-        "/album/upc:634904078164": ALBUM,
-        "/search/album": {"data": [ALBUM]},
-        "/album/14880539": ALBUM,
+    assert {link.url for link in partial.links} == {
+        TRACK_URL,
+        ALBUM_URL,
+        "https://www.deezer.com/artist/399",
     }
 
-    by_upc = await adapter(routes).lookup(query, context(query, upcs=upcs))
-    searched = await adapter(routes).lookup(query, context(query))
 
-    assert by_upc == searched
-    assert by_upc.candidate is not None
-    assert [label.name for label in by_upc.candidate.labels] == ["XL Recordings"]
-    assert by_upc.candidate.upcs == ["634904078164"]
-    assert [tag.name for tag in by_upc.tags] == ["Rock"]
+@pytest.mark.asyncio
+async def test_known_link_of_another_kind_does_not_replace_search() -> None:
+    query = parse_query("Radiohead - Paranoid Android", EntityKind.TRACK)
+    search_url = "https://www.deezer.com/search/Radiohead%20Paranoid%20Android/track"
+    lookup_context = LookupContext(
+        query=query,
+        links=[Link(service="deezer", url=ALBUM_URL, target=LinkTarget.ALBUM, sources=[])],
+    )
+    seen: list[str] = []
+
+    partial = await adapter(
+        {
+            search_url: (200, f'<a href="{TRACK_URL}">Track</a>'.encode()),
+            TRACK_URL: (200, track_page()),
+        },
+        seen,
+    ).lookup(query, lookup_context)
+
+    assert partial.candidate is not None
+    assert partial.candidate.url == TRACK_URL
+    assert ALBUM_URL not in seen
 
 
 @pytest.mark.asyncio
-async def test_deezer_urls_are_resolved_by_id() -> None:
-    track_query = parse_query("https://www.deezer.com/track/138539973")
-    album_query = parse_query("https://www.deezer.com/album/14880539")
-    routes: dict[str, object] = {"/track/138539973": TRACK, "/album/14880539": ALBUM}
-    deezer = adapter(routes)
+async def test_search_skips_other_versions() -> None:
+    query = parse_query("Radiohead - Paranoid Android", EntityKind.TRACK)
+    search_url = "https://www.deezer.com/search/Radiohead%20Paranoid%20Android/track"
+    live_url = "https://www.deezer.com/track/1"
+    links = f'<a href="{live_url}">Live</a><a href="{TRACK_URL}">Original</a>'.encode()
+    seen: list[str] = []
+    routes = {
+        search_url: (200, links),
+        live_url: (200, track_page("Paranoid Android (Live)")),
+        TRACK_URL: (200, track_page()),
+    }
 
-    track = await deezer.lookup(track_query, context(track_query))
-    album = await deezer.lookup(album_query, context(album_query))
+    partial = await adapter(routes, seen).lookup(query, context(query))
 
-    assert deezer.resolves(track_query)
-    assert not deezer.resolves(parse_query("Radiohead - OK Computer", EntityKind.ALBUM))
-    assert track.candidate is not None
-    assert track.candidate.kind is EntityKind.TRACK
-    assert album.candidate is not None
-    assert album.candidate.kind is EntityKind.ALBUM
+    assert partial.candidate is not None
+    assert partial.candidate.url == TRACK_URL
+    assert seen == [search_url, live_url, TRACK_URL]
 
 
-@pytest.mark.parametrize(
-    ("query", "routes"),
-    [
-        (
-            parse_query("Radiohead - Paranoid Android", EntityKind.TRACK),
-            {"/search/track": {"data": []}},
-        ),
-        (parse_query("Radiohead - OK Computer", EntityKind.ALBUM), {"/search/album": {"data": []}}),
-        (parse_query("https://bandcamp.example/x"), {}),
-    ],
-)
 @pytest.mark.asyncio
-async def test_nothing_found(query: Query, routes: dict[str, object]) -> None:
-    with pytest.raises(NotFoundError):
-        await adapter(routes).lookup(query, context(query))
+async def test_search_without_candidates_is_not_found() -> None:
+    query = parse_query("Radiohead - OK Computer", EntityKind.ALBUM)
+    search_url = "https://www.deezer.com/search/Radiohead%20OK%20Computer/album"
+
+    with pytest.raises(NotFoundError, match="no matching Deezer album"):
+        await adapter({search_url: (200, b"<html></html>")}).lookup(query, context(query))
 
 
-@pytest.mark.parametrize(
-    ("error", "raised"),
-    [
-        ({"code": 800, "message": "no data"}, NotFoundError),
-        ({"code": 4, "message": "Quota limit exceeded"}, RateLimitedError),
-        ({"code": 300, "type": "OAuthException", "message": "invalid token"}, SourceError),
-    ],
-)
-def test_errors_inside_successful_responses(
-    error: dict[str, object],
-    raised: type[Exception],
-) -> None:
-    with pytest.raises(raised):
-        check(json.dumps({"error": error}).encode(), "https://api.deezer.com/x")
-    check(b'{"id": 1}', "https://api.deezer.com/x")
+@pytest.mark.asyncio
+async def test_missing_record_data_is_an_error() -> None:
+    query = parse_query(TRACK_URL)
+
+    with pytest.raises(SourceError, match="no record data"):
+        await adapter({TRACK_URL: (200, b"<html></html>")}).lookup(query, context(query))

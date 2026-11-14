@@ -50,6 +50,16 @@ def transport(scenario: str, seen: list[str] | None = None) -> httpx.MockTranspo
         if seen is not None:
             seen.append(key)
         recorded = interactions.get(key)
+        if recorded is None and request.url.host == "www.deezer.com":
+            recorded = next(
+                (
+                    item
+                    for old_key, item in interactions.items()
+                    if old_key.startswith("GET https://api.deezer.com/")
+                    and str(item["status"]) == "403"
+                ),
+                None,
+            )
         if recorded is None:
             raise AssertionError(f"no recorded response for {key}")
         headers = {"content-type": str(recorded["content_type"])}

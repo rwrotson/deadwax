@@ -46,10 +46,10 @@ The README lists sources planned for later versions and those deadwax will not u
 
 ## Deezer
 
-- **Access:** `api.deezer.com`, keyless.
-- **Finds the record by:** ISRC (track) or barcode (album) from the identity pass, else a search; it resolves Deezer URLs.
-- **Contributes:** Deezer links and previews, ISRC, barcode, label, and genres.
-- **Limits:** Akamai refuses some networks with an "Access Denied" page. This is reported as `blocked`. Behind a refused proxy, see [Proxies](#proxies).
+- **Access:** public HTML at `www.deezer.com`, without an API key.
+- **Finds the record by:** a Deezer URL from the query or earlier sources, else HTML search and verification of the linked record pages.
+- **Contributes:** Deezer links, and ISRC, barcode, label, and genres when present in the page's embedded data.
+- **Limits:** HTML may be blocked on some networks or omit fields; no API fallback is used. Behind a refused proxy, see [Proxies](#proxies).
 
 ## Odesli (song.link)
 

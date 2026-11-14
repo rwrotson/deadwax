@@ -32,7 +32,7 @@ SECRET_PARAMS = frozenset({"key", "api_key", "token", "client_id"})
 HOSTS = {
     "musicbrainz.org": "musicbrainz",
     "itunes.apple.com": "itunes",
-    "api.deezer.com": "deezer",
+    "www.deezer.com": "deezer",
     "song.link": "odesli",
     "album.link": "odesli",
     "api.discogs.com": "discogs",
