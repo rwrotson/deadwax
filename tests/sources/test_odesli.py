@@ -76,7 +76,7 @@ def adapter(requests: list[httpx.Request], body: bytes | None = None) -> OdesliA
         return httpx.Response(200, content=body or page({"pageData": PAGE_DATA}))
 
     config = SourcesConfig.model_validate(
-        {"odesli": {"rate": 1000}, "http": {"escalation": "none"}},
+        {"odesli": {"rate": 1000}, "http": {"escalation": []}},
     )
     return OdesliAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 

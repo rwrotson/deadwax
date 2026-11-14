@@ -108,7 +108,7 @@ def make(
     config = SourcesConfig.model_validate(
         {
             "soundcloud": {"rate": 1000, "client_id": "c1d"},
-            "http": {"retries": 0, "escalation": "none"},
+            "http": {"retries": 0, "escalation": []},
         },
     )
     return SoundCloudAdapter(config, HttpResources(transport=httpx.MockTransport(handler))), seen

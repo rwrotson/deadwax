@@ -116,7 +116,7 @@ def make(seen: list[httpx.Request] | None = None, **overrides: Handler) -> Wikip
         return httpx.Response(200, content=json.dumps(body).encode())
 
     config = SourcesConfig.model_validate(
-        {"wikipedia": {"rate": 1000}, "http": {"retries": 0, "escalation": "none"}},
+        {"wikipedia": {"rate": 1000}, "http": {"retries": 0, "escalation": []}},
     )
     return WikipediaAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 

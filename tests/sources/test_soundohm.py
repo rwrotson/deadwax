@@ -70,7 +70,7 @@ def make(
         return httpx.Response(404)
 
     config = SourcesConfig.model_validate(
-        {"soundohm": {"rate": 1000}, "http": {"retries": 0, "escalation": "none"}},
+        {"soundohm": {"rate": 1000}, "http": {"retries": 0, "escalation": []}},
     )
     return SoundohmAdapter(config, HttpResources(transport=httpx.MockTransport(handler))), seen
 

@@ -50,7 +50,7 @@ def make(
         return httpx.Response(200, content=json.dumps({"results": results}).encode())
 
     config = SourcesConfig.model_validate(
-        {"kexp": {"rate": 1000}, "http": {"retries": 0, "escalation": "none"}},
+        {"kexp": {"rate": 1000}, "http": {"retries": 0, "escalation": []}},
     )
     return KexpAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 

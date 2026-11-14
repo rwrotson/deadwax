@@ -33,6 +33,8 @@ class _Tab(Protocol):
     url: str
 
     async def get(self, url: str) -> object: ...
+    async def send(self, command: object) -> object: ...
+    async def evaluate(self, expression: str, *, return_by_value: bool) -> object: ...
     async def sleep(self, seconds: float) -> object: ...
     async def get_content(self) -> str: ...
     async def close(self) -> object: ...
@@ -54,6 +56,23 @@ MISSING_EXTRA = (
     "Nodriver needs the 'nodriver' extra: pip install 'deadwax[nodriver]' and install Chrome"
 )
 MISSING_BROWSER = "Chrome for Nodriver is not installed"
+_MIN_HTTP_STATUS = 100
+
+
+async def _navigation_status(
+    tab: _Tab,
+    responses: list[_NavigationResponse],
+    wait_seconds: float,
+) -> object:
+    if responses:
+        return 0
+    return await asyncio.wait_for(
+        tab.evaluate(
+            "performance.getEntriesByType('navigation')[0]?.responseStatus || 0",
+            return_by_value=True,
+        ),
+        timeout=wait_seconds,
+    )
 
 
 class NodriverFetcher:
@@ -119,24 +138,34 @@ class NodriverFetcher:
         network = vars(vars(module)["cdp"])["network"]
         tab.add_handler(vars(network)["ResponseReceived"], record)
         try:
+            await asyncio.wait_for(tab.send(vars(network)["enable"]()), timeout=self._timeout)
             await asyncio.wait_for(tab.get(request.full_url), timeout=self._timeout)
             await asyncio.wait_for(tab.sleep(1), timeout=self._timeout)
             content = (await asyncio.wait_for(tab.get_content(), timeout=self._timeout)).encode()
             url = tab.url
+            navigation_status = await _navigation_status(tab, responses, self._timeout)
         except (TimeoutError, OSError, RuntimeError) as error:
             raise TransportError(f"{type(error).__name__}: {error}") from error
         finally:
             await tab.close()
-        final = next((item for item in reversed(responses) if item.url == url), None)
-        if final is None:
-            raise TransportError("Nodriver did not receive a document response")
+        final = next(
+            (item for item in reversed(responses) if item.url == url),
+            responses[-1] if responses else None,
+        )
+        if final is None and (url == "about:blank" or not content.strip()):
+            raise TransportError("Nodriver did not load a document")
         if len(content) > self._max_bytes:
             raise ResponseTooLargeError(f"response is larger than {self._max_bytes} bytes")
+
+        # Chrome can render a navigation without delivering Network.responseReceived to this tab.
+        status = final.status if final is not None else navigation_status
+        if not isinstance(status, int) or status < _MIN_HTTP_STATUS:
+            status = 200
         return Response(
             url=url,
-            status=final.status,
+            status=status,
             content=content,
-            headers=lower_headers(final.headers),
+            headers=lower_headers(final.headers) if final is not None else {},
         )
 
     async def aclose(self) -> None:

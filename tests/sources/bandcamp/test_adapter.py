@@ -88,7 +88,7 @@ def adapter(routes: Mapping[str, Route], seen: list[str] | None = None) -> Bandc
         return httpx.Response(status, content=body)
 
     config = SourcesConfig.model_validate(
-        {"bandcamp": {"rate": 1000}, "http": {"retries": 0, "escalation": "none"}},
+        {"bandcamp": {"rate": 1000}, "http": {"retries": 0, "escalation": []}},
     )
     return BandcampAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 

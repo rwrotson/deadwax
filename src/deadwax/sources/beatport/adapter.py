@@ -22,6 +22,7 @@ class BeatportAdapter(SearchPageAdapter):
         },
     )
     service = p.SERVICE
+    required_marker = b"__NEXT_DATA__"
 
     def search_request(self, key: RecordKey) -> tuple[str, Mapping[str, str]]:
         """Track or release search."""

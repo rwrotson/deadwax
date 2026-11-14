@@ -116,7 +116,7 @@ def config(**changes: object) -> SourcesConfig:
     return SourcesConfig.model_validate(
         {
             "spotify": {"rate": 1000, "client_id": "id", "client_secret": "secret"},
-            "http": {"retries": 0, "escalation": "none"},
+            "http": {"retries": 0, "escalation": []},
             **changes,
         },
     )

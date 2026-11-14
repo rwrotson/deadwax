@@ -72,7 +72,7 @@ def make(
         return httpx.Response(404)
 
     config = SourcesConfig.model_validate(
-        {"beatport": {"rate": 1000}, "http": {"retries": 0, "escalation": "none"}},
+        {"beatport": {"rate": 1000}, "http": {"retries": 0, "escalation": []}},
     )
     return BeatportAdapter(config, HttpResources(transport=httpx.MockTransport(handler))), seen
 
@@ -257,7 +257,7 @@ async def test_challenge_is_blocked() -> None:
 @pytest.mark.parametrize(
     ("content", "message"),
     [
-        ("<html></html>", "no __NEXT_DATA__"),
+        ("<html></html>", "required page state missing"),
         ('<script id="__NEXT_DATA__">{not json</script>', "not valid JSON"),
         ('<script id="__NEXT_DATA__">[]</script>', "no page properties"),
         (state_page({"chartPosition": None}), "neither a track nor a release"),

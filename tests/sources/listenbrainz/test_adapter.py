@@ -58,7 +58,7 @@ def make(seen: list[httpx.Request] | None = None) -> ListenBrainzAdapter:
         return httpx.Response(200, content=json.dumps(ROUTES[request.url.path]).encode())
 
     config = SourcesConfig.model_validate(
-        {"listenbrainz": {"rate": 1000}, "http": {"retries": 0, "escalation": "none"}},
+        {"listenbrainz": {"rate": 1000}, "http": {"retries": 0, "escalation": []}},
     )
     return ListenBrainzAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 

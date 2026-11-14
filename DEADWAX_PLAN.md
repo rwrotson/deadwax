@@ -265,6 +265,20 @@ Changed: transport selection and missing-transport fallback in the shared HTTP c
 
 Verification: delegated to the user in a separate environment. No check or live command was run in this session; Stage 13 remains open.
 
+User live run (`--album "Burial - Untrue" --sources beatport,juno,soundohm,odesli,discogs,hardwax,bandcamp --no-cache`): Bandcamp, Juno, Hard Wax, and Soundohm contributed facts; Beatport failed with "Nodriver did not receive a document response"; Discogs exceeded its 30-second adapter timeout; Odesli had no streaming seed. Nodriver launched Chrome twice and emitted event-loop shutdown warnings. Follow-up code enables CDP Network events before navigation, accepts the last document response when its URL differs from the final tab URL, and lets a transport error fall through to the next configured engine. These fixes await the user's live recheck.
+
+Local checks after the follow-up: `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (830 offline tests, 98.83% coverage; format, lint, import contracts, mypy all passed). `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run --group docs properdocs build --strict` passed. Fixture setup and the recorder now use an empty allowed-transport list in place of the removed `Escalation.NONE`. No live request was made by the agent.
+
+User recheck after installing Patchright Chromium: Beatport remained `blocked` by Cloudflare through Patchright, curl_cffi, and httpx; Nodriver again lacked a document response. Discogs' optional reviews had the same Nodriver error, while its core lookup completed with a 60-second adapter timeout. The Nodriver transport now returns rendered HTML when CDP omits the document response event, using the response status when available and a provisional 200 otherwise; an empty navigation still fails. Offline `poe check` passed (831 tests, 98.83% coverage). Live behaviour after this change awaits the user.
+
+Next user run (Beatport alone): Nodriver supplied HTML but Beatport rejected it for lacking `__NEXT_DATA__`; the source returned `failed`. The browser transport now reads the navigation status from the Performance API when CDP omits the response event. Beatport marks `__NEXT_DATA__` as required page state at the HTTP layer, so an incomplete page tries the next configured transport. This change awaits local checks and a live recheck.
+
+2026-11-14 local verification: `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (833 tests, 98.78% coverage; format, lint, import contracts and mypy passed). `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run --group docs properdocs build --strict` passed. No external request was made; Beatport's live result after the page-state fallback remains unverified.
+
+Final local pass after limiting the Performance API probe to navigations without a CDP response event: `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed again (833 tests, 98.78% coverage). The strict docs build above remains the latest docs check; no external request was made.
+
+User live recheck on 2026-11-14 (`--album "Burial - Untrue" --sources beatport --no-cache --timeout 60`): Beatport returned `blocked` with "Cloudflare challenge (tried nodriver, browser, impersonate, httpx)". All four configured HTML transports ran; the missing-state fallback no longer ends in a parser error. Beatport facts remain live-unverified because the site refused every transport from this network.
+
 | Date | Decision | Reason | Affected stage |
 | --- | --- | --- | --- |
 | 2026-11-13 | v2 source scope: all sources planned in v1 except Rough Trade, Apple Music, Traxsource, Mixcloud and BBC Sounds; YouTube for links only. | User review of what each source can give. | v2 |

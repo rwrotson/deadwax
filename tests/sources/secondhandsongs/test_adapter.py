@@ -89,7 +89,7 @@ def make(
     config = SourcesConfig.model_validate(
         {
             "secondhandsongs": {"rate": 1000, "api_key": api_key},
-            "http": {"retries": 0, "escalation": "none"},
+            "http": {"retries": 0, "escalation": []},
         },
     )
     return SecondHandSongsAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))

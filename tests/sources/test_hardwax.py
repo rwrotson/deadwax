@@ -74,7 +74,7 @@ def make(
         return httpx.Response(404)
 
     config = SourcesConfig.model_validate(
-        {"hardwax": {"rate": 1000}, "http": {"retries": 0, "escalation": "none"}},
+        {"hardwax": {"rate": 1000}, "http": {"retries": 0, "escalation": []}},
     )
     return HardWaxAdapter(config, HttpResources(transport=httpx.MockTransport(handler))), seen
 

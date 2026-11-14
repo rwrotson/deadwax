@@ -111,6 +111,7 @@ class Setup:
         profile: Profile = Profile.API,
         secret_params: frozenset[str] = frozenset(),
         escalation: Escalation | None = None,
+        required_marker: bytes | None = None,
     ) -> HttpClient:
         def factory(step: Escalation) -> Callable[[HttpSettings, str | None], Fetcher]:
             def create(settings: HttpSettings, proxy: str | None) -> Fetcher:
@@ -146,7 +147,7 @@ class Setup:
             cache=CacheSettings(blocked_ttl=self.blocked_ttl),
             lastfm=LastfmSettings(proxy=SecretStr(self.proxy) if self.proxy else None),
         )
-        spec = ClientSpec("lastfm", profile, {"x-source": "test"}, secret_params)
+        spec = ClientSpec("lastfm", profile, {"x-source": "test"}, secret_params, required_marker)
         return HttpClient(spec, config, resources)
 
 
@@ -322,6 +323,39 @@ async def test_escalated_transport_errors_carry_the_url() -> None:
             await client.get(URL)
 
     assert raised.value.url == URL
+
+
+@pytest.mark.asyncio
+async def test_unavailable_browser_falls_through_to_next_transport() -> None:
+    setup = Setup(Server([httpx.Response(403, content=CHALLENGE)]), retries=0)
+    setup.fetchers = {
+        Escalation.IMPERSONATE: FakeFetcher("impersonate", [page(403, CHALLENGE)]),
+        Escalation.BROWSER: FakeFetcher("browser", [TransportError("no document")]),
+        Escalation.NODRIVER: FakeFetcher("nodriver", [page()]),
+    }
+
+    async with setup.client(Profile.BROWSER) as client:
+        response = await client.get(URL)
+
+    assert response.text == "<html>ok</html>"
+    assert setup.created == [Escalation.IMPERSONATE, Escalation.BROWSER, Escalation.NODRIVER]
+
+
+@pytest.mark.asyncio
+async def test_missing_required_page_state_tries_next_transport() -> None:
+    setup = Setup(Server([httpx.Response(200, content=b"<html>challenge</html>")]))
+    setup.fetchers = {
+        Escalation.IMPERSONATE: FakeFetcher("impersonate", [page(200, b"<script>ready</script>")]),
+    }
+
+    async with setup.client(
+        Profile.BROWSER,
+        escalation=Escalation.IMPERSONATE,
+        required_marker=b"ready",
+    ) as client:
+        response = await client.get(URL)
+
+    assert response.text == "<script>ready</script>"
 
 
 @pytest.mark.asyncio

@@ -56,7 +56,9 @@ class BandcampAdapter(HttpAdapter):
         """Use plain HTTP for Bandcamp's JSON endpoints."""
         if self._api_client is None:
             self._api_client = HttpClient(
-                self.client_spec(Profile.API), self.config, self.resources,
+                self.client_spec(Profile.API),
+                self.config,
+                self.resources,
             )
         return self._api_client
 

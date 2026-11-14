@@ -15,7 +15,6 @@ from deadwax import (
     DiscogsSettings,
     Dossier,
     EntityKind,
-    Escalation,
     HttpSettings,
     LastfmSettings,
     Query,
@@ -213,7 +212,7 @@ def config(scenario: str, live: frozenset[str]) -> SourcesConfig:
     token = os.environ.get("DEADWAX_DISCOGS__TOKEN") if "discogs" in live else None
     lastfm_key = os.environ.get("DEADWAX_LASTFM__API_KEY") if "lastfm" in live else None
     return SourcesConfig(
-        http=HttpSettings(escalation=Escalation.NONE),
+        http=HttpSettings(escalation=()),
         adapter_timeout=180,
         discogs=DiscogsSettings(token=SecretStr(token) if token else None),
         lastfm=LastfmSettings(api_key=SecretStr(lastfm_key) if lastfm_key else None),

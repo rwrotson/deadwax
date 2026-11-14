@@ -64,7 +64,7 @@ def make(
     config = SourcesConfig.model_validate(
         {
             "youtube": {"rate": 1000, "api_key": "k3y"},
-            "http": {"retries": 0, "escalation": "none"},
+            "http": {"retries": 0, "escalation": []},
         },
     )
     return YouTubeAdapter(config, HttpResources(transport=httpx.MockTransport(handler))), seen

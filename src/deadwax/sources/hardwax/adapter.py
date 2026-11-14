@@ -33,7 +33,9 @@ class HardWaxAdapter(SearchPageAdapter):
         """Use plain HTTP for the JSON search feed."""
         if self._feed_client is None:
             self._feed_client = HttpClient(
-                self.client_spec(Profile.API), self.config, self.resources,
+                self.client_spec(Profile.API),
+                self.config,
+                self.resources,
             )
         return self._feed_client
 

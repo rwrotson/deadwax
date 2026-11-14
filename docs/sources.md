@@ -134,7 +134,7 @@ The README lists sources planned for later versions and those deadwax will not u
 ## Beatport
 
 - **Group:** `streaming`; opt-in.
-- **Access:** scraped pages; the record lives in the Next.js state (`__NEXT_DATA__`) of search, track, and release pages. Beatport answers plain requests with a Cloudflare challenge, so it needs the escalation ladder (`deadwax[stealth]` or `deadwax[browser]`); otherwise it reports `blocked`.
+- **Access:** scraped pages; the record lives in the Next.js state (`__NEXT_DATA__`) of search, track, and release pages. A rendered page without that state triggers the next HTML transport. Beatport answers plain requests with a Cloudflare challenge; each available transport may still be blocked.
 - **Finds the record by:** a Beatport track or release URL in the query or from an earlier source, else a track or release search through the matching gate. Each result's mix name is part of its title, so an Extended Mix found for an Original Mix query becomes an `other_version` relation.
 - **Contributes:** for a track: artist (remixers apart), title with mix name and the version it denotes, the release's date, tempo, key, ISRC, label and catalog number; genre and sub-genre as `genre` and `style` tags; remixers as credits; the DJ charts that list it as `charted_by` relations; the page's link. For a release: artist, title, date, barcode, label and catalog number, remixers, and the link; release pages list no genres or tempos.
 

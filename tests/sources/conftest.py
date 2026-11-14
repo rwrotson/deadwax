@@ -75,7 +75,7 @@ def fast_config(**changes: object) -> SourcesConfig:
     fields["spotify"] = {**FAST, "client_id": "test-id", "client_secret": "test-secret"}
     fields["youtube"] = {**FAST, "api_key": "test-key"}
     fields["soundcloud"] = {**FAST, "client_id": "test-id"}
-    fields["http"] = {"escalation": "none"}
+    fields["http"] = {"escalation": []}
     return SourcesConfig.model_validate(fields | changes)
 
 

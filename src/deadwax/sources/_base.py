@@ -52,6 +52,7 @@ class HttpAdapter(ABC):
     # User-Agent replacing the profile's one unless the source's settings name another.
     default_user_agent: str | None = None
     secret_params: frozenset[str] = frozenset()
+    required_marker: bytes | None = None
 
     def __init__(self, config: SourcesConfig, resources: HttpResources) -> None:
         self.config = config
@@ -98,7 +99,7 @@ class HttpAdapter(ABC):
         headers = dict(self.headers())
         if (user_agent := self.user_agent()) is not None:
             headers["user-agent"] = user_agent
-        return ClientSpec(self.name, profile, headers, self.secret_params)
+        return ClientSpec(self.name, profile, headers, self.secret_params, self.required_marker)
 
     @property
     def client(self) -> HttpClient:

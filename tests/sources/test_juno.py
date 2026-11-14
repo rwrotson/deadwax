@@ -88,7 +88,7 @@ def make(
         return httpx.Response(200, content=(PAGES / f"{name}.html").read_bytes())
 
     config = SourcesConfig.model_validate(
-        {"juno": {"rate": 1000}, "http": {"retries": 0, "escalation": "none"}},
+        {"juno": {"rate": 1000}, "http": {"retries": 0, "escalation": []}},
     )
     return JunoAdapter(config, HttpResources(transport=httpx.MockTransport(handler))), seen
 

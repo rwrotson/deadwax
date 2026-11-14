@@ -159,6 +159,7 @@ class ClientSpec:
     profile: Profile = Profile.API
     headers: Mapping[str, str] = field(default_factory=dict)
     secret_params: frozenset[str] = frozenset()
+    required_marker: bytes | None = None
 
 
 class HttpClient:
@@ -365,11 +366,21 @@ class HttpClient:
         safe_url = redact(request.full_url, self.spec.secret_params)
         reason = ""
         tried: list[str] = []
+        challenged = False
         level = self._level
         while level < len(self._steps):
             try:
                 fetcher = self._fetcher(level)
                 response = await self._attempt(fetcher, request, safe_url, exchange)
+            except TransportError as error:
+                error.url = error.url or safe_url
+                if level == len(self._steps) - 1:
+                    raise
+                step = self._steps[level]
+                self._unavailable.append(f"{step} failed: {error}")
+                trace(logger, "http.step_failed", step=step, reason=str(error))
+                level += 1
+                continue
             except SourceError as error:
                 error.url = error.url or safe_url
                 raise
@@ -378,14 +389,30 @@ class HttpClient:
                 continue
             tried.append(fetcher.name)
             challenge = detect_challenge(response.status, response.headers, response.content)
-            if challenge is None:
+            marker_missing = (
+                self.spec.required_marker is not None
+                and self.spec.required_marker not in response.content
+            )
+            if challenge is None and not marker_missing:
                 self._level = level
                 return response
-            reason = challenge
-            trace(logger, "http.challenge", url=safe_url, challenge=challenge, fetcher=fetcher.name)
+            if challenge is not None:
+                challenged = True
+                reason = challenge
+                trace(
+                    logger,
+                    "http.challenge",
+                    url=safe_url,
+                    challenge=challenge,
+                    fetcher=fetcher.name,
+                )
+            else:
+                reason = "required page state missing"
+                trace(logger, "http.page_incomplete", url=safe_url, fetcher=fetcher.name)
             level += 1
         unavailable = f"; {'; '.join(self._unavailable)}" if self._unavailable else ""
-        raise BlockedError(f"{reason} (tried {', '.join(tried)}{unavailable})", url=safe_url)
+        failure_type = BlockedError if challenged else SourceError
+        raise failure_type(f"{reason} (tried {', '.join(tried)}{unavailable})", url=safe_url)
 
     async def _drop_step(self, level: int, error: ConfigurationError) -> None:
         """Skip one unavailable transport and continue with the next."""
