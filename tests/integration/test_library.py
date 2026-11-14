@@ -8,10 +8,12 @@ from deadwax import (
     Dossier,
     EntityKind,
     ErrorKind,
+    GeniusSettings,
     LastfmSettings,
     SoundCloudSettings,
     SourcesConfig,
     SpotifySettings,
+    TextKind,
     YouTubeSettings,
     lookup,
     parse_query,
@@ -27,6 +29,7 @@ SPOTIFY_ID = os.environ.get("DEADWAX_SPOTIFY__CLIENT_ID")
 SPOTIFY_SECRET = os.environ.get("DEADWAX_SPOTIFY__CLIENT_SECRET")
 YOUTUBE_KEY = os.environ.get("DEADWAX_YOUTUBE__API_KEY")
 SOUNDCLOUD_ID = os.environ.get("DEADWAX_SOUNDCLOUD__CLIENT_ID")
+GENIUS_TOKEN = os.environ.get("DEADWAX_GENIUS__TOKEN")
 
 # Tracks from a personal library as "Artist - Title" from their tags. Tracks of compilations
 # tagged "Various Artists" use the artist from the title, and an untagged file its name.
@@ -75,6 +78,7 @@ def live_config() -> SourcesConfig:
         ),
         youtube=YouTubeSettings(api_key=_secret(YOUTUBE_KEY)),
         soundcloud=SoundCloudSettings(client_id=_secret(SOUNDCLOUD_ID)),
+        genius=GeniusSettings(token=_secret(GENIUS_TOKEN)),
     )
 
 
@@ -129,3 +133,20 @@ async def test_library_track(
     assert identity.version.kind is parse_title(query.title).version.kind
     if not query.artist.isascii():
         assert not identity.artist.value.isascii(), "non-Latin names are not transliterated"
+
+
+@pytest.mark.enable_socket
+@pytest.mark.timeout(120)
+@pytest.mark.asyncio
+async def test_genius_song(live_report: list[str]) -> None:
+    if GENIUS_TOKEN is None:
+        pytest.skip("Genius token is unavailable")
+    query = parse_query("Kanye West - Stronger", EntityKind.TRACK)
+    dossier = await lookup(query, live_config(), include=["genius"])
+
+    live_report.append(summary("genius_stronger", dossier))
+    assert dossier.found
+    assert dossier.credits
+    assert dossier.relations
+    assert any(text.kind is TextKind.USER for text in dossier.texts)
+    assert any(text.kind is TextKind.LYRICS and text.body for text in dossier.texts)

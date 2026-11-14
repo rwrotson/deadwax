@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–13 done; Stage 14 implemented, live verification pending (Phonica, Boomkat, and Norman Records deferred for blocked access).
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–14 done (Phonica, Boomkat, and Norman Records deferred for blocked access).
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -110,7 +110,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 11 | Done (Beatport not live-verified) | Beatport (Juno Download dropped: shut down); BPM and key. |
 | 12 | Done (Juno live-verified once by the agent) | Shops I: Juno, Hard Wax, Soundohm; shop-text deduplication (Phonica moved to the unscheduled blocking item). |
 | 13 | Done | Shops II: Forced Exposure and Bleep; Nodriver repair. Boomkat and Norman Records deferred after retry. |
-| 14 | Implementation complete (live verification pending) | Genius. |
+| 14 | Done | Genius. |
 | 15 | Not started | Reviews I: AllMusic, Album of the Year. |
 | 16 | Not started | Reviews II: press adapter with per-site rules, Resident Advisor. |
 | 17 | Not started | Radio: NTS, WFMU; context tags. |
@@ -553,7 +553,7 @@ Decision (user): Phonica leaves Stage 12 and joins the unscheduled blocking item
 
 Stage 12 closed: Hard Wax, Soundohm, Juno, and shop-text deduplication meet the acceptance; Juno's live verification is the single agent run recorded above, Hard Wax and Soundohm were live-verified, deduplication is mock-tested only.
 
-**Current task:** Stage 14 implementation complete. **Next action:** live Genius verification when a token is available, then Stage 15.
+**Current task:** Stage 14 complete. **Next action:** Stage 15, reviews I.
 
 ### 2026-11-13 — Stage 13 access check (in progress)
 
@@ -576,6 +576,12 @@ Verification: `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` pass
 Decision (user): store full song lyrics when Genius serves them. Implemented a token-authenticated Genius adapter in the enrichment pass, added it to the default set, and represented lyrics as a `lyrics` text with `work` scope. API description, annotations, writer and producer credits, song relationships and the song link remain available when the separate HTML fetch fails. Missing token yields `skipped`. Added Genius settings, credential instructions, source and output documentation, and import contracts.
 
 Verification: `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (840 tests, 98.17% branch coverage; format, lint, import contracts, strict mypy). Mock transport tests cover API extraction, full lyrics with line breaks, no matching song, absent lyrics, and blocked HTML. `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run --group docs properdocs build --strict` passed after documentation edits. No live Genius lookup was possible: neither the environment nor the local `.env` contains a Genius token. Therefore API payload fields and live HTML behaviour remain unverified; no live runs on the five check records or a Genius-strong record were performed.
+
+### 2026-11-14 — Stage 14 live verification and closure
+
+The user added `DEADWAX_GENIUS__TOKEN` to the untracked `.env`. Live lookups with caching disabled and the default HTML escalation ladder confirmed Genius API fields and full lyrics: *Kanye West — Stronger* returned 20 annotations, 8 credits, 93 relations including samples and interpolations, and lyrics; *Radiohead — Paranoid Android* returned 13 annotations, 9 credits, relations, and lyrics; *Everything but the Girl — Missing (Todd Terry Remix)* returned the remix with lyrics, 5 credits, and a `remix_of` relation. Both album check records returned no Genius facts, as intended for a song-only adapter. *Кино — Группа крови* returned `not_found` because the search had no exact match. A plain HTTP fetch met Cloudflare; the configured escalation ladder retrieved the HTML page. No token or lyric body was recorded.
+
+Added the Genius token to the opt-in integration configuration and a live invariant test. The targeted live test passed (one test, 11.68 s). `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (840 offline tests, 98.17% branch coverage; format, lint, import contracts, strict mypy). The full `poe test-live` suite was not run; the live check was limited to the new source and the five acceptance records.
 
 ## Resume instructions
 
