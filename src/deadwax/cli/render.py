@@ -154,7 +154,11 @@ def _texts(dossier: Dossier) -> list[Text | Table]:
         header.append_text(_sources(text.sources))
         parts.append(header)
         if text.body.strip():
-            body = text.body if len(text.body) <= _TEXT_LIMIT else text.body[:_TEXT_LIMIT] + "…"
+            body = (
+                text.body
+                if text.kind.value == "lyrics" or len(text.body) <= _TEXT_LIMIT
+                else text.body[:_TEXT_LIMIT] + "…"
+            )
             parts.append(Text(body))
     return parts
 

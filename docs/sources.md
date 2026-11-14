@@ -163,6 +163,12 @@ The README lists sources planned for later versions and those deadwax will not u
 
 Both are opt-in `shops` sources and search release titles through the matching gate. Forced Exposure gives label copy, genre, date, label, catalog number, and related releases. Bleep gives editorial copy, genre sections, date, label, catalog number, and an `appears_on` relation when a track is found on a release. Both try Patchright first. Boomkat and Norman Records remain deferred because their product pages answer Cloudflare challenges even through Nodriver with a working Chrome for Testing executable.
 
+## Genius
+
+- **Access:** Genius API with `DEADWAX_GENIUS__TOKEN`; the song page is fetched separately for lyrics. Without a token the source is `skipped`.
+- **Finds the record by:** track search through the matching gate. Album queries contribute no facts.
+- **Contributes:** description and annotations as texts, writers and producers as credits, samples, covers, remixes and interpolations as directional relations, a song link, and full lyrics when present in the page HTML. A blocked page leaves API facts available and records an error.
+
 ## Escalation ladder
 
 Bandcamp, Beatport, Hard Wax, Soundohm, and Juno pages, the song.link page, and Discogs review pages use browser-like headers, HTTP/2, and cookies. When the response is a challenge page (Cloudflare, Akamai, DataDome, PerimeterX, Fastly, Sucuri, or a captcha on 403/429/503), the client switches to a stronger transport and keeps using it for that source:

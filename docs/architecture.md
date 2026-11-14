@@ -46,7 +46,7 @@ From top to bottom:
 
 ```
 deadwax.sources.lookup        composition: builds adapters and runs the orchestrator
-musicbrainz | itunes | deezer | odesli | discogs | bandcamp | lastfm | wikipedia | listenbrainz | secondhandsongs | kexp | spotify | youtube | soundcloud | beatport | hardwax | soundohm | juno | bleep | forcedexposure
+musicbrainz | itunes | deezer | odesli | discogs | bandcamp | lastfm | wikipedia | listenbrainz | secondhandsongs | kexp | spotify | youtube | soundcloud | beatport | hardwax | soundohm | juno | bleep | forcedexposure | genius
 deadwax.sources._base | _html adapter base class, service names of URLs, search keys | HTML and JSON-LD helpers
 deadwax.sources._http
 deadwax.sources.config

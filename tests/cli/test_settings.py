@@ -143,5 +143,5 @@ def test_default_source_set_matches_the_library() -> None:
     assert (
         load_settings().default_sources
         == SourcesConfig().default_sources
-        == ("core", "listenbrainz", "secondhandsongs", "kexp", "spotify", "youtube")
+        == ("core", "listenbrainz", "secondhandsongs", "kexp", "spotify", "youtube", "genius")
     )

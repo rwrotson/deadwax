@@ -81,6 +81,7 @@ Every source is described in detail in [the sources guide](https://rwrotson.gith
 | Forced Exposure | implemented, opt-in | label copy, genre, release date, label, catalog number, related releases | Patchright first; albums only |
 | Bleep | implemented, opt-in | editorial description, genres, release date, label, catalog number, tracklist | Patchright first |
 | SoundCloud | implemented, opt-in, needs `soundcloud.client_id` | uploader descriptions, genre and tags, plays, likes and reposts, notable reposting accounts, uploads absent elsewhere (edits, bootlegs) as other versions; resolves SoundCloud URLs | no new API apps: the web client's ID changes now and then and must be replaced by hand |
+| Genius | implemented, default, needs `genius.token` | song description, annotations, credits, song relations, full lyrics when available | API facts remain when the HTML page is blocked |
 
 Names written in a non-Latin script are compared as written: a store that lists "Кино" as "Kino" is reported as `no_match`.
 
@@ -90,7 +91,7 @@ Names written in a non-Latin script are compared as written: a store that lists 
 |-------|---------|---------|
 | Shops | Boomkat, Norman | access blocked by Cloudflare |
 | Reviews and press | AllMusic, Resident Advisor (GraphQL), press reviews through one adapter with per-site rules | |
-| Catalogues and communities | Rate Your Music, Genius, Album of the Year | Rate Your Music only through a browser |
+| Catalogues and communities | Rate Your Music, Album of the Year | Rate Your Music only through a browser |
 | Radio and mixes | NTS, 1001Tracklists, WFMU | |
 | Samples | WhoSampled | needs a separate decision on its terms of service |
 
@@ -114,6 +115,7 @@ Sources without their credential are `skipped` (or, where noted, work with less)
 | `DEADWAX_SPOTIFY__CLIENT_ID`, `DEADWAX_SPOTIFY__CLIENT_SECRET` | Spotify | for every lookup |
 | `DEADWAX_YOUTUBE__API_KEY` | YouTube | for every lookup |
 | `DEADWAX_SOUNDCLOUD__CLIENT_ID` | SoundCloud | for every lookup |
+| `DEADWAX_GENIUS__TOKEN` | Genius | for every lookup |
 
 **Discogs token.** Sign in at discogs.com, open [Settings → Developers](https://www.discogs.com/settings/developers), and press **Generate new token**. Copy the personal access token into `DEADWAX_DISCOGS__TOKEN`.
 
@@ -126,6 +128,8 @@ Sources without their credential are `skipped` (or, where noted, work with less)
 **YouTube Data API key.** In the [Google Cloud console](https://console.cloud.google.com/), create a project, open **APIs & Services → Library**, and enable **YouTube Data API v3**. Then **APIs & Services → Credentials → Create credentials → API key**; restricting the key to YouTube Data API v3 is advised. Put it into `DEADWAX_YOUTUBE__API_KEY`. The free quota of 10,000 units a day allows about 100 lookups (100 units a search).
 
 **SoundCloud client ID.** SoundCloud registers no new API apps. The client ID of an app registered earlier (soundcloud.com/you/apps) works and does not change. Otherwise copy the ID of SoundCloud's web client by hand: open soundcloud.com with the browser's developer tools on the **Network** tab, filter for `api-v2`, and copy the `client_id` parameter (32 characters) of any request to `api-v2.soundcloud.com` into `DEADWAX_SOUNDCLOUD__CLIENT_ID`. Using the web client's ID is unofficial, and SoundCloud changes it now and then: when deadwax reports "is soundcloud.client_id stale?", copy it again.
+
+**Genius token.** Sign in at [Genius API Clients](https://genius.com/api-clients), create an API client, open its details, and copy the client access token into `DEADWAX_GENIUS__TOKEN`.
 
 ## Development
 

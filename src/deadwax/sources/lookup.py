@@ -12,6 +12,7 @@ from deadwax.sources.config import SourcesConfig
 from deadwax.sources.deezer import DeezerAdapter
 from deadwax.sources.discogs import DiscogsAdapter
 from deadwax.sources.forcedexposure import ForcedExposureAdapter
+from deadwax.sources.genius import GeniusAdapter
 from deadwax.sources.hardwax import HardWaxAdapter
 from deadwax.sources.itunes import ItunesAdapter
 from deadwax.sources.juno import JunoAdapter
@@ -50,6 +51,7 @@ ADAPTERS: tuple[type[HttpAdapter], ...] = (
     JunoAdapter,
     ForcedExposureAdapter,
     BleepAdapter,
+    GeniusAdapter,
 )
 
 

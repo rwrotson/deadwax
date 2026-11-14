@@ -19,6 +19,7 @@ from deadwax import (
     CacheSettings,
     ConfigurationError,
     DiscogsSettings,
+    GeniusSettings,
     HttpSettings,
     LastfmSettings,
     SecondHandSongsSettings,
@@ -88,6 +89,7 @@ class Settings(BaseSettings):
     kexp: SourceSettings = Field(default_factory=SourceSettings)
     spotify: SpotifySettings = Field(default_factory=SpotifySettings)
     youtube: YouTubeSettings = Field(default_factory=YouTubeSettings)
+    genius: GeniusSettings = Field(default_factory=GeniusSettings)
     soundcloud: SoundCloudSettings = Field(default_factory=SoundCloudSettings)
     beatport: SourceSettings = Field(default_factory=SourceSettings)
     hardwax: SourceSettings = Field(default_factory=SourceSettings)

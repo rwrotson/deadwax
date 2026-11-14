@@ -67,7 +67,10 @@ Relation kinds are directional:
 | `similar` | Similar records or artists according to a source |
 | `other_version` | Another version of the same work, kept apart from the identity |
 
+Genius song lyrics appear as a full `lyrics` text with `work` scope when the page contains them. JSON, Markdown, and terminal output retain the complete text.
+
 ## Errors
+
 
 `errors` lists sources that contributed nothing or only part of what they could. Each has `source`, `kind`, `reason`, and sometimes `url`:
 

@@ -60,6 +60,7 @@ DEFAULT_SOURCES: tuple[str, ...] = (
     "kexp",
     "spotify",
     "youtube",
+    "genius",
 )
 
 
@@ -214,6 +215,12 @@ class YouTubeSettings(SourceSettings):
     api_key: SecretStr | None = Field(default=None, description="YouTube Data API key")
 
 
+class GeniusSettings(SourceSettings):
+    """Settings of the Genius source."""
+
+    token: SecretStr | None = Field(default=None, description="Genius API client access token")
+
+
 class SoundCloudSettings(SourceSettings):
     """Settings of the SoundCloud source."""
 
@@ -248,6 +255,7 @@ DEFAULT_RATES: dict[str, float] = {
     "juno": 0.5,
     "bleep": 0.5,
     "forcedexposure": 0.5,
+    "genius": 1.0,
 }
 
 DEFAULT_HTML_TRANSPORTS: tuple[Escalation, ...] = (
@@ -304,6 +312,7 @@ class SourcesConfig(_Model):
     kexp: SourceSettings = SourceSettings()
     spotify: SpotifySettings = SpotifySettings()
     youtube: YouTubeSettings = YouTubeSettings()
+    genius: GeniusSettings = GeniusSettings()
     soundcloud: SoundCloudSettings = SoundCloudSettings()
     beatport: SourceSettings = SourceSettings()
     hardwax: SourceSettings = SourceSettings()

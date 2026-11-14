@@ -97,7 +97,11 @@ async def test_mainstream_track(replay: Replay, config: SourcesConfig) -> None:
         link.service for link in dossier.links
     }
     assert "alternative rock" in tags_from(dossier, "discogs")
-    assert errors(dossier) == {"deezer": ErrorKind.BLOCKED, "discogs": ErrorKind.BLOCKED}
+    assert errors(dossier) == {
+        "deezer": ErrorKind.BLOCKED,
+        "discogs": ErrorKind.BLOCKED,
+        "genius": ErrorKind.SKIPPED,
+    }
     reviews = next(e for e in dossier.errors if e.source == "discogs")
     assert reviews.reason.startswith("reviews:")
     assert {"pandora", "yandex"} <= {
@@ -428,7 +432,7 @@ def test_describe_sources() -> None:
     assert list(sources) == [
         "spotify", "musicbrainz", "odesli", "itunes", "deezer", "discogs", "bandcamp", "lastfm",
         "wikipedia", "listenbrainz", "secondhandsongs", "kexp", "youtube", "soundcloud",
-        "beatport", "hardwax", "soundohm", "juno", "forcedexposure", "bleep",
+        "beatport", "hardwax", "soundohm", "juno", "forcedexposure", "bleep", "genius",
     ]  # fmt: skip
     assert sources["musicbrainz"].pass_ is Pass.IDENTITY
     assert sources["odesli"].status.ready

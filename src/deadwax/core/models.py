@@ -63,6 +63,7 @@ class TextKind(StrEnum):
     SHOP = "shop"
     WIKI = "wiki"
     USER = "user"
+    LYRICS = "lyrics"
 
     # Host's note on a radio play or show.
     BROADCAST = "broadcast"
@@ -85,6 +86,8 @@ class RelationKind(StrEnum):
     REMIXED_BY = "remixed_by"
     SAMPLES = "samples"
     SAMPLED_BY = "sampled_by"
+    INTERPOLATES = "interpolates"
+    INTERPOLATED_BY = "interpolated_by"
     REPOSTED_BY = "reposted_by"
 
     # A DJ's chart that lists the record; the target's artist is the DJ.
