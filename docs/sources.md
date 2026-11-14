@@ -204,4 +204,6 @@ By default HTTP transports use proxy variables from the environment; browsers us
 
 A page refused on one route does not count as refused on another: changing a source's proxy ignores its cached `blocked` entries.
 
+For a local browser check, set `DEADWAX_HTTP__BROWSER_HEADLESS=false` and `DEADWAX_HTTP__PATCHRIGHT_CHANNEL=chrome` after installing Chrome. This Patchright mode uses a temporary profile without a custom user agent, language header, or viewport. Nodriver can use the same visible mode and its existing executable path setting. Browser transports return a ready page immediately; they wait up to `DEADWAX_HTTP__BROWSER_CHALLENGE_WAIT` seconds (default 5) only while a challenge or required page marker remains. Browser profiles are removed after the lookup. Use `--no-cache --timeout 60` when comparing browser transports on protected sources.
+
 All sources share per-host rate limits with jitter, bounded retries with backoff that honours `Retry-After`, a response size cap, and the response cache (`--no-cache` bypasses it).

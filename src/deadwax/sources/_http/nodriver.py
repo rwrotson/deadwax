@@ -6,6 +6,7 @@ from typing import Protocol, cast
 from urllib.parse import urlsplit, urlunsplit
 
 from deadwax.core import ConfigurationError, SourceError
+from deadwax.sources._http.challenge import detect_challenge
 from deadwax.sources._http.messages import (
     Request,
     Response,
@@ -62,6 +63,7 @@ MISSING_EXTRA = (
 )
 MISSING_BROWSER = "Chrome for Nodriver is not installed"
 _MIN_HTTP_STATUS = 100
+_POLL_SECONDS = 0.25
 
 
 def _chrome_error_page(content: bytes) -> bool:
@@ -128,6 +130,7 @@ class NodriverFetcher:
         headless: bool = True,
         browser_path: Path | None = None,
         sandbox: bool = True,
+        challenge_wait: float = 5.0,
     ) -> None:
         try:
             _module()
@@ -139,6 +142,7 @@ class NodriverFetcher:
         self._headless = headless
         self._browser_path = browser_path
         self._sandbox = sandbox
+        self._challenge_wait = challenge_wait
         self._browser: _Browser | None = None
 
     async def _open(self) -> _Browser:
@@ -188,17 +192,44 @@ class NodriverFetcher:
         try:
             await asyncio.wait_for(tab.send(vars(network)["enable"]()), timeout=self._timeout)
             await asyncio.wait_for(tab.get(request.full_url), timeout=self._timeout)
-            await asyncio.wait_for(tab.sleep(1), timeout=self._timeout)
-            content = (await asyncio.wait_for(tab.get_content(), timeout=self._timeout)).encode()
-            if _chrome_error_page(content):
-                raise TransportError("Chrome could not load the page")
-            url = tab.url
-            navigation_status = await _navigation_status(tab, responses, self._timeout)
+            response = await self._ready_response(tab, request, responses)
         except (TimeoutError, OSError, RuntimeError) as error:
             raise TransportError(f"{type(error).__name__}: {error}") from error
         finally:
             await tab.close()
-        return _page_response(url, content, responses, navigation_status, self._max_bytes)
+        return response
+
+    async def _ready_response(
+        self,
+        tab: _Tab,
+        request: Request,
+        responses: list[_NavigationResponse],
+    ) -> Response:
+        deadline = asyncio.get_running_loop().time() + self._challenge_wait
+        while True:
+            content = (await asyncio.wait_for(tab.get_content(), timeout=self._timeout)).encode()
+            if _chrome_error_page(content):
+                raise TransportError("Chrome could not load the page")
+            navigation_status = await _navigation_status(tab, responses, self._timeout)
+            response = _page_response(
+                tab.url,
+                content,
+                responses,
+                navigation_status,
+                self._max_bytes,
+            )
+            incomplete = (
+                request.required_marker is not None and request.required_marker not in content
+            )
+            if (
+                not incomplete
+                and detect_challenge(response.status, response.headers, content) is None
+            ):
+                return response
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                return response
+            await asyncio.sleep(min(_POLL_SECONDS, remaining))
 
     async def aclose(self) -> None:
         """Stop the browser and discard its temporary profile."""

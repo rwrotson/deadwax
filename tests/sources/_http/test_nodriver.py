@@ -17,6 +17,7 @@ class FakeTab:
     status: int | None = 200
     url: str = "about:blank"
     content: str = "<html>ready</html>"
+    content_sequence: list[str] = field(default_factory=list)
     navigation_status: int = 200
     callback: Callable[[object], None] | None = None
     closed: bool = False
@@ -48,6 +49,8 @@ class FakeTab:
         pass
 
     async def get_content(self) -> str:
+        if self.content_sequence:
+            return self.content_sequence.pop(0)
         return self.content
 
     async def close(self) -> None:
@@ -181,6 +184,29 @@ async def test_explicit_browser_and_sandbox_settings(scenario: Scenario) -> None
             "sandbox": False,
         },
     ]
+
+
+@pytest.mark.asyncio
+async def test_waits_for_required_page_state(scenario: Scenario) -> None:
+    scenario.tab.content_sequence = ["<html>loading</html>", "<html>READY</html>"]
+    fetcher = NodriverFetcher(timeout=5, max_bytes=100, challenge_wait=1)
+
+    response = await fetcher.fetch(
+        Request("GET", "https://example.test/page", required_marker=b"READY"),
+    )
+
+    assert response.text == "<html>READY</html>"
+
+
+@pytest.mark.asyncio
+async def test_returns_incomplete_page_when_wait_expires(scenario: Scenario) -> None:
+    fetcher = NodriverFetcher(timeout=5, max_bytes=100, challenge_wait=0)
+
+    response = await fetcher.fetch(
+        Request("GET", "https://example.test/page", required_marker=b"MISSING"),
+    )
+
+    assert b"MISSING" not in response.content
 
 
 @pytest.mark.asyncio

@@ -1,8 +1,10 @@
-import contextlib
+import asyncio
+import tempfile
 from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urlsplit, urlunsplit
 
 from deadwax.core import ConfigurationError, SourceError
+from deadwax.sources._http.challenge import detect_challenge
 from deadwax.sources._http.messages import (
     Request,
     Response,
@@ -13,7 +15,7 @@ from deadwax.sources._http.profiles import CHROME, BrowserIdentity
 from deadwax.sources.config import DIRECT
 
 if TYPE_CHECKING:
-    from patchright.async_api import Browser, BrowserContext, Playwright
+    from patchright.async_api import Browser, BrowserContext, Page, Playwright
     from patchright.async_api import Response as PageResponse
 
 MISSING_EXTRA = (
@@ -22,8 +24,7 @@ MISSING_EXTRA = (
 )
 MISSING_BROWSER = "Chromium for Patchright is not installed: run 'patchright install chromium'"
 
-# A challenge page reloads itself once solved; this bounds the wait for that, in milliseconds.
-_SETTLE_MS = 5000.0
+_POLL_SECONDS = 0.25
 
 
 def launch_proxy(proxy: str | None) -> dict[str, Any]:
@@ -46,7 +47,7 @@ class BrowserFetcher:
 
     name = "browser"
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 -- independent browser launch and request settings
         self,
         *,
         timeout: float,
@@ -54,6 +55,8 @@ class BrowserFetcher:
         identity: BrowserIdentity = CHROME,
         proxy: str | None = None,
         headless: bool = True,
+        channel: str = "chromium",
+        challenge_wait: float = 5.0,
     ) -> None:
         try:
             import patchright.async_api  # noqa: F401, PLC0415 -- optional extra (R7)
@@ -64,6 +67,9 @@ class BrowserFetcher:
         self._identity = identity
         self._proxy = proxy
         self._headless = headless
+        self._channel = channel
+        self._challenge_wait = challenge_wait
+        self._profile: tempfile.TemporaryDirectory[str] | None = None
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
@@ -74,6 +80,16 @@ class BrowserFetcher:
         if self._context is None:
             self._playwright = await async_playwright().start()
             try:
+                if self._channel == "chrome":
+                    self._profile = tempfile.TemporaryDirectory(prefix="deadwax-patchright-")
+                    self._context = await self._playwright.chromium.launch_persistent_context(
+                        user_data_dir=self._profile.name,
+                        channel="chrome",
+                        headless=self._headless,
+                        no_viewport=True,
+                        **launch_proxy(self._proxy),
+                    )
+                    return self._context
                 self._browser = await self._playwright.chromium.launch(
                     headless=self._headless,
                     **launch_proxy(self._proxy),
@@ -112,11 +128,7 @@ class BrowserFetcher:
                 timeout=self._timeout_ms,
             )
 
-            # Pages that keep polling never become idle; the DOM is loaded by then anyway.
-            with contextlib.suppress(Error):
-                await page.wait_for_load_state("networkidle", timeout=_SETTLE_MS)
-
-            content = (await page.content()).encode()
+            content = await self._ready_content(page, request, navigations)
             final = navigations[-1] if navigations else None
             headers = await final.all_headers() if final is not None else {}
             url = page.url
@@ -131,6 +143,27 @@ class BrowserFetcher:
         status = final.status
         return Response(url=url, status=status, content=content, headers=headers)
 
+    async def _ready_content(
+        self,
+        page: Page,
+        request: Request,
+        navigations: list[PageResponse],
+    ) -> bytes:
+        deadline = asyncio.get_running_loop().time() + self._challenge_wait
+        while True:
+            content = (await page.content()).encode()
+            final = navigations[-1] if navigations else None
+            status = final.status if final is not None else 200
+            incomplete = (
+                request.required_marker is not None and request.required_marker not in content
+            )
+            if not incomplete and detect_challenge(status, {}, content) is None:
+                return content
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                return content
+            await asyncio.sleep(min(_POLL_SECONDS, remaining))
+
     async def aclose(self) -> None:
         """Close the browser and stop Patchright."""
         if self._context is not None:
@@ -139,4 +172,7 @@ class BrowserFetcher:
             await self._browser.close()
         if self._playwright is not None:
             await self._playwright.stop()
+        if self._profile is not None:
+            self._profile.cleanup()
+            self._profile = None
         self._context = self._browser = self._playwright = None

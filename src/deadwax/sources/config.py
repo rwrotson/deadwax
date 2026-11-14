@@ -104,7 +104,9 @@ class HttpSettings(_Model):
     patchright_channel: str = Field(
         default="chromium",
         pattern="^(chromium|chrome)$",
-        description="Patchright browser: bundled Chromium or installed Chrome with a temporary profile",
+        description=(
+            "Patchright browser: bundled Chromium or installed Chrome with a temporary profile"
+        ),
     )
     browser_challenge_wait: float = Field(
         default=5.0,

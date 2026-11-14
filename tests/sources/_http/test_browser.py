@@ -1,7 +1,9 @@
+import asyncio
 import sys
 import types
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pytest
 
@@ -27,6 +29,7 @@ class Scenario:
     """What the fake browser does; tests change it before fetching."""
 
     html: str = "<html>page</html>"
+    html_sequence: list[str] = field(default_factory=list)
     statuses: list[int] = field(default_factory=lambda: [403, 200])
     launch_fails: bool = False
     goto_fails: bool = False
@@ -85,6 +88,8 @@ class FakePage:
             raise FakeError("Timeout")
 
     async def content(self) -> str:
+        if self.scenario.html_sequence:
+            return self.scenario.html_sequence.pop(0)
         return self.scenario.html
 
     async def close(self) -> None:
@@ -125,6 +130,10 @@ class FakeChromium:
         if self.scenario.launch_fails:
             raise FakeError("Executable doesn't exist")
         return FakeBrowser(self.scenario)
+
+    async def launch_persistent_context(self, **options: object) -> FakeContext:
+        self.scenario.launches.append(options)
+        return FakeContext(self.scenario)
 
 
 @dataclass
@@ -231,6 +240,46 @@ async def test_chromium_is_launched_with_the_proxy(scenario: Scenario) -> None:
     assert scenario.launches == [
         {"headless": True, "proxy": {"server": "http://proxy.example:8080"}},
     ]
+
+
+@pytest.mark.asyncio
+async def test_chrome_uses_a_temporary_profile_without_identity_overrides(
+    scenario: Scenario,
+) -> None:
+    fetcher = BrowserFetcher(timeout=5, max_bytes=100, headless=False, channel="chrome")
+
+    await fetcher.fetch(PAGE)
+    profile = scenario.launches[0]["user_data_dir"]
+    await fetcher.aclose()
+
+    assert scenario.launches[0]["channel"] == "chrome"
+    assert scenario.launches[0]["headless"] is False
+    assert scenario.launches[0]["no_viewport"] is True
+    assert scenario.contexts == []
+    assert scenario.closed == ["context", "playwright"]
+    assert isinstance(profile, str)
+    assert not await asyncio.to_thread(Path(profile).exists)
+
+
+@pytest.mark.asyncio
+async def test_browser_waits_for_required_page_state(scenario: Scenario) -> None:
+    scenario.html_sequence = ["<html>loading</html>", "<html>READY</html>"]
+    fetcher = BrowserFetcher(timeout=5, max_bytes=100, challenge_wait=1)
+
+    response = await fetcher.fetch(
+        Request("GET", PAGE.url, required_marker=b"READY"),
+    )
+
+    assert response.text == "<html>READY</html>"
+
+
+@pytest.mark.asyncio
+async def test_browser_returns_incomplete_page_when_wait_expires(scenario: Scenario) -> None:
+    fetcher = BrowserFetcher(timeout=5, max_bytes=100, challenge_wait=0)
+
+    response = await fetcher.fetch(Request("GET", PAGE.url, required_marker=b"MISSING"))
+
+    assert b"MISSING" not in response.content
 
 
 @pytest.mark.parametrize(
