@@ -32,6 +32,7 @@ class Scenario:
     html_sequence: list[str] = field(default_factory=list)
     statuses: list[int] = field(default_factory=lambda: [403, 200])
     launch_fails: bool = False
+    close_fails: bool = False
     goto_fails: bool = False
     never_idle: bool = False
     launches: list[dict[str, object]] = field(default_factory=list)
@@ -107,6 +108,8 @@ class FakeContext:
 
     async def close(self) -> None:
         self.scenario.closed.append("context")
+        if self.scenario.close_fails:
+            raise FakeError("driver connection closed")
 
 
 @dataclass
@@ -288,6 +291,32 @@ async def test_browser_waits_for_required_page_state(scenario: Scenario) -> None
     )
 
     assert response.text == "<html>READY</html>"
+
+
+@pytest.mark.asyncio
+async def test_browser_waits_for_aws_waf_page_to_clear(scenario: Scenario) -> None:
+    scenario.html_sequence = [
+        "<script>window.awsWafCookieDomainList = [];</script>",
+        "<html>ready</html>",
+    ]
+    fetcher = BrowserFetcher(timeout=5, max_bytes=100, challenge_wait=1)
+
+    response = await fetcher.fetch(PAGE)
+
+    assert response.text == "<html>ready</html>"
+
+
+@pytest.mark.asyncio
+async def test_driver_close_error_does_not_mask_navigation_error(scenario: Scenario) -> None:
+    scenario.goto_fails = True
+    scenario.close_fails = True
+    fetcher = BrowserFetcher(timeout=5, max_bytes=100, channel="chrome")
+
+    with pytest.raises(TransportError, match="ERR_CONNECTION_RESET"):
+        await fetcher.fetch(PAGE)
+    await fetcher.aclose()
+
+    assert scenario.closed == ["context", "playwright"]
 
 
 @pytest.mark.asyncio

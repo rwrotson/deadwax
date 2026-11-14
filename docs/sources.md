@@ -183,7 +183,7 @@ Both are opt-in `shops` sources and search release titles through the matching g
 
 ## Escalation ladder
 
-Bandcamp, Beatport, Hard Wax, Soundohm, and Juno pages, the song.link page, and Discogs review pages use browser-like headers, HTTP/2, and cookies. When the response is a challenge page (Cloudflare, Akamai, DataDome, PerimeterX, Fastly, Sucuri, or a captcha on 403/429/503), the client switches to a stronger transport and keeps using it for that source:
+Bandcamp, Beatport, Hard Wax, Soundohm, and Juno pages, the song.link page, and Discogs review pages use browser-like headers, HTTP/2, and cookies. When the response is a challenge page (Cloudflare, Akamai, DataDome, PerimeterX, Fastly, Sucuri, AWS WAF, or a captcha on 403/429/503), the client switches to a stronger transport and keeps using it for that source:
 
 | Step | Requires |
 |------|----------|
@@ -205,6 +205,8 @@ By default HTTP transports use proxy variables from the environment; browsers us
 A page refused on one route does not count as refused on another: changing a source's proxy ignores its cached `blocked` entries.
 
 For a local browser check, set `DEADWAX_HTTP__BROWSER_HEADLESS=false` and `DEADWAX_HTTP__PATCHRIGHT_CHANNEL=chrome` after installing Chrome. This Patchright mode uses a temporary profile without a custom user agent, language header, or viewport. Nodriver can use the same visible mode and its existing executable path setting. Browser transports return a ready page immediately; they wait up to `DEADWAX_HTTP__BROWSER_CHALLENGE_WAIT` seconds (default 5) only while a challenge or required page marker remains. Browser profiles are removed after the lookup. Use `--no-cache --timeout 60` when comparing browser transports on protected sources.
+
+If Chrome leaves a tab at `about:blank` with `net::ERR_INVALID_HANDLE`, it has failed before loading the site's challenge. On this Mac, system Chrome 157 has that failure; Patchright with its bundled Chrome for Testing 156 (`patchright_channel=chromium`) loaded Bleep in both headed and headless modes. Use a separate profile directory when switching Chrome versions.
 
 To keep a browser session between runs, set `DEADWAX_HTTP__PATCHRIGHT_PROFILE_DIR` or `DEADWAX_HTTP__NODRIVER_PROFILE_DIR` to a dedicated directory. Set only the transport you intend to use for that source, for example `DEADWAX_BEATPORT__HTML_TRANSPORTS='["browser"]'`. For the first run, set `DEADWAX_HTTP__BROWSER_HEADLESS=false` and `DEADWAX_HTTP__BROWSER_CHALLENGE_WAIT=120`, then run the lookup with `--no-cache --timeout 180` so there is time to complete a challenge in its window. Later runs reuse that transport's cookies and browser storage; return to the default challenge wait if manual interaction is no longer needed. Do not point either setting at your regular Chrome profile, share one directory between transports, open the same directory in two processes, or commit it. When no profile path is configured, the temporary-profile behavior above remains. A profile can contain login credentials, and a previously solved challenge may still recur.
 

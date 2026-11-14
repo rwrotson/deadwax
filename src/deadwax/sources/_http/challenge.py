@@ -8,6 +8,7 @@ _CHALLENGE_MARKERS = (
     ("captcha-delivery.com", "DataDome captcha"),
     ("/_fs-ch-", "Fastly client challenge"),
     ("sucuri_cloudproxy_js", "Sucuri challenge"),
+    ("awswafcookiedomainlist", "AWS WAF challenge"),
 )
 
 # Captcha widgets also appear on ordinary pages, so they count only on a refusal.

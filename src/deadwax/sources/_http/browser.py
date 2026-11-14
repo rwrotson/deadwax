@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -176,13 +177,20 @@ class BrowserFetcher:
 
     async def aclose(self) -> None:
         """Close the browser and stop Patchright."""
-        if self._context is not None:
-            await self._context.close()
-        if self._browser is not None:
-            await self._browser.close()
-        if self._playwright is not None:
-            await self._playwright.stop()
-        if self._profile is not None:
-            self._profile.cleanup()
-            self._profile = None
-        self._context = self._browser = self._playwright = None
+        from patchright.async_api import Error  # noqa: PLC0415 -- optional extra (R7)
+
+        try:
+            if self._context is not None:
+                with contextlib.suppress(Error):
+                    await self._context.close()
+            if self._browser is not None:
+                with contextlib.suppress(Error):
+                    await self._browser.close()
+        finally:
+            if self._playwright is not None:
+                with contextlib.suppress(Error):
+                    await self._playwright.stop()
+            if self._profile is not None:
+                self._profile.cleanup()
+                self._profile = None
+            self._context = self._browser = self._playwright = None
