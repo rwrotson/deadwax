@@ -99,6 +99,13 @@ class Settings(BaseSettings):
     forcedexposure: SourceSettings = Field(default_factory=SourceSettings)
     allmusic: SourceSettings = Field(default_factory=SourceSettings)
     albumoftheyear: SourceSettings = Field(default_factory=SourceSettings)
+    phonica: SourceSettings = Field(default_factory=SourceSettings)
+    boomkat: SourceSettings = Field(
+        default_factory=lambda: SourceSettings(browser_headless=False),
+    )
+    norman: SourceSettings = Field(
+        default_factory=lambda: SourceSettings(browser_headless=False),
+    )
 
     @classmethod
     def settings_customise_sources(

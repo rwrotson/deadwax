@@ -88,6 +88,8 @@ _HARDWAX = re.compile(r"^hardwax\.com$")
 _SOUNDOHM = re.compile(r"^soundohm\.com$")
 _JUNO = re.compile(r"^juno\.co\.uk$")
 _PHONICA = re.compile(r"^phonicarecords\.com$")
+_BOOMKAT = re.compile(r"^boomkat\.com$")
+_NORMAN = re.compile(r"^normanrecords\.com$")
 _BLEEP = re.compile(r"^bleep\.com$")
 _FORCED_EXPOSURE = re.compile(r"^forcedexposure\.com$")
 _ALLMUSIC = re.compile(r"^allmusic\.com$")
@@ -120,6 +122,9 @@ _URL_RULES = (
     _UrlRule(_SOUNDOHM, re.compile(r"^/product/[^/]+"), EntityKind.ALBUM),
     _UrlRule(_JUNO, re.compile(r"^/products/[^/]+/\d+-\d+"), EntityKind.ALBUM),
     _UrlRule(_PHONICA, re.compile(r"^/product/[^/]+/\d+"), EntityKind.ALBUM),
+    _UrlRule(_BOOMKAT, re.compile(r"^/artists/[^/]+/releases/[^/]+/[^/]+"), EntityKind.ALBUM),
+    _UrlRule(_BOOMKAT, re.compile(r"^/products/[^/]+"), EntityKind.ALBUM),
+    _UrlRule(_NORMAN, re.compile(r"^/records/\d+-"), EntityKind.ALBUM),
     _UrlRule(_BLEEP, re.compile(r"^/release/\d+"), EntityKind.ALBUM),
     _UrlRule(_FORCED_EXPOSURE, re.compile(r"^/Catalog/.+\.html$"), EntityKind.ALBUM),
     _UrlRule(_ALLMUSIC, re.compile(r"^/album/"), EntityKind.ALBUM),

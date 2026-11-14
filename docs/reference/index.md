@@ -68,6 +68,13 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.sources.bleep.parse` | Extract Bleep descriptions and release details |
 | `deadwax.sources.forcedexposure.adapter` | Search Forced Exposure and read product pages |
 | `deadwax.sources.forcedexposure.parse` | Extract Forced Exposure label copy and release details |
+| `deadwax.sources.phonica.adapter` | Search Phonica and read product pages |
+| `deadwax.sources.phonica.parse` | Extract Phonica release facts and search results |
+| `deadwax.sources.phonica.models` | Model Phonica search responses |
+| `deadwax.sources.boomkat.adapter` | Search Boomkat and read release pages |
+| `deadwax.sources.boomkat.parse` | Extract Boomkat descriptions and genres |
+| `deadwax.sources.norman.adapter` | Read Norman Records product URLs |
+| `deadwax.sources.norman.parse` | Extract Norman Records release identity and genres |
 | `deadwax.logs.settings` | Define logging settings |
 | `deadwax.logs.setup` | Configure console and file logging for applications |
 | `deadwax.logs.runs` | Journal each lookup run to its own event file and an index of runs |

@@ -297,7 +297,7 @@ type = "layers"
 containers = ["deadwax.sources"]
 layers = [
     "lookup",
-    "musicbrainz | itunes | deezer | odesli | discogs | bandcamp | lastfm | wikipedia | listenbrainz | secondhandsongs | kexp | spotify | youtube | soundcloud | beatport | hardwax | soundohm | juno | bleep | forcedexposure | genius | allmusic | albumoftheyear",
+    "musicbrainz | itunes | deezer | odesli | discogs | bandcamp | lastfm | wikipedia | listenbrainz | secondhandsongs | kexp | spotify | youtube | soundcloud | beatport | hardwax | soundohm | juno | bleep | forcedexposure | phonica | boomkat | norman | genius | allmusic | albumoftheyear",
     "_base | _html",
     "_http",
     "config",
@@ -385,6 +385,24 @@ layers = ["adapter", "parse"]
 name = "R8: Juno adapter modules"
 type = "layers"
 containers = ["deadwax.sources.juno"]
+layers = ["adapter", "parse"]
+
+[[tool.importlinter.contracts]]
+name = "R8: Phonica adapter modules"
+type = "layers"
+containers = ["deadwax.sources.phonica"]
+layers = ["adapter", "parse", "models"]
+
+[[tool.importlinter.contracts]]
+name = "R8: Boomkat adapter modules"
+type = "layers"
+containers = ["deadwax.sources.boomkat"]
+layers = ["adapter", "parse"]
+
+[[tool.importlinter.contracts]]
+name = "R8: Norman Records adapter modules"
+type = "layers"
+containers = ["deadwax.sources.norman"]
 layers = ["adapter", "parse"]
 
 [[tool.importlinter.contracts]]

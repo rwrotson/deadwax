@@ -10,6 +10,7 @@ from deadwax.sources.allmusic import AllMusicAdapter
 from deadwax.sources.bandcamp import BandcampAdapter
 from deadwax.sources.beatport import BeatportAdapter
 from deadwax.sources.bleep import BleepAdapter
+from deadwax.sources.boomkat import BoomkatAdapter
 from deadwax.sources.config import SourcesConfig
 from deadwax.sources.deezer import DeezerAdapter
 from deadwax.sources.discogs import DiscogsAdapter
@@ -22,7 +23,9 @@ from deadwax.sources.kexp import KexpAdapter
 from deadwax.sources.lastfm import LastfmAdapter
 from deadwax.sources.listenbrainz import ListenBrainzAdapter
 from deadwax.sources.musicbrainz import MusicBrainzAdapter
+from deadwax.sources.norman import NormanAdapter
 from deadwax.sources.odesli import OdesliAdapter
+from deadwax.sources.phonica import PhonicaAdapter
 from deadwax.sources.secondhandsongs import SecondHandSongsAdapter
 from deadwax.sources.soundcloud import SoundCloudAdapter
 from deadwax.sources.soundohm import SoundohmAdapter
@@ -53,6 +56,9 @@ ADAPTERS: tuple[type[HttpAdapter], ...] = (
     JunoAdapter,
     ForcedExposureAdapter,
     BleepAdapter,
+    PhonicaAdapter,
+    BoomkatAdapter,
+    NormanAdapter,
     GeniusAdapter,
     AllMusicAdapter,
     AlbumOfTheYearAdapter,

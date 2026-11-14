@@ -118,11 +118,29 @@ class BrowserFetcher:
         return self._context
 
     async def fetch(self, request: Request) -> Response:
-        """Load the page, wait for a challenge to clear, and return the rendered HTML."""
-        from patchright.async_api import Error  # noqa: PLC0415 -- optional extra (R7)
-
+        """Fetch a rendered page or a same-origin browser POST."""
+        if request.method == "POST":
+            return await self._post(request)
         if request.method != "GET":
             raise SourceError(f"the browser transport cannot send {request.method} requests")
+        return await self._get(request)
+
+    async def _post(self, request: Request) -> Response:
+        from patchright.async_api import Error  # noqa: PLC0415 -- optional extra (R7)
+
+        context = await self._open()
+        page = await context.new_page()
+        try:
+            return await self._post_from_page(page, request)
+        except Error as error:
+            raise TransportError(f"{type(error).__name__}: {error}") from error
+        finally:
+            await page.close()
+
+    async def _get(self, request: Request) -> Response:
+        """Load the page, wait for a challenge to clear, and return rendered HTML."""
+        from patchright.async_api import Error  # noqa: PLC0415 -- optional extra (R7)
+
         context = await self._open()
         page = await context.new_page()
         navigations: list[PageResponse] = []
@@ -154,15 +172,55 @@ class BrowserFetcher:
         status = final.status
         return Response(url=url, status=status, content=content, headers=headers)
 
+    async def _post_from_page(self, page: Page, request: Request) -> Response:
+        """Send a same-origin POST with the profile's browser cookies."""
+        parts = urlsplit(request.full_url)
+        origin = urlunsplit((parts.scheme, parts.netloc, "/", "", ""))
+        await page.goto(origin, wait_until="domcontentloaded", timeout=self._timeout_ms)
+        await self._ready_content(page, Request("GET", origin), [])
+        result = await page.evaluate(
+            """async ({url, headers, body}) => {
+                const response = await fetch(url, {method: 'POST', headers, body});
+                return {url: response.url, status: response.status,
+                    headers: Object.fromEntries(response.headers.entries()),
+                    content: await response.text()};
+            }""",
+            {
+                "url": request.full_url,
+                "headers": dict(request.headers),
+                "body": request.body.decode("utf-8") if request.body is not None else None,
+            },
+        )
+        content = result["content"].encode()
+        if len(content) > self._max_bytes:
+            raise ResponseTooLargeError(f"response is larger than {self._max_bytes} bytes")
+        return Response(
+            url=result["url"],
+            status=result["status"],
+            content=content,
+            headers=result["headers"],
+        )
+
     async def _ready_content(
         self,
         page: Page,
         request: Request,
         navigations: list[PageResponse],
     ) -> bytes:
+        from patchright.async_api import Error  # noqa: PLC0415 -- optional extra (R7)
+
         deadline = asyncio.get_running_loop().time() + self._challenge_wait
         while True:
-            content = (await page.content()).encode()
+            try:
+                content = (await page.content()).encode()
+            except Error as error:
+                if (
+                    "page is navigating and changing the content" not in str(error)
+                    or asyncio.get_running_loop().time() >= deadline
+                ):
+                    raise
+                await asyncio.sleep(_POLL_SECONDS)
+                continue
             final = navigations[-1] if navigations else None
             status = final.status if final is not None else 200
             incomplete = (

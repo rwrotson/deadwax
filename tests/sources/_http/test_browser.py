@@ -93,6 +93,14 @@ class FakePage:
             return self.scenario.html_sequence.pop(0)
         return self.scenario.html
 
+    async def evaluate(self, script: str, arguments: dict[str, object]) -> dict[str, object]:
+        return {
+            "url": arguments["url"],
+            "status": 200,
+            "content": '{"results": 1}',
+            "headers": {"content-type": "application/json"},
+        }
+
     async def close(self) -> None:
         self.closed = True
 
@@ -209,10 +217,23 @@ async def test_navigation_errors_and_size_limit(scenario: Scenario) -> None:
     scenario.goto_fails = True
     with pytest.raises(TransportError, match="ERR_CONNECTION_RESET"):
         await fetcher.fetch(PAGE)
-    with pytest.raises(SourceError, match="cannot send POST"):
-        await fetcher.fetch(Request("POST", "https://x"))
+    with pytest.raises(SourceError, match="cannot send PUT"):
+        await fetcher.fetch(Request("PUT", "https://x"))
 
     assert all(page.closed for page in scenario.pages)
+
+
+@pytest.mark.asyncio
+async def test_post_uses_browser_page_and_returns_api_response(scenario: Scenario) -> None:
+    fetcher = BrowserFetcher(timeout=5, max_bytes=100)
+
+    response = await fetcher.fetch(
+        Request("POST", "https://example.com/search", body=b"id=0"),
+    )
+
+    assert response.status == 200
+    assert response.json() == {"results": 1}
+    assert scenario.pages[0].closed
 
 
 @pytest.mark.asyncio

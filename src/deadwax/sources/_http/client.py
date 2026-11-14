@@ -179,7 +179,9 @@ class HttpClient:
     def __init__(self, spec: ClientSpec, config: SourcesConfig, resources: HttpResources) -> None:
         self.spec = spec
         self._config = config
-        self._settings = config.http
+        self._settings = config.http.model_copy(
+            update={"browser_headless": config.browser_headless(spec.source)},
+        )
         self._resources = resources
         self._proxy = config.proxy(spec.source)
         self._route = route(self._proxy)

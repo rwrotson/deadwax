@@ -156,6 +156,25 @@ def _html_transports(value: str) -> tuple[Escalation, ...]:
     return steps
 
 
+def _source_browser_overrides(
+    headless: bool,
+    headed: bool,
+    steps: tuple[Escalation, ...] | None,
+) -> dict[str, object]:
+    """Build source overrides for one lookup."""
+    overrides: dict[str, object] = {}
+    for name, field in SourcesConfig.model_fields.items():
+        section = field.annotation
+        if isinstance(section, type) and issubclass(section, SourceSettings):
+            source_overrides: dict[str, object] = {}
+            if headless or headed:
+                source_overrides["browser_headless"] = headless
+            if steps is not None:
+                source_overrides["html_transports"] = steps
+            overrides[name] = source_overrides
+    return overrides
+
+
 def _browser_overrides(
     headless: bool,
     headed: bool,
@@ -168,13 +187,11 @@ def _browser_overrides(
     http: dict[str, object] = {}
     if headless or headed:
         http["browser_headless"] = headless
-    if html_transport is not None:
-        steps = _html_transports(html_transport)
+    steps = _html_transports(html_transport) if html_transport is not None else None
+    if steps is not None:
         http["escalation"] = tuple(step for step in steps if step is not Escalation.HTTPX)
-        for name, field in SourcesConfig.model_fields.items():
-            section = field.annotation
-            if isinstance(section, type) and issubclass(section, SourceSettings):
-                overrides[name] = {"html_transports": steps}
+    if headless or headed or steps is not None:
+        overrides.update(_source_browser_overrides(headless, headed, steps))
     if http:
         overrides["http"] = http
     return overrides

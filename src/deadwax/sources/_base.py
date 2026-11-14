@@ -139,6 +139,7 @@ _SERVICES = (
     ("pandora.com", "pandora"),
     ("audiomack.com", "audiomack"),
     ("boomkat.com", "boomkat"),
+    ("normanrecords.com", "norman"),
     ("junodownload.com", "junodownload"),
     ("juno.co.uk", "juno"),
     ("hardwax.com", "hardwax"),

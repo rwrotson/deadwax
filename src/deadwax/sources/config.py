@@ -203,6 +203,10 @@ class SourceSettings(_Model):
         default=None,
         description="Ordered HTML transports; unset: the source's built-in order",
     )
+    browser_headless: bool | None = Field(
+        default=None,
+        description="Browser mode for this source; unset uses the shared HTTP setting",
+    )
 
 
 class DiscogsSettings(SourceSettings):
@@ -291,6 +295,9 @@ DEFAULT_RATES: dict[str, float] = {
     "genius": 1.0,
     "allmusic": 0.5,
     "albumoftheyear": 0.5,
+    "phonica": 0.5,
+    "boomkat": 0.5,
+    "norman": 0.5,
 }
 
 DEFAULT_HTML_TRANSPORTS: tuple[Escalation, ...] = (
@@ -301,6 +308,9 @@ DEFAULT_HTML_TRANSPORTS: tuple[Escalation, ...] = (
 )
 
 SOURCE_HTML_TRANSPORTS: dict[str, tuple[Escalation, ...]] = {
+    "phonica": (Escalation.BROWSER,),
+    "boomkat": (Escalation.BROWSER,),
+    "norman": (Escalation.NODRIVER,),
     "beatport": (
         Escalation.NODRIVER,
         Escalation.BROWSER,
@@ -357,6 +367,16 @@ class SourcesConfig(_Model):
     forcedexposure: SourceSettings = SourceSettings()
     allmusic: SourceSettings = SourceSettings()
     albumoftheyear: SourceSettings = SourceSettings()
+    phonica: SourceSettings = SourceSettings()
+    boomkat: SourceSettings = SourceSettings(browser_headless=False)
+    norman: SourceSettings = SourceSettings(browser_headless=False)
+
+    def browser_headless(self, source: str) -> bool:
+        """Return the browser mode selected for a source."""
+        settings = getattr(self, source, None)
+        if isinstance(settings, SourceSettings) and settings.browser_headless is not None:
+            return settings.browser_headless
+        return self.http.browser_headless
 
     def rate(self, source: str) -> float:
         """Return the request rate of a source in requests per second."""

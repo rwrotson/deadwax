@@ -1,0 +1,74 @@
+{
+ "0": {
+  "cover": "2a03999cc991586b4701cc8026f3697f.jpg",
+  "type": "12\"",
+  "album": "Truant",
+  "label": "COCOON",
+  "artist": "ALAN FITZPATRICK",
+  "description": "Alan Fitzpatrick is one of the men of the moment speaking of all things techno! Since his first steps into the arena in 2008 he turned into one of the most wanted producers around. His releases on labels like “Quartz\", “My Favorite Robot” and especially on “Drumcode” brought him on par...",
+  "price": "7.49",
+  "id_web": "123589",
+  "date_released": "November 30th -0001",
+  "has_stock": "0",
+  "product_playlist": [
+   {
+    "trackname": "Truant",
+    "filename": "d7513d8377361eca535dfbac5a579a1e.mp3"
+   },
+   {
+    "trackname": "Memories Of A Time Once Past But Long Forgotten",
+    "filename": "72e159744344f898755c8ff99fd99946.mp3"
+   }
+  ],
+  "slug": "product/alan-fitzpatrick-truant-cocoon/123589"
+ },
+ "1": {
+  "cover": "588c46b54ad08671ab2d9d06c170f613.jpg",
+  "type": "CD",
+  "album": "Truant / Rough Sleeper CD",
+  "label": "HYPERDUB",
+  "artist": "BURIAL",
+  "description": "Pre-order : Shipping for December 17th delivery. Please order seperately to avoid having the rest of your order held up. <br /><br /> The release is comprised of two pieces of music, with a combined duration of 25 minutes 32 seconds.",
+  "price": "4.99",
+  "id_web": "111125",
+  "date_released": null,
+  "has_stock": "0",
+  "product_playlist": [
+   {
+    "trackname": "Truant ",
+    "filename": "e52058595845110d5d09655d635dc7c2.mp3"
+   },
+   {
+    "trackname": "Rough Sleeper",
+    "filename": "59057882b2ba34f83a5562fcb9c8b5e1.mp3"
+   }
+  ],
+  "slug": "product/burial-truant-rough-sleeper-cd-hyperdub/111125"
+ },
+ "2": {
+  "cover": "98df0d2d72bc12a9d0a524696659c136.jpg",
+  "type": "12\"",
+  "album": "Truant / Rough Sleeper",
+  "label": "HYPERDUB",
+  "artist": "BURIAL",
+  "description": "<p>Burial's latest 12\" for Hyperdub, a true epic clocking in with a total of over 25minutes of music, absolutely superlative stuff!</p>",
+  "price": "5.82",
+  "id_web": "111124",
+  "date_released": "January 1st 1970",
+  "has_stock": "0",
+  "product_playlist": [
+   {
+    "trackname": "Truant ",
+    "filename": "15eaef2b23acc88787e061adc1268eb7.mp3"
+   },
+   {
+    "trackname": "Rough Sleeper",
+    "filename": "2f626644dfb2eaa02f8324a675f56bfb.mp3"
+   }
+  ],
+  "slug": "product/burial-truant-rough-sleeper-hyperdub/111124"
+ },
+ "pagination_links": "",
+ "href": "https://www.phonicarecords.com/search/truant",
+ "archive_name": "Search results"
+}

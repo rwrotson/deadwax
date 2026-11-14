@@ -129,6 +129,9 @@ def test_browser_flags_override_environment_for_one_lookup(
     flagged_config = fake.calls[0][1]
     plain_config = fake.calls[1][1]
     assert flagged_config.http.browser_headless
+    assert flagged_config.browser_headless("phonica")
+    assert flagged_config.browser_headless("boomkat")
+    assert flagged_config.browser_headless("norman")
     assert flagged_config.http.patchright_profile_dir == tmp_path / "profile"
     assert flagged_config.discogs.token is not None
     assert flagged_config.discogs.token.get_secret_value() == "example-token"
@@ -142,6 +145,8 @@ def test_browser_flags_override_environment_for_one_lookup(
         Escalation.NODRIVER,
     )
     assert not plain_config.http.browser_headless
+    assert not plain_config.browser_headless("boomkat")
+    assert not plain_config.browser_headless("norman")
     assert plain_config.html_transports("beatport") == (Escalation.BROWSER, Escalation.HTTPX)
 
 
@@ -155,6 +160,7 @@ def test_headed_overrides_headless_environment(
 
     assert result.exit_code == 0
     assert not fake.calls[0][1].http.browser_headless
+    assert not fake.calls[0][1].browser_headless("phonica")
 
 
 @pytest.mark.parametrize(
@@ -261,6 +267,9 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
     assert table.exit_code == as_json.exit_code == 0
     statuses = {row["source"]: row["status"]["state"] for row in json.loads(as_json.stdout)}
     assert statuses == {
+        "phonica": "ready",
+        "boomkat": "ready",
+        "norman": "ready",
         "spotify": "missing_credential",
         "musicbrainz": "ready",
         "odesli": "ready",
