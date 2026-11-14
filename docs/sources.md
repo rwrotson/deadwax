@@ -159,6 +159,10 @@ The README lists sources planned for later versions and those deadwax will not u
 - **Finds the record by:** a Juno product URL in the query or from an earlier source, else a search through the matching gate. Search results list each release's tracks, so a track is found on the release that holds it; Juno's mix names ("Todd Terry club mix") are part of the track's title.
 - **Contributes:** the shop review as a `shop` text, the genre as a `genre` tag and Juno's tags as `tag` tags, label and catalog number ("unknown label" is left out), the release date, the product link; for a track, an `appears_on` relation to the release. Artists are as Juno prints them, in capitals. "People also bought" is loaded by the page's scripts and is not read.
 
+## Forced Exposure and Bleep
+
+Both are opt-in `shops` sources and search release titles through the matching gate. Forced Exposure gives label copy, genre, date, label, catalog number, and related releases. Bleep gives editorial copy, genre sections, date, label, catalog number, and an `appears_on` relation when a track is found on a release. Both try Patchright first. Boomkat and Norman Records remain deferred because their product pages answer Cloudflare challenges even through Nodriver with a working Chrome for Testing executable.
+
 ## Escalation ladder
 
 Bandcamp, Beatport, Hard Wax, Soundohm, and Juno pages, the song.link page, and Discogs review pages use browser-like headers, HTTP/2, and cookies. When the response is a challenge page (Cloudflare, Akamai, DataDome, PerimeterX, Fastly, Sucuri, or a captcha on 403/429/503), the client switches to a stronger transport and keeps using it for that source:
@@ -178,7 +182,7 @@ A refused page is remembered in the cache for `cache.blocked_ttl` (default one d
 
 By default HTTP transports use proxy variables from the environment; browsers use their own proxy configuration. `.env` does not set proxy variables for other processes.
 
-`DEADWAX_HTTP__PROXY` sets the proxy of every source, and `DEADWAX_<SOURCE>__PROXY` overrides it for one source. The value is `direct` or an `http://` or `https://` proxy URL with a port. Nodriver cannot use a proxy that requires a user name and password; it reports a configuration error in that case. Bot protection can refuse a proxy's exit address; `DEADWAX_DEEZER__PROXY=direct` bypasses it for Deezer.
+`DEADWAX_HTTP__PROXY` sets the proxy of every source, and `DEADWAX_<SOURCE>__PROXY` overrides it for one source. The value is `direct` or an `http://` or `https://` proxy URL with a port. Nodriver cannot use a proxy that requires a user name and password; it reports a configuration error in that case. Bot protection can refuse a proxy's exit address; `DEADWAX_DEEZER__PROXY=direct` bypasses it for Deezer. `DEADWAX_HTTP__NODRIVER_BROWSER_PATH` selects a Chrome executable; `DEADWAX_HTTP__NODRIVER_SANDBOX=false` disables Chrome's sandbox only when explicitly chosen. On this Mac, system Chrome 157 fails external navigation with `ERR_INVALID_HANDLE`; Chrome for Testing 156 works with Nodriver when both settings are supplied.
 
 A page refused on one route does not count as refused on another: changing a source's proxy ignores its cached `blocked` entries.
 

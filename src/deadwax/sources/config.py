@@ -100,6 +100,14 @@ class HttpSettings(_Model):
         default=True,
         description="Run Patchright and Nodriver without a visible browser window",
     )
+    nodriver_browser_path: Path | None = Field(
+        default=None,
+        description="Chrome executable for Nodriver; unset uses its system discovery",
+    )
+    nodriver_sandbox: bool = Field(
+        default=True,
+        description="Enable Chrome's sandbox for Nodriver; disable only for a trusted browser",
+    )
     max_response_bytes: int = Field(
         default=10_000_000,
         gt=0,
@@ -238,6 +246,8 @@ DEFAULT_RATES: dict[str, float] = {
     "hardwax": 0.5,
     "soundohm": 0.5,
     "juno": 0.5,
+    "bleep": 0.5,
+    "forcedexposure": 0.5,
 }
 
 DEFAULT_HTML_TRANSPORTS: tuple[Escalation, ...] = (
@@ -259,6 +269,13 @@ SOURCE_HTML_TRANSPORTS: dict[str, tuple[Escalation, ...]] = {
         Escalation.BROWSER,
         Escalation.NODRIVER,
         Escalation.HTTPX,
+    ),
+    "bleep": (Escalation.BROWSER, Escalation.HTTPX, Escalation.IMPERSONATE, Escalation.NODRIVER),
+    "forcedexposure": (
+        Escalation.BROWSER,
+        Escalation.HTTPX,
+        Escalation.IMPERSONATE,
+        Escalation.NODRIVER,
     ),
 }
 
@@ -292,6 +309,8 @@ class SourcesConfig(_Model):
     hardwax: SourceSettings = SourceSettings()
     soundohm: SourceSettings = SourceSettings()
     juno: SourceSettings = SourceSettings()
+    bleep: SourceSettings = SourceSettings()
+    forcedexposure: SourceSettings = SourceSettings()
 
     def rate(self, source: str) -> float:
         """Return the request rate of a source in requests per second."""

@@ -88,6 +88,8 @@ _HARDWAX = re.compile(r"^hardwax\.com$")
 _SOUNDOHM = re.compile(r"^soundohm\.com$")
 _JUNO = re.compile(r"^juno\.co\.uk$")
 _PHONICA = re.compile(r"^phonicarecords\.com$")
+_BLEEP = re.compile(r"^bleep\.com$")
+_FORCED_EXPOSURE = re.compile(r"^forcedexposure\.com$")
 
 # A SoundCloud track page is '/<user>/<track>', optionally with a secret-link token; the
 # names below are site sections and profile tabs, not users and tracks. Sets ('/<user>/sets/')
@@ -116,6 +118,8 @@ _URL_RULES = (
     _UrlRule(_SOUNDOHM, re.compile(r"^/product/[^/]+"), EntityKind.ALBUM),
     _UrlRule(_JUNO, re.compile(r"^/products/[^/]+/\d+-\d+"), EntityKind.ALBUM),
     _UrlRule(_PHONICA, re.compile(r"^/product/[^/]+/\d+"), EntityKind.ALBUM),
+    _UrlRule(_BLEEP, re.compile(r"^/release/\d+"), EntityKind.ALBUM),
+    _UrlRule(_FORCED_EXPOSURE, re.compile(r"^/Catalog/.+\.html$"), EntityKind.ALBUM),
     _UrlRule(_BANDCAMP, re.compile(r"^/album/"), EntityKind.ALBUM),
     _UrlRule(_BANDCAMP, re.compile(r"^/track/"), EntityKind.TRACK),
     _UrlRule(

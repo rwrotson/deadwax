@@ -61,6 +61,10 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.sources.soundohm.parse` | Turn Soundohm pages into identity, shop texts, genres, and links |
 | `deadwax.sources.juno.adapter` | Search Juno and read its product pages |
 | `deadwax.sources.juno.parse` | Turn Juno pages into identity, shop texts, tags, relations, and links |
+| `deadwax.sources.bleep.adapter` | Search Bleep and read release pages |
+| `deadwax.sources.bleep.parse` | Extract Bleep descriptions and release details |
+| `deadwax.sources.forcedexposure.adapter` | Search Forced Exposure and read product pages |
+| `deadwax.sources.forcedexposure.parse` | Extract Forced Exposure label copy and release details |
 | `deadwax.logs.settings` | Define logging settings |
 | `deadwax.logs.setup` | Configure console and file logging for applications |
 | `deadwax.logs.runs` | Journal each lookup run to its own event file and an index of runs |

@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–12 done (Beatport tested on saved pages only: Cloudflare blocks every transport; Phonica moved to the unscheduled blocking item).
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–13 done (Beatport tested on saved pages only; Phonica, Boomkat, and Norman Records deferred for blocked access).
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -109,7 +109,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 10 | Done | Spotify, YouTube (links only), SoundCloud. |
 | 11 | Done (Beatport not live-verified) | Beatport (Juno Download dropped: shut down); BPM and key. |
 | 12 | Done (Juno live-verified once by the agent) | Shops I: Juno, Hard Wax, Soundohm; shop-text deduplication (Phonica moved to the unscheduled blocking item). |
-| 13 | Not started | Shops II: Boomkat, Norman Records, Forced Exposure, Bleep. |
+| 13 | Done | Shops II: Forced Exposure and Bleep; Nodriver repair. Boomkat and Norman Records deferred after retry. |
 | 14 | Not started | Genius. |
 | 15 | Not started | Reviews I: AllMusic, Album of the Year. |
 | 16 | Not started | Reviews II: press adapter with per-site rules, Resident Advisor. |
@@ -173,7 +173,9 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 ### Stage 13: shops II
 
-- [ ] Boomkat (Cloudflare, escalation ladder), Norman Records, Forced Exposure, Bleep: `shop` and `label` texts, genres, related releases as `similar`.
+- [x] Forced Exposure and Bleep: `shop` and `label` texts, genres, related releases as `similar` where present.
+- [x] Repair Nodriver's false HTTP 200 on Chrome error pages; allow explicit browser path and sandbox settings.
+- [x] Retry Boomkat and Norman Records through the repaired Nodriver; defer both after Cloudflare 403.
 
 **Suggested message:** `feat(sources): add Boomkat, Norman Records, Forced Exposure and Bleep adapters`.
 
@@ -551,13 +553,23 @@ Decision (user): Phonica leaves Stage 12 and joins the unscheduled blocking item
 
 Stage 12 closed: Hard Wax, Soundohm, Juno, and shop-text deduplication meet the acceptance; Juno's live verification is the single agent run recorded above, Hard Wax and Soundohm were live-verified, deduplication is mock-tested only.
 
-**Current task:** Stage 13 (access checked; adapters not started). **Next action:** use the Playwright-rendered Bleep pages and obtain saved search and product pages for Boomkat, Norman Records, and Forced Exposure, or working live access.
+**Current task:** Stage 13 complete. **Next action:** Stage 14, Genius; decide with the user whether lyrics are stored before implementation.
 
 ### 2026-11-13 — Stage 13 access check (in progress)
 
 The working tree was clean before the check. Requests for the Boomkat `Untrue`, Norman Records `Untrue`, Bleep `Untrue`, and Forced Exposure home pages returned HTTP 403 from this environment. Norman Records returned a Cloudflare "Just a moment" page both with plain curl and with the installed curl_cffi Chrome impersonation. Removing proxy environment variables did not change its response. The search index shows product pages for Boomkat, Norman Records, Bleep, and Forced Exposure, but it does not expose their HTML structure or verify that deadwax can fetch them. No adapter or parser was added; Stage 13 remains open. Saved search and product pages, or working live access, are needed to build verified extraction fixtures.
 
 Playwright Chromium follow-up: Boomkat and Norman Records product URLs still returned 403 Cloudflare pages; a Forced Exposure product returned 403. Bleep's `Untrue` product returned HTTP 202 and, after eight seconds, rendered its actual page (artist, title, date, description, tracklist). Its search form is `GET /search/query?q=…`: `Burial Untrue` returned no results, while `Untrue` returned the release. The rendered product and search HTML were saved temporarily at `/tmp/bleep_untrue.html` and `/tmp/bleep_search_untrue.html` for parser research; they are not repository fixtures. No adapter or parser was added; the other three sources still need readable pages.
+
+### 2026-11-14 — Stage 13 evidence
+
+The system Chrome 157 returned `net::ERR_INVALID_HANDLE` for an external page even when launched directly without Nodriver; Chrome for Testing 156 loaded it. Nodriver with an explicitly selected Chrome for Testing executable and `sandbox=False` loaded external pages. Nodriver now treats Chrome's network error page as `TransportError`, avoiding a false HTTP 200. Both settings are opt-in; the default sandbox remains enabled.
+
+With the working browser, Nodriver still received Cloudflare 403 for Boomkat and Norman Records products. Per the user's decision, both sources are deferred. Forced Exposure and Bleep use Patchright first. Their product pages returned real HTML through Patchright, and their search and product pages were saved as fixtures (request-verification tokens removed).
+
+Implemented: opt-in Forced Exposure and Bleep adapters using `SearchPageAdapter`, source configuration and URL recognition, README and source documentation. Forced Exposure extracts a release's label copy, genre, label, catalog number, date, and recommended releases. Bleep extracts editorial copy, genre sections, label, catalog number, date, and a track's `appears_on` relation when listed. Search results pass through the matching gate.
+
+Verification: `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (836 tests, 98.41% branch coverage; format, lint, 30 import contracts, and strict mypy passed). `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run --group docs properdocs build --strict` passed. Saved-page tests cover search and extraction; offline checks cover absent pages, another version, and the Chrome error. Live library lookups with Patchright and no cache: Bleep's *Burial — Untrue* returned one text and one genre without errors; Forced Exposure's *VA — Hyperdub 5.4 EP* returned one text, one genre, ten related releases without errors. Of five check records, Forced Exposure returned a text for Huerco S.; both stores returned `not_found` for the other four, and Bleep returned `not_found` for Huerco S. A live Nodriver request using system Chrome now raised `TransportError` for its Chrome error page.
 
 ## Resume instructions
 

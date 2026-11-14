@@ -7,9 +7,11 @@ from deadwax.sources._base import HttpAdapter
 from deadwax.sources._http import HttpResources, open_cache
 from deadwax.sources.bandcamp import BandcampAdapter
 from deadwax.sources.beatport import BeatportAdapter
+from deadwax.sources.bleep import BleepAdapter
 from deadwax.sources.config import SourcesConfig
 from deadwax.sources.deezer import DeezerAdapter
 from deadwax.sources.discogs import DiscogsAdapter
+from deadwax.sources.forcedexposure import ForcedExposureAdapter
 from deadwax.sources.hardwax import HardWaxAdapter
 from deadwax.sources.itunes import ItunesAdapter
 from deadwax.sources.juno import JunoAdapter
@@ -46,6 +48,8 @@ ADAPTERS: tuple[type[HttpAdapter], ...] = (
     HardWaxAdapter,
     SoundohmAdapter,
     JunoAdapter,
+    ForcedExposureAdapter,
+    BleepAdapter,
 )
 
 

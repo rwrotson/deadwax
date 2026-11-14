@@ -70,6 +70,8 @@ def _nodriver(settings: HttpSettings, proxy: str | None) -> Fetcher:
         max_bytes=settings.max_response_bytes,
         proxy=proxy,
         headless=settings.browser_headless,
+        browser_path=settings.nodriver_browser_path,
+        sandbox=settings.nodriver_sandbox,
     )
 
 

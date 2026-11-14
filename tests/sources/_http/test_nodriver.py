@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -149,6 +150,37 @@ async def test_navigation_status_without_document_event_is_returned(scenario: Sc
     response = await fetcher.fetch(Request("GET", "https://example.test/page"))
 
     assert response.status == 403
+
+
+@pytest.mark.asyncio
+async def test_chrome_network_error_is_not_a_success(scenario: Scenario) -> None:
+    scenario.tab.status = None
+    scenario.tab.content = '<html><body class="neterror">ERR_INVALID_HANDLE</body></html>'
+    fetcher = NodriverFetcher(timeout=5, max_bytes=100)
+
+    with pytest.raises(TransportError, match="Chrome could not load"):
+        await fetcher.fetch(Request("GET", "https://example.test/page"))
+
+
+@pytest.mark.asyncio
+async def test_explicit_browser_and_sandbox_settings(scenario: Scenario) -> None:
+    fetcher = NodriverFetcher(
+        timeout=5,
+        max_bytes=100,
+        browser_path=Path("/custom/chrome"),
+        sandbox=False,
+    )
+
+    await fetcher.fetch(Request("GET", "https://example.test/page"))
+
+    assert scenario.launched == [
+        {
+            "headless": True,
+            "browser_args": [],
+            "browser_executable_path": "/custom/chrome",
+            "sandbox": False,
+        },
+    ]
 
 
 @pytest.mark.asyncio

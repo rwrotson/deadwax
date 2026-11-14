@@ -144,6 +144,8 @@ _SERVICES = (
     ("hardwax.com", "hardwax"),
     ("phonicarecords.com", "phonica"),
     ("soundohm.com", "soundohm"),
+    ("bleep.com", "bleep"),
+    ("forcedexposure.com", "forcedexposure"),
     ("7digital.com", "7digital"),
 )
 
