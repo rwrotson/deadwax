@@ -14,7 +14,10 @@ from deadwax import (
     ConfigurationError,
     Dossier,
     EntityKind,
+    Escalation,
     InvalidQueryError,
+    SourcesConfig,
+    SourceSettings,
     describe_sources,
     lookup,
     parse_query,
@@ -136,6 +139,47 @@ def _names(value: str | None) -> list[str] | None:
     return [name.strip() for name in value.split(",") if name.strip()] if value else None
 
 
+def _html_transports(value: str) -> tuple[Escalation, ...]:
+    """Parse a complete, ordered list of HTML transports from a command option."""
+    names = [name.strip().lower() for name in value.split(",")]
+    if not names or any(not name for name in names):
+        raise _usage_error("--html-transport needs comma-separated transport names")
+    try:
+        steps = tuple(
+            Escalation.BROWSER if (step := Escalation(name)) is Escalation.PATCHRIGHT else step
+            for name in names
+        )
+    except ValueError as error:
+        raise _usage_error(f"unknown HTML transport: {error}") from error
+    if len(steps) != len(set(steps)):
+        raise _usage_error("--html-transport contains a duplicate transport")
+    return steps
+
+
+def _browser_overrides(
+    headless: bool,
+    headed: bool,
+    html_transport: str | None,
+) -> dict[str, object]:
+    """Build one-run browser settings without changing saved configuration."""
+    if headless and headed:
+        raise _usage_error("--headless and --headed cannot be used together")
+    overrides: dict[str, object] = {}
+    http: dict[str, object] = {}
+    if headless or headed:
+        http["browser_headless"] = headless
+    if html_transport is not None:
+        steps = _html_transports(html_transport)
+        http["escalation"] = tuple(step for step in steps if step is not Escalation.HTTPX)
+        for name, field in SourcesConfig.model_fields.items():
+            section = field.annotation
+            if isinstance(section, type) and issubclass(section, SourceSettings):
+                overrides[name] = {"html_transports": steps}
+    if http:
+        overrides["http"] = http
+    return overrides
+
+
 ConfigOption = Annotated[
     Path | None,
     typer.Option("--config", help="TOML settings file.", dir_okay=False, show_default=False),
@@ -171,6 +215,18 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
         float | None,
         typer.Option("--timeout", min=0.001, help="Seconds per source."),
     ] = None,
+    headless: Annotated[
+        bool,
+        typer.Option("--headless", help="Run Patchright and Nodriver without a window."),
+    ] = False,
+    headed: Annotated[
+        bool,
+        typer.Option("--headed", help="Show Patchright and Nodriver windows."),
+    ] = False,
+    html_transport: Annotated[
+        str | None,
+        typer.Option("--html-transport", help="HTML transports for this lookup, in order."),
+    ] = None,
     config: ConfigOption = None,
     verbose: VerboseOption = False,
 ) -> None:
@@ -180,6 +236,7 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
         overrides["cache"] = {"enabled": False}
     if timeout is not None:
         overrides["adapter_timeout"] = timeout
+    overrides.update(_browser_overrides(headless, headed, html_transport))
     settings = _settings(config, verbose, **overrides)
 
     with _journal(ctx, settings, "lookup") as journal:

@@ -12,6 +12,7 @@ from deadwax import (
     ConfigurationError,
     Dossier,
     EntityKind,
+    Escalation,
     Identity,
     Query,
     SourcesConfig,
@@ -105,6 +106,76 @@ def test_options_reach_the_lookup(fake: FakeLookup, tmp_path: Path) -> None:
     assert query.kind is EntityKind.ALBUM
     assert (config.cache.enabled, config.adapter_timeout) == (False, 5)
     assert (include, exclude) == (["musicbrainz", "itunes"], ["deezer"])
+
+
+def test_browser_flags_override_environment_for_one_lookup(
+    fake: FakeLookup,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("DEADWAX_HTTP__BROWSER_HEADLESS", "false")
+    monkeypatch.setenv("DEADWAX_HTTP__ESCALATION", '["browser"]')
+    monkeypatch.setenv("DEADWAX_HTTP__PATCHRIGHT_PROFILE_DIR", str(tmp_path / "profile"))
+    monkeypatch.setenv("DEADWAX_DISCOGS__TOKEN", "example-token")
+    monkeypatch.setenv("DEADWAX_BLEEP__RATE", "0.25")
+
+    flagged = runner.invoke(
+        app,
+        ["--track", "a - b", "--headless", "--html-transport", "browser,nodriver"],
+    )
+    plain = runner.invoke(app, ["--track", "a - b"])
+
+    assert flagged.exit_code == plain.exit_code == 0
+    flagged_config = fake.calls[0][1]
+    plain_config = fake.calls[1][1]
+    assert flagged_config.http.browser_headless
+    assert flagged_config.http.patchright_profile_dir == tmp_path / "profile"
+    assert flagged_config.discogs.token is not None
+    assert flagged_config.discogs.token.get_secret_value() == "example-token"
+    assert flagged_config.bleep.rate == 0.25
+    assert flagged_config.html_transports("beatport") == (
+        Escalation.BROWSER,
+        Escalation.NODRIVER,
+    )
+    assert flagged_config.html_transports("bleep") == (
+        Escalation.BROWSER,
+        Escalation.NODRIVER,
+    )
+    assert not plain_config.http.browser_headless
+    assert plain_config.html_transports("beatport") == (Escalation.BROWSER, Escalation.HTTPX)
+
+
+def test_headed_overrides_headless_environment(
+    fake: FakeLookup,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DEADWAX_HTTP__BROWSER_HEADLESS", "true")
+
+    result = runner.invoke(app, ["--track", "a - b", "--headed"])
+
+    assert result.exit_code == 0
+    assert not fake.calls[0][1].http.browser_headless
+
+
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        (["--headless", "--headed"], "cannot be used together"),
+        (["--html-transport", ""], "needs comma-separated"),
+        (["--html-transport", "browser,patchright"], "duplicate transport"),
+        (["--html-transport", "browser,unknown"], "unknown HTML transport"),
+    ],
+)
+def test_invalid_browser_flags_are_usage_errors(
+    fake: FakeLookup,
+    options: list[str],
+    message: str,
+) -> None:
+    result = runner.invoke(app, ["--track", "a - b", *options])
+
+    assert result.exit_code == EXIT_USAGE
+    assert message in result.output
+    assert not fake.calls
 
 
 @pytest.mark.parametrize("output", ["json", "markdown"])
