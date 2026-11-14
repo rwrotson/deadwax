@@ -147,6 +147,7 @@ class HttpResources:
     sleep: Sleep = asyncio.sleep
     now: Callable[[], datetime] = _utcnow
     rng: random.Random = field(default_factory=random.Random)
+    profile_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
 @dataclass(slots=True)
@@ -443,6 +444,18 @@ class HttpClient:
             return False
         return detect_challenge(response.status, response.headers, response.content) is None
 
+    async def _fetch_once(self, fetcher: Fetcher, request: Request) -> Response:
+        persistent = (
+            fetcher.name == "browser" and self._settings.patchright_profile_dir is not None
+        ) or (fetcher.name == "nodriver" and self._settings.nodriver_profile_dir is not None)
+        if not persistent:
+            return await fetcher.fetch(request)
+        async with self._resources.profile_lock:
+            try:
+                return await fetcher.fetch(request)
+            finally:
+                await fetcher.aclose()
+
     async def _attempt(
         self,
         fetcher: Fetcher,
@@ -461,7 +474,7 @@ class HttpClient:
             exchange.attempts += 1
             exchange.fetchers.append(fetcher.name)
             try:
-                response = await fetcher.fetch(request)
+                response = await self._fetch_once(fetcher, request)
             except TransportError as error:
                 if attempt >= self._policy.retries:
                     raise

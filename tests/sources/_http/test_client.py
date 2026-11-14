@@ -1,3 +1,4 @@
+import asyncio
 import random
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -166,6 +167,36 @@ async def test_api_requests_are_honest_and_cached(tmp_path: Path) -> None:
     assert request.headers["user-agent"].endswith("(+https://c)")
     assert request.headers["x-source"] == "test"
     assert first.json() == second.json() == {"ok": True}
+
+
+@pytest.mark.asyncio
+async def test_persistent_profile_is_used_by_one_browser_at_a_time(tmp_path: Path) -> None:
+    resources = HttpResources()
+    config = SourcesConfig(http=HttpSettings(patchright_profile_dir=tmp_path / "profile"))
+    clients = [HttpClient(ClientSpec("beatport"), config, resources) for _ in range(2)]
+    active = 0
+    peak = 0
+
+    class Browser:
+        name = "browser"
+
+        async def fetch(self, request: Request) -> Response:
+            nonlocal active, peak
+            active += 1
+            peak = max(peak, active)
+            await asyncio.sleep(0.01)
+            return page()
+
+        async def aclose(self) -> None:
+            nonlocal active
+            active -= 1
+
+    await asyncio.gather(
+        *(client._fetch_once(Browser(), Request("GET", URL)) for client in clients),
+    )
+
+    assert peak == 1
+    assert active == 0
 
 
 @pytest.mark.asyncio
