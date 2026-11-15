@@ -272,6 +272,7 @@ def test_url_relations_give_ids_and_links() -> None:
     assert p.url_ids(relations) == {"wikidata": "Q3859219", "discogs_master": "21491"}
     assert [(link.service, link.target) for link in p.links(relations, LinkTarget.TRACK, "u")] == [
         ("spotify", LinkTarget.ALBUM),
+        ("rateyourmusic", LinkTarget.TRACK),
     ]
 
 

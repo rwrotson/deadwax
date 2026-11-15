@@ -429,6 +429,7 @@ def test_describe_sources_marks_groups_and_the_default_set() -> None:
         "residentadvisor",
         "nts",
         "wfmu",
+        "rateyourmusic",
     ]
 
 
@@ -445,6 +446,7 @@ def test_describe_sources() -> None:
         "beatport", "hardwax", "soundohm", "juno", "forcedexposure", "bleep", "phonica",
         "boomkat", "norman", "genius",
         "allmusic", "albumoftheyear", "pressreviews", "residentadvisor", "nts", "wfmu",
+        "rateyourmusic",
     ]  # fmt: skip
     assert sources["musicbrainz"].pass_ is Pass.IDENTITY
     assert sources["odesli"].status.ready

@@ -114,7 +114,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 15 | Done | Reviews I: AllMusic, Album of the Year. |
 | 16 | Done | Reviews II: press adapter with per-site rules, Resident Advisor; RA DJ charts dropped after site redesign. |
 | 17 | Done | Radio: NTS, WFMU; context tags. |
-| 18 | Not started | Rate Your Music; browser-first fetching. |
+| 18 | In progress (live access blocked) | Rate Your Music; browser-first fetching. |
 | 19 | Not started | 1001Tracklists, WhoSampled. |
 | 20 | Not started | Qualification. |
 
@@ -687,3 +687,9 @@ Mock-tested: NTS v2 search, a rejected live version, episode genres and neighbou
 `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (909 tests, 97.04% branch coverage; format, lint, 33 import contracts, strict mypy). The strict docs build and `git diff --check` passed. Stage 17 is Done. No Stage 18 work started.
 
 Distinguish planned, implemented, mock-tested, and live-verified behaviour in every handoff.
+
+### 2026-11-16 — Stage 18 implementation, live verification pending
+
+The user confirmed express RYM permission for automated access and chose full visible user reviews and chart positions as relations. Added the opt-in Rate Your Music adapter, browser-only default transport, URL recognition, settings, documentation, and public `secondary_genre`, `rating_votes`, and `charted_in` kinds. Synthetic HTML tests cover the extraction shape, search results, and missing page identity. The parser selectors are provisional because no real RYM page could be captured. The sandboxed direct request failed DNS resolution; an unsandboxed request reached RYM but received HTTP 403 with `cf-mitigated: challenge`. A live headed Patchright lookup of *Radiohead — OK Computer* returned `blocked` ("Cloudflare challenge (tried browser)") on the search page. Further five-record runs would hit the same challenge, so Stage 18 remains in progress; real page fixtures, blocked/not-found/version tests, and live verification remain required before completion.
+
+`UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (912 tests, 97.00% branch coverage; format, lint, 33 import contracts, strict mypy). The strict docs build passed.

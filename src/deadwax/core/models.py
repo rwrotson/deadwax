@@ -47,6 +47,7 @@ class TagKind(StrEnum):
     """Vocabulary a tag comes from."""
 
     GENRE = "genre"
+    SECONDARY_GENRE = "secondary_genre"
     STYLE = "style"
     MOOD = "mood"
     THEME = "theme"
@@ -92,6 +93,7 @@ class RelationKind(StrEnum):
 
     # A DJ's chart that lists the record; the target's artist is the DJ.
     CHARTED_BY = "charted_by"
+    CHARTED_IN = "charted_in"
 
     SIMILAR = "similar"
     CO_PLAYED = "co_played"
@@ -109,6 +111,7 @@ class MetricKind(StrEnum):
     # Score a service computes from its own plays, such as Spotify's 0-100 popularity.
     POPULARITY = "popularity"
     USER_SCORE = "user_score"
+    RATING_VOTES = "rating_votes"
 
 
 class EntityType(StrEnum):

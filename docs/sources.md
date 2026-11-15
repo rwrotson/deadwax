@@ -121,6 +121,13 @@ The README lists sources planned for later versions and those deadwax will not u
 - **Access:** the public artist browser and playlist HTML. The basic and advanced search forms report that searches cannot run, but the artist browser still lists plays. Up to ten recent matching playlists are read and checked by artist, title, and version.
 - **Contributes:** dated playlists as `broadcast` relations and comments attached to the matching row as `broadcast` texts. A host is named as the text's author only when the program title identifies one.
 
+## Rate Your Music
+
+- **Group:** `catalogues`; opt-in. Automated access requires express permission from RYM.
+- **Access:** browser first, using the `browser` extra. Searches releases or songs and reads the matched page.
+- **Contributes:** primary and secondary genres, descriptors, average user score and rating count, chart relations with displayed position, and up to ten visible full user reviews.
+- **Limits:** live page parsing is unverified while DNS access to RYM is unavailable in the development environment.
+
 ## Spotify
 
 - **Group:** `streaming`; in the default set.

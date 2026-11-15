@@ -42,7 +42,7 @@ An episode genre tag has `context_url` set to the episode URL. It describes the 
 | `credits` | `role`, `name`, `detail` (instruments or tracks the credit covers) |
 | `texts` | `kind` (`review`, `editorial`, `label`, `shop`, `wiki`, `user`, `broadcast`), `body`, `title`, `author`, `publication`, `date`, `rating` (`value`, `scale`, `text`), `language` |
 | `relations` | `kind`, `target` (`type`, `name`, `artist`, `date`, `url`, `ids`), `note` |
-| `metrics` | `kind` (`listens`, `listeners`, `likes`, `reposts`, `popularity`, `user_score`), `value`, `scale` (highest possible value, when bounded) |
+| `metrics` | `kind` (`listens`, `listeners`, `likes`, `reposts`, `popularity`, `user_score`, `rating_votes`), `value`, `scale` (highest possible value, when bounded) |
 | `links` | `service`, `url`, `target` (`track`, `album`, `artist`, `label`, `other`), `preview_url` |
 | `review_links` | `publication`, `url`, `sources`; review pages passed to later press lookups |
 

@@ -28,6 +28,7 @@ from deadwax.sources.nts import NtsAdapter
 from deadwax.sources.odesli import OdesliAdapter
 from deadwax.sources.phonica import PhonicaAdapter
 from deadwax.sources.press import PressAdapter
+from deadwax.sources.rateyourmusic import RateYourMusicAdapter
 from deadwax.sources.residentadvisor import ResidentAdvisorAdapter
 from deadwax.sources.secondhandsongs import SecondHandSongsAdapter
 from deadwax.sources.soundcloud import SoundCloudAdapter
@@ -70,6 +71,7 @@ ADAPTERS: tuple[type[HttpAdapter], ...] = (
     ResidentAdvisorAdapter,
     NtsAdapter,
     WfmuAdapter,
+    RateYourMusicAdapter,
 )
 
 

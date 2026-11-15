@@ -53,6 +53,7 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.sources.genius` | Read Genius song descriptions, annotations, credits, relations, and lyrics |
 | `deadwax.sources.allmusic` | Read AllMusic reviews, tags, credits, and similar albums |
 | `deadwax.sources.albumoftheyear` | Read Album of the Year scores, genres, and review links |
+| `deadwax.sources.rateyourmusic` | Read Rate Your Music genres, ratings, charts, and reviews |
 | `deadwax.sources.press` | Read linked reviews from Pitchfork, The Quietus, and The Wire |
 | `deadwax.sources.residentadvisor` | Read linked Resident Advisor reviews and biographies |
 | `deadwax.sources.soundcloud.adapter` | Read uploads and their reposters from SoundCloud (client ID) |
