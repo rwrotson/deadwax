@@ -12,6 +12,12 @@ from deadwax.sources._http import detect_challenge
         (200, {"x-datadome": "protected"}, b"<p>ok</p>", None),
         (503, {}, b"<TITLE>Just a moment...</TITLE>", "Cloudflare challenge"),
         (200, {}, b'<script src="/cdn-cgi/challenge-platform/h/b">', "Cloudflare challenge"),
+        (
+            200,
+            {},
+            b'<title>Search - Album of The Year</title><script src="https://www.albumoftheyear.org/cdn-cgi/challenge-platform/scripts/precursor/main.js"></script>',
+            None,
+        ),
         (307, {}, b"<script>var sucuri_cloudproxy_js='';</script>", "Sucuri challenge"),
         (202, {}, b"<script>window.awsWafCookieDomainList = [];</script>", "AWS WAF challenge"),
         (200, {}, b"<form class=g-recaptcha>", None),

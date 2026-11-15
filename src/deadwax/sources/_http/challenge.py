@@ -34,6 +34,8 @@ def detect_challenge(status: int, headers: Mapping[str, str], body: bytes) -> st
     if refused and "x-datadome" in lowered:
         return "DataDome block"
     text = body[:_SCAN_BYTES].decode("utf-8", "replace").lower()
+    # Ordinary pages can load Cloudflare's precursor script without a challenge.
+    text = text.replace("/cdn-cgi/challenge-platform/scripts/precursor/", "")
     markers = _CHALLENGE_MARKERS + _REFUSAL_MARKERS if refused else _CHALLENGE_MARKERS
     for marker, name in markers:
         if marker in text:

@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–14 done (Phonica, Boomkat, and Norman Records deferred for blocked access).
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–15 done (Boomkat and Norman Records remain access-limited).
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -111,7 +111,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 12 | Done (Juno live-verified once by the agent) | Shops I: Juno, Hard Wax, Soundohm; shop-text deduplication (Phonica moved to the unscheduled blocking item). |
 | 13 | Done | Shops II: Forced Exposure and Bleep; Nodriver repair. Boomkat and Norman Records deferred after retry. |
 | 14 | Done | Genius. |
-| 15 | In progress (page verification pending) | Reviews I: AllMusic, Album of the Year. |
+| 15 | Done | Reviews I: AllMusic, Album of the Year. |
 | 16 | Not started | Reviews II: press adapter with per-site rules, Resident Advisor. |
 | 17 | Not started | Radio: NTS, WFMU; context tags. |
 | 18 | Not started | Rate Your Music; browser-first fetching. |
@@ -188,8 +188,8 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 ### Stage 15: reviews I
 
-- [ ] AllMusic: review with rating and critic, moods and themes as `mood`/`theme` tags, styles, credits, similar albums.
-- [ ] Album of the Year: critic scores per publication, user score, genres; review links carried in the context for Stage 16, with MusicBrainz review links.
+- [x] AllMusic: review with rating and critic, moods and themes as `mood`/`theme` tags, styles, credits, similar albums.
+- [x] Album of the Year: critic scores per publication, user score, genres; review links carried in the context for Stage 16, with MusicBrainz review links.
 
 **Acceptance:** an AllMusic score from Wikipedia's ratings template and from AllMusic itself merge into one review. **Suggested message:** `feat(sources): add AllMusic and Album of the Year adapters`.
 
@@ -622,6 +622,22 @@ The user manually cleared the Album of the Year challenge in a headed Patchright
 Live limitation: a normal no-cache `deadwax lookup 'Radiohead - OK Computer' --album --sources albumoftheyear --headed --html-transport browser` returned `blocked` at the search URL on a fresh browser request, despite the successful direct page captures. The initial CLI attempt returned `not_found` before the user cleared the challenge. Thus AOTY extraction is real-page fixture-verified and its pages were fetched live, but a complete live adapter lookup and the five check-record runs remain unverified. Stage 15 stays In progress.
 
 Verification: `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (891 tests, 97.74% branch coverage; format, lint, 33 import contracts, strict mypy). `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run --group docs properdocs build --strict` passed. The five check-record runs were skipped because the strong-record CLI request remained blocked.
+
+### 2026-11-15 — Stage 15 live acceptance retry
+
+The worktree was clean at the start. A no-cache, headed Patchright CLI lookup of *Radiohead — OK Computer* with only Album of the Year returned `blocked` on `https://www.albumoftheyear.org/search/?q=Radiohead+OK+Computer`: Cloudflare challenge after one browser transport. The first attempt inside the sandbox could not access Patchright's installed Chromium; the retry with browser/profile access launched successfully and reached the site. This is an access failure, not a parser result.
+
+Ran the five v1 manual-check records plus *OK Computer* with `--sources allmusic,albumoftheyear --headed --html-transport browser --no-cache --format json`. All six lookups reported `blocked` at each source's search URL, with no identity or extracted facts. The previous AllMusic live success and both real-page fixture tests remain valid, but neither source passed this session's end-to-end live checks. No adapter defect was established, so no source code or fixture was changed. Stage 15 remains In progress; a complete Album of the Year live lookup and the five-record acceptance gate are still pending. No Stage 16 work started.
+
+`UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (891 tests, 97.74% branch coverage; format, lint, 33 import contracts, strict mypy). `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run --group docs properdocs build --strict` passed. The full `poe test-live` suite was not run because this retry targeted Stage 15's six records and the browser search was blocked.
+
+### 2026-11-15 — Stage 15 closure after headed browser verification
+
+The user confirmed that headed Chrome displayed the normal Album of the Year search results without a challenge. The request still reported `blocked`: a normal HTTP 200 page loaded Cloudflare's `/cdn-cgi/challenge-platform/scripts/precursor/` script, which the challenge detector mistook for an active interstitial. A direct browser probe confirmed the page title, status, and marker. The detector now ignores that precursor script while retaining detection of actual challenge pages; an offline regression test covers the normal page.
+
+The no-cache, headed Patchright CLI lookup of *Radiohead — OK Computer* then completed through search and album page: 16 critic scores, a 93/100 user score, four genre tags, 16 publication review links, and no errors. The five v1 check records were run with `--sources allmusic,albumoftheyear --headed --html-transport browser --no-cache --timeout 180 --format json` and `DEADWAX_HTTP__BROWSER_CHALLENGE_WAIT=120`. *Huerco S. — For Those of You Who Have Never (And Also Those Who Have)* returned eight texts, 28 tags, one credit, one user-score metric, eight review links, and no errors. The other four records returned `not_found` from both sources, with no blocked or failed errors; neither adapter supplied facts for a different version. A combined live *OK Computer* lookup with Wikipedia, AllMusic, and Album of the Year returned no errors. Wikipedia's two 5/5 AllMusic scores, AllMusic's current 4.5/5 score, and Album of the Year's 100/100 AllMusic score remained distinct; the equal-score merge is covered by the offline test.
+
+`UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (892 tests, 97.74% branch coverage; format, lint, 33 import contracts, strict mypy). The full `poe test-live` suite was not run; live verification covered the Stage 15 sources and five acceptance records. Stage 15 is Done. No Stage 16 work started.
 
 
 > Read `AGENTS.md`, `docs/architecture.md`, and `DEADWAX_PLAN.md`. Inspect the branch, worktree, stage table, and latest evidence. Implement the first incomplete stage only, preserving accepted and standing decisions and import rules. Run the stage checks, append dated evidence, update the status only when acceptance passes, report an English commit message, stop at the stage boundary, and do not create commits.
