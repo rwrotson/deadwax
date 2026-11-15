@@ -87,6 +87,7 @@ Every source is described in detail in [the sources guide](https://rwrotson.gith
 | Genius | implemented, default, needs `genius.token` | song description, annotations, credits, song relations, full lyrics when available | API facts remain when the HTML page is blocked |
 | AllMusic | experimental, opt-in | review, rating, critic, styles, moods, themes, credits; similar albums when available | The *OK Computer* search and album page were live-verified through a persistent Patchright profile; direct requests may be blocked |
 | Album of the Year | experimental, opt-in | critic scores, user score, genres, links to critic reviews | Live pages currently return Cloudflare 403 from the development network; extraction awaits saved-page verification |
+| Press reviews | experimental, opt-in | full accessible review text, author, and score from linked Pitchfork, The Quietus, and The Wire pages | needs review links from earlier sources; live extraction is unverified |
 
 Names written in a non-Latin script are compared as written: a store that lists "Кино" as "Kino" is reported as `no_match`.
 
@@ -95,7 +96,7 @@ Names written in a non-Latin script are compared as written: a store that lists 
 | Group | Sources | Caveats |
 |-------|---------|---------|
 | Shops | Boomkat, Norman | access blocked by Cloudflare |
-| Reviews and press | Resident Advisor (GraphQL), press reviews through one adapter with per-site rules | |
+| Reviews and press | Resident Advisor (GraphQL) | |
 | Catalogues and communities | Rate Your Music | Rate Your Music only through a browser |
 | Radio and mixes | NTS, 1001Tracklists, WFMU | |
 | Samples | WhoSampled | needs a separate decision on its terms of service |

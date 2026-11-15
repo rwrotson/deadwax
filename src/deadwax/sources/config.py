@@ -298,6 +298,7 @@ DEFAULT_RATES: dict[str, float] = {
     "phonica": 0.5,
     "boomkat": 0.5,
     "norman": 0.5,
+    "pressreviews": 0.5,
 }
 
 DEFAULT_HTML_TRANSPORTS: tuple[Escalation, ...] = (
@@ -370,6 +371,7 @@ class SourcesConfig(_Model):
     phonica: SourceSettings = SourceSettings()
     boomkat: SourceSettings = SourceSettings(browser_headless=False)
     norman: SourceSettings = SourceSettings(browser_headless=False)
+    pressreviews: SourceSettings = SourceSettings()
 
     def browser_headless(self, source: str) -> bool:
         """Return the browser mode selected for a source."""

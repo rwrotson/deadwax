@@ -112,7 +112,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 13 | Done | Shops II: Forced Exposure and Bleep; Nodriver repair. Boomkat and Norman Records deferred after retry. |
 | 14 | Done | Genius. |
 | 15 | Done | Reviews I: AllMusic, Album of the Year. |
-| 16 | Not started | Reviews II: press adapter with per-site rules, Resident Advisor. |
+| 16 | In progress | Reviews II: press adapter with per-site rules, Resident Advisor. |
 | 17 | Not started | Radio: NTS, WFMU; context tags. |
 | 18 | Not started | Rate Your Music; browser-first fetching. |
 | 19 | Not started | 1001Tracklists, WhoSampled. |
@@ -639,6 +639,12 @@ The no-cache, headed Patchright CLI lookup of *Radiohead — OK Computer* then c
 
 `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (892 tests, 97.74% branch coverage; format, lint, 33 import contracts, strict mypy). The full `poe test-live` suite was not run; live verification covered the Stage 15 sources and five acceptance records. Stage 15 is Done. No Stage 16 work started.
 
+
+### 2026-11-15 — Stage 16 in progress
+
+The user chose full available review text and Pitchfork, The Quietus, and The Wire for the press adapter. Added an opt-in `pressreviews` adapter in the links pass, with per-site HTML selectors, record matching, configuration, documentation, and synthetic extraction tests. It consumes review links from earlier passes. No real press page was captured, so those selectors and end-to-end extraction are not live-verified. The Resident Advisor GraphQL adapter, biographies, and DJ charts remain unimplemented. A sandboxed request could not resolve `ra.co`; an unsandboxed request to a public review returned HTTP 403, so the GraphQL operation and response shape could not be captured. The five-record and strong-record live acceptance runs were not performed.
+
+`UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (896 tests, 97.38% branch coverage; format, lint, 33 import contracts, strict mypy). The strict documentation build and `git diff --check` passed. Stage 16 remains In progress until all deliverables are implemented and accepted.
 
 > Read `AGENTS.md`, `docs/architecture.md`, and `DEADWAX_PLAN.md`. Inspect the branch, worktree, stage table, and latest evidence. Implement the first incomplete stage only, preserving accepted and standing decisions and import rules. Run the stage checks, append dated evidence, update the status only when acceptance passes, report an English commit message, stop at the stage boundary, and do not create commits.
 

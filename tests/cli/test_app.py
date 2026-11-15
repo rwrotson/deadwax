@@ -293,6 +293,7 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
         "genius": "missing_credential",
         "allmusic": "ready",
         "albumoftheyear": "ready",
+        "pressreviews": "ready",
     }
     assert "DEADWAX_DISCOGS__TOKEN" in table.stdout
     assert "DEADWAX_LASTFM__API_KEY" in table.stdout

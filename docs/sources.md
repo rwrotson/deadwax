@@ -185,6 +185,12 @@ These shops are opt-in. Phonica uses Patchright headless by default and sends it
 - **Contributes:** critic scores by publication, user score as a metric, genres, and links to original reviews for the later press pass.
 - **Limits:** direct requests currently meet Cloudflare 403 from the development network. The extraction selectors require verification against a saved page.
 
+## Press reviews
+
+- **Pass:** links; opt-in; group `press`.
+- **Contributes:** full accessible review text, author, score when present, and review-page provenance from Pitchfork, The Quietus, and The Wire.
+- **Limits:** reads review links found by earlier sources; inaccessible pages and pages without a matching record contribute no text.
+
 ## Escalation ladder
 
 Bandcamp, Beatport, Hard Wax, Soundohm, and Juno pages, the song.link page, and Discogs review pages use browser-like headers, HTTP/2, and cookies. When the response is a challenge page (Cloudflare, Akamai, DataDome, PerimeterX, Fastly, Sucuri, AWS WAF, or a captcha on 403/429/503), the client switches to a stronger transport and keeps using it for that source:

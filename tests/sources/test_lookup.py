@@ -425,6 +425,7 @@ def test_describe_sources_marks_groups_and_the_default_set() -> None:
         "norman",
         "allmusic",
         "albumoftheyear",
+        "pressreviews",
     ]
 
 
@@ -440,7 +441,7 @@ def test_describe_sources() -> None:
         "wikipedia", "listenbrainz", "secondhandsongs", "kexp", "youtube", "soundcloud",
         "beatport", "hardwax", "soundohm", "juno", "forcedexposure", "bleep", "phonica",
         "boomkat", "norman", "genius",
-        "allmusic", "albumoftheyear",
+        "allmusic", "albumoftheyear", "pressreviews",
     ]  # fmt: skip
     assert sources["musicbrainz"].pass_ is Pass.IDENTITY
     assert sources["odesli"].status.ready
