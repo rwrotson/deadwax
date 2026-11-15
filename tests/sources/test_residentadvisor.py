@@ -1,6 +1,21 @@
-from deadwax import EntityKind, Scope, TextKind
-from deadwax.core import RecordKey
-from deadwax.sources.residentadvisor import _extract, _review_id
+import json
+
+import httpx
+import pytest
+
+from deadwax import (
+    EntityKind,
+    ErrorKind,
+    HttpSettings,
+    Query,
+    Scope,
+    SourcesConfig,
+    TextKind,
+    lookup,
+)
+from deadwax.core import BlockedError, LookupContext, RecordKey
+from deadwax.sources._http import HttpResources
+from deadwax.sources.residentadvisor import ResidentAdvisorAdapter, _extract, _review_id
 
 
 def test_review_link_and_graphql_record() -> None:
@@ -37,3 +52,90 @@ def test_other_version_and_other_host_are_rejected() -> None:
     }
 
     assert _extract(record, key, "https://ra.co/reviews/4920") is None
+
+
+@pytest.mark.asyncio
+async def test_search_finds_review_without_an_incoming_link() -> None:
+    operations: list[str] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        operation = payload["operationName"]
+        operations.append(operation)
+        if operation == "DEADWAX_SEARCH":
+            data: dict[str, object] = {
+                "search": [
+                    {
+                        "id": "4920",
+                        "value": "Burial - Untrue",
+                        "contentUrl": "/reviews/4920",
+                    },
+                ],
+            }
+        else:
+            data = {
+                "review": {
+                    "type": "ALBUM",
+                    "title": "Burial - Untrue",
+                    "content": "<p>Full review.</p>",
+                    "artists": [{"name": "Burial"}],
+                },
+            }
+        return httpx.Response(200, json={"data": data})
+
+    query = Query(kind=EntityKind.ALBUM, artist="Burial", title="Untrue")
+    config = SourcesConfig(http=HttpSettings(escalation=()))
+
+    result = await lookup(
+        query,
+        config,
+        include=("residentadvisor",),
+        transport=httpx.MockTransport(respond),
+    )
+
+    assert operations == ["DEADWAX_SEARCH", "DEADWAX_REVIEW"]
+    assert [text.body for text in result.texts] == ["Full review."]
+    assert result.errors == []
+
+
+@pytest.mark.asyncio
+async def test_search_rejects_another_version() -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        assert json.loads(request.content)["operationName"] == "DEADWAX_SEARCH"
+        return httpx.Response(
+            200,
+            json={
+                "data": {
+                    "search": [{"value": "Burial - Untrue (Live)", "contentUrl": "/reviews/5"}],
+                },
+            },
+        )
+
+    query = Query(kind=EntityKind.ALBUM, artist="Burial", title="Untrue")
+    config = SourcesConfig(http=HttpSettings(escalation=()))
+
+    result = await lookup(
+        query,
+        config,
+        include=("residentadvisor",),
+        transport=httpx.MockTransport(respond),
+    )
+
+    assert result.texts == []
+    assert result.errors[0].kind is ErrorKind.NOT_FOUND
+
+
+@pytest.mark.asyncio
+async def test_blocked_graphql_search() -> None:
+    query = Query(kind=EntityKind.ALBUM, artist="Burial", title="Untrue")
+    config = SourcesConfig(http=HttpSettings(escalation=(), retries=0))
+    transport = httpx.MockTransport(
+        lambda _: httpx.Response(403, text="<title>Just a moment...</title>"),
+    )
+    adapter = ResidentAdvisorAdapter(config, HttpResources(transport=transport))
+
+    try:
+        with pytest.raises(BlockedError):
+            await adapter.lookup(query, LookupContext(query=query))
+    finally:
+        await adapter.aclose()

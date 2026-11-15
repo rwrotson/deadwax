@@ -189,13 +189,13 @@ These shops are opt-in. Phonica uses Patchright headless by default and sends it
 
 - **Pass:** links; opt-in; group `press`.
 - **Contributes:** full accessible review text, author, score when present, and review-page provenance from Pitchfork, The Quietus, and The Wire.
-- **Limits:** reads review links found by earlier sources; inaccessible pages and pages without a matching record contribute no text.
+- **Limits:** reads review links found by earlier sources; inaccessible pages and pages without a matching record contribute no text. Pitchfork, The Quietus, and The Wire parsers were checked on live pages.
 
 ## Resident Advisor
 
 - **Pass:** links; opt-in; group `press`.
 - **Contributes:** full available review text, author, and artist and label biographies from GraphQL for linked RA reviews.
-- **Limits:** requires a review link from an earlier source. [RA discontinued DJ charts](https://ra.co/news/74703), so no chart relations are extracted.
+- **Limits:** finds reviews by GraphQL search or an earlier review link. [RA discontinued DJ charts](https://ra.co/news/74703), so no chart relations are extracted.
 
 ## Escalation ladder
 

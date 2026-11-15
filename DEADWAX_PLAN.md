@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–15 done (Boomkat and Norman Records remain access-limited).
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–16 done (Boomkat and Norman Records remain access-limited).
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -112,7 +112,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 13 | Done | Shops II: Forced Exposure and Bleep; Nodriver repair. Boomkat and Norman Records deferred after retry. |
 | 14 | Done | Genius. |
 | 15 | Done | Reviews I: AllMusic, Album of the Year. |
-| 16 | In progress | Reviews II: press adapter with per-site rules, Resident Advisor. |
+| 16 | Done | Reviews II: press adapter with per-site rules, Resident Advisor; RA DJ charts dropped after site redesign. |
 | 17 | Not started | Radio: NTS, WFMU; context tags. |
 | 18 | Not started | Rate Your Music; browser-first fetching. |
 | 19 | Not started | 1001Tracklists, WhoSampled. |
@@ -195,9 +195,9 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 ### Stage 16: reviews II
 
-- [ ] Decide with the user how much review text is kept, before the stage.
-- [ ] Press adapter: one adapter, per-site rules (Pitchfork, The Quietus, The Wire, and others agreed at the stage) reading review links from the context.
-- [ ] Resident Advisor through its GraphQL endpoint: reviews, artist and label bios. DJ charts were discontinued by RA's site redesign and are dropped from this stage.
+- [x] The user chose full available review text.
+- [x] Press adapter: one adapter, per-site rules for Pitchfork, The Quietus, and The Wire, reading review links from the context.
+- [x] Resident Advisor through its GraphQL endpoint: reviews, artist and label bios. DJ charts were discontinued by RA's site redesign and dropped from this stage.
 
 **Suggested message:** `feat(sources): add press review and Resident Advisor adapters`.
 
@@ -653,6 +653,16 @@ The dedicated headed Patchright profile opened RA's *Burial — Untrue* review (
 Headed Chrome also fetched Pitchfork's *Amnesiac* and The Quietus's *Tunes, 2011 to 2019* review pages (both HTTP 200). The first press parser failed on both; updated the site rules from their live markup. The parser now returns 12,819 and 17,289 characters respectively on those pages, with matching artist and title. Added small markup tests. The Wire has not been checked on a real review page, and the five-record acceptance runs remain pending. Stage 16 remains In progress.
 
 `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (900 tests, 96.89% branch coverage; format, lint, 33 import contracts, strict mypy). The strict documentation build and `git diff --check` passed. The full live suite was not run; the live probes above targeted the new sources.
+
+### 2026-11-15 — Stage 16 completion
+
+The Wire's *Hen Ogledd — Discombobulated* review opened in headed Chrome (HTTP 200). Its page names the artist and album inside the first review-body paragraph, not the headline. The site rule now reads that identity, extracts 4,418 characters of review text and author Abi Bliss, and excludes the magazine issue notice. A small markup test covers this shape. Pitchfork's live *Amnesiac* page stores its 9/10 score in the current review header of `__PRELOADED_STATE__`; the parser reads that field, not scores of recommended reviews, and a test covers it.
+
+RA's public GraphQL schema exposed `search(searchTerm, indices: [REVIEW])`. Browser-verified searches for *Burial — Untrue* and *Huerco S. — For Those of You Who Have Never (And Also Those Who Have)* returned exact review IDs among other results. The RA adapter now searches when context has no review link, matches the result before fetching it, and retains the earlier linked-review path. Mock tests cover search, another version rejected, biographies, blocked responses, and not found. Live library searches returned a 2,760-character review and a label biography for *Untrue*, and a 1,965-character review and a label biography for *For Those...*. Artist biography extraction remains mock-tested because those two reviews supplied none.
+
+The five v1 check records were run live and without cache. With MusicBrainz, Album of the Year, press reviews, and RA selected, *Huerco S.* returned a 10,594-character Pitchfork review; the other four had no linked review on the supported press sites and returned `not_found` rather than a wrong record. RA search alone returned the *Huerco S.* review and `not_found` for the other four; no failed or blocked errors occurred. *Burial — Untrue* was the extra strong record: the combined live lookup returned Pitchfork and RA reviews. A second combined run of *Huerco S.* and *Untrue* returned both publications' full reviews with no errors. Direct live page parsing was verified for all three press sites, while full lookup coverage for The Quietus and The Wire remains limited by absence of their links in those check records.
+
+`UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (904 tests, 97.29% branch coverage; format, lint, 33 import contracts, strict mypy). The strict documentation build and `git diff --check` passed. The full `poe test-live` suite was not run; live verification targeted the Stage 16 sources and acceptance records. Stage 16 is Done. RA DJ charts were dropped because [RA says the redesigned site no longer supports them](https://ra.co/news/74703).
 
 > Read `AGENTS.md`, `docs/architecture.md`, and `DEADWAX_PLAN.md`. Inspect the branch, worktree, stage table, and latest evidence. Implement the first incomplete stage only, preserving accepted and standing decisions and import rules. Run the stage checks, append dated evidence, update the status only when acceptance passes, report an English commit message, stop at the stage boundary, and do not create commits.
 

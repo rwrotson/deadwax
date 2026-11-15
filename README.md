@@ -87,8 +87,8 @@ Every source is described in detail in [the sources guide](https://rwrotson.gith
 | Genius | implemented, default, needs `genius.token` | song description, annotations, credits, song relations, full lyrics when available | API facts remain when the HTML page is blocked |
 | AllMusic | experimental, opt-in | review, rating, critic, styles, moods, themes, credits; similar albums when available | The *OK Computer* search and album page were live-verified through a persistent Patchright profile; direct requests may be blocked |
 | Album of the Year | experimental, opt-in | critic scores, user score, genres, links to critic reviews | Live pages currently return Cloudflare 403 from the development network; extraction awaits saved-page verification |
-| Press reviews | experimental, opt-in | full accessible review text, author, and score when present from linked Pitchfork, The Quietus, and The Wire pages | needs review links from earlier sources; Pitchfork and The Quietus pages were live-verified, The Wire remains unverified |
-| Resident Advisor | experimental, opt-in | full text of linked reviews and associated artist and label biographies | GraphQL review extraction verified on *Burial — Untrue*; RA discontinued DJ charts |
+| Press reviews | implemented, opt-in | full accessible review text, author, and score when present from linked Pitchfork, The Quietus, and The Wire pages | needs review links from earlier sources; all three sites were checked on live pages |
+| Resident Advisor | implemented, opt-in | full review text and associated artist and label biographies | finds reviews by GraphQL search or earlier review links; RA discontinued DJ charts |
 
 Names written in a non-Latin script are compared as written: a store that lists "Кино" as "Kino" is reported as `no_match`.
 

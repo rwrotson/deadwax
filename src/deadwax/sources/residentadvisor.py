@@ -34,6 +34,11 @@ _QUERY = """query DEADWAX_REVIEW($id: ID!) {
     artists { id name contentUrl biography { id blurb } }
   }
 }"""
+_SEARCH_QUERY = """query DEADWAX_SEARCH($term: String!) {
+  search(searchTerm: $term, indices: [REVIEW], limit: 10) {
+    id value contentUrl searchType reviewType
+  }
+}"""
 
 
 def _object(value: object) -> dict[str, object]:
@@ -128,12 +133,17 @@ class ResidentAdvisorAdapter(HttpAdapter):
     profile = Profile.BROWSER
     capabilities = frozenset({Capability.TEXTS})
 
-    async def _fetch_review(self, review_id: str) -> dict[str, object]:
+    async def _graphql(
+        self,
+        operation: str,
+        variables: dict[str, str],
+        query: str,
+    ) -> dict[str, object]:
         payload = json.dumps(
             {
-                "operationName": "DEADWAX_REVIEW",
-                "variables": {"id": review_id},
-                "query": _QUERY,
+                "operationName": operation,
+                "variables": variables,
+                "query": query,
             },
         ).encode()
         response = await self.client.request(
@@ -151,7 +161,26 @@ class ResidentAdvisorAdapter(HttpAdapter):
             ) from error
         if root.get("errors"):
             raise SourceError("Resident Advisor GraphQL returned errors", url=response.url)
-        return _object(_object(root.get("data")).get("review"))
+        return _object(root.get("data"))
+
+    async def _search_url(self, key: RecordKey) -> str | None:
+        data = await self._graphql(
+            "DEADWAX_SEARCH",
+            {"term": f"{key.artist} {key.title}"},
+            _SEARCH_QUERY,
+        )
+        results = data.get("search")
+        for value in results if isinstance(results, list) else []:
+            hit = _object(value)
+            name = _string(hit.get("value"))
+            path = _string(hit.get("contentUrl"))
+            if not name or not path or _review_id(f"https://ra.co{path}") is None:
+                continue
+            artist, separator, title = name.partition(" - ")
+            found_key = RecordKey(artist=artist, title=title, kind=key.kind)
+            if separator and compare(key, found_key).verdict is Verdict.MATCH:
+                return f"https://ra.co{path}"
+        return None
 
     async def lookup(self, query: Query, context: LookupContext) -> Partial:
         """Query RA for a linked review and keep facts matching the record."""
@@ -160,14 +189,19 @@ class ResidentAdvisorAdapter(HttpAdapter):
             raise NotFoundError("no record identity for Resident Advisor")
         links = [link.url for link in context.review_links if _review_id(link.url)]
         if not links:
-            raise NotFoundError("no Resident Advisor review link")
+            found = await self._search_url(key)
+            if found is None:
+                raise NotFoundError("no matching Resident Advisor review")
+            links = [found]
         texts: list[Text] = []
         candidate = None
         for url in dict.fromkeys(links):
             review_id = _review_id(url)
             if review_id is None:
                 continue
-            record = await self._fetch_review(review_id)
+            record = _object(
+                (await self._graphql("DEADWAX_REVIEW", {"id": review_id}, _QUERY)).get("review"),
+            )
             extracted = _extract(record, key, url)
             if extracted is None:
                 continue
