@@ -44,6 +44,8 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.sources.kexp.adapter` | Read plays of a record on KEXP with programs, hosts, and comments |
 | `deadwax.sources.kexp.parse` | Turn KEXP plays into broadcast relations and host texts |
 | `deadwax.sources.kexp.models` | Model KEXP API responses |
+| `deadwax.sources.nts` | Read NTS episodes and their tracklists |
+| `deadwax.sources.wfmu` | Read WFMU playlists and DJ comments |
 | `deadwax.sources.spotify.adapter` | Read tracks and albums from the Spotify Web API (client credentials) |
 | `deadwax.sources.spotify.parse` | Turn Spotify responses into identity, metrics, and links |
 | `deadwax.sources.spotify.models` | Model Spotify Web API responses |

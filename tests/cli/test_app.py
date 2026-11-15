@@ -295,6 +295,8 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
         "albumoftheyear": "ready",
         "pressreviews": "ready",
         "residentadvisor": "ready",
+        "nts": "ready",
+        "wfmu": "ready",
     }
     assert "DEADWAX_DISCOGS__TOKEN" in table.stdout
     assert "DEADWAX_LASTFM__API_KEY" in table.stdout
@@ -304,6 +306,7 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
         ("catalogues", False),
         ("press", False),
         ("radio", True),
+        ("radio", False),
         ("streaming", True),
         ("streaming", False),
         ("shops", False),

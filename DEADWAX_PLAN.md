@@ -113,7 +113,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 14 | Done | Genius. |
 | 15 | Done | Reviews I: AllMusic, Album of the Year. |
 | 16 | Done | Reviews II: press adapter with per-site rules, Resident Advisor; RA DJ charts dropped after site redesign. |
-| 17 | Not started | Radio: NTS, WFMU; context tags. |
+| 17 | In progress | Radio: NTS, WFMU; context tags. Mock-tested; live source acceptance blocked. |
 | 18 | Not started | Rate Your Music; browser-first fetching. |
 | 19 | Not started | 1001Tracklists, WhoSampled. |
 | 20 | Not started | Qualification. |
@@ -665,5 +665,11 @@ The five v1 check records were run live and without cache. With MusicBrainz, Alb
 `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (904 tests, 97.29% branch coverage; format, lint, 33 import contracts, strict mypy). The strict documentation build and `git diff --check` passed. The full `poe test-live` suite was not run; live verification targeted the Stage 16 sources and acceptance records. Stage 16 is Done. RA DJ charts were dropped because [RA says the redesigned site no longer supports them](https://ra.co/news/74703).
 
 > Read `AGENTS.md`, `docs/architecture.md`, and `DEADWAX_PLAN.md`. Inspect the branch, worktree, stage table, and latest evidence. Implement the first incomplete stage only, preserving accepted and standing decisions and import rules. Run the stage checks, append dated evidence, update the status only when acceptance passes, report an English commit message, stop at the stage boundary, and do not create commits.
+
+### 2026-11-15 — Stage 17 in progress
+
+The worktree was clean at the start. Added opt-in NTS and WFMU adapters, `co_played` relations, and a `context_url` on tags. Mocked lookup tests verify NTS episode, neighbour and genre extraction and WFMU playlist comments. Source registration, CLI settings, documentation, and import contracts were updated. `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (906 tests, 97.07% branch coverage), the strict docs build passed, and `git diff --check` passed.
+
+Live verification is incomplete: the public NTS `/api/v2/search` returned HTTP 200 with an empty `results` list for Burial, Archangel, and a suggested popular term. WFMU's advanced playlist search returned HTTP 200 with “Sorry, you cannot run searches at this time.” No end-to-end live lookup on the five check records or a strong record succeeded. The recorded payloads are synthetic, so current extraction paths remain unverified against live result and playlist markup. Stage 17 remains in progress; do not begin Stage 18.
 
 Distinguish planned, implemented, mock-tested, and live-verified behaviour in every handoff.

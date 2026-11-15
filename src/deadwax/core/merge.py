@@ -572,7 +572,7 @@ def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Parti
 
     tags = _dedupe(
         (tag for p in accepted for tag in p.tags),
-        lambda t: normalize_text(t.name),
+        lambda t: (normalize_text(t.name), t.context_url),
         _combine_tags,
     )
 

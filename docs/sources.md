@@ -109,6 +109,18 @@ The README lists sources planned for later versions and those deadwax will not u
 - **Finds the record by:** the MusicBrainz recording ID, else artist and title (the API ignores release group IDs, so albums are found by artist and album title); plays of other records or versions are dropped by the matching gate.
 - **Contributes:** the latest 25 plays as `broadcast` relations (program, date, hosts, playlist page); host comments as `broadcast` texts, split at dashed separator lines, with a repeated comment merged into one text.
 
+## NTS
+
+- **Group:** `radio`; opt-in.
+- **Access:** public NTS JSON search and episode endpoints. The track search returned no results for tested live queries on 2026-11-15, so extraction is currently verified only by mocked responses.
+- **Contributes:** matching episodes as `broadcast` relations, the immediately preceding and following tracks as `co_played` relations, and episode genres as tags with `context_url` set to the episode URL.
+
+## WFMU
+
+- **Group:** `radio`; opt-in.
+- **Access:** public advanced playlist search and playlist HTML. The search returned “Sorry, you cannot run searches at this time” on 2026-11-15, so extraction is currently verified only by mocked responses.
+- **Contributes:** matching playlists as `broadcast` relations and comments attached to the matching row as `broadcast` texts.
+
 ## Spotify
 
 - **Group:** `streaming`; in the default set.

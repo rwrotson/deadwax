@@ -94,6 +94,7 @@ class RelationKind(StrEnum):
     CHARTED_BY = "charted_by"
 
     SIMILAR = "similar"
+    CO_PLAYED = "co_played"
     OTHER_VERSION = "other_version"
 
 
@@ -225,6 +226,10 @@ class Tag(Fact):
 
     name: str
     kind: TagKind = TagKind.TAG
+    context_url: str | None = Field(
+        default=None,
+        description="Episode or set whose context this tag describes, rather than the record",
+    )
     weight: float | None = Field(
         default=None,
         ge=0,

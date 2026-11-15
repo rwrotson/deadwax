@@ -37,6 +37,8 @@ Facts have a `scope`: `recording`, `work`, `release`, `release_group`, `artist`,
 | List | Item fields |
 |------|-------------|
 | `tags` | `name`, `kind` (`genre`, `style`, `mood`, `theme`, `descriptor`, `tag`), `weight` (0–1, the source's own weighting, when it has one) |
+
+An episode genre tag has `context_url` set to the episode URL. It describes the episode, not the recording, and does not merge with the recording's own genre tag.
 | `credits` | `role`, `name`, `detail` (instruments or tracks the credit covers) |
 | `texts` | `kind` (`review`, `editorial`, `label`, `shop`, `wiki`, `user`, `broadcast`), `body`, `title`, `author`, `publication`, `date`, `rating` (`value`, `scale`, `text`), `language` |
 | `relations` | `kind`, `target` (`type`, `name`, `artist`, `date`, `url`, `ids`), `note` |
@@ -60,6 +62,7 @@ Relation kinds are directional:
 | `label`, `label_release` | The label; its other releases |
 | `appears_on`, `compilation` | Releases and compilations containing the record |
 | `mix`, `broadcast` | DJ mixes and broadcasts containing it |
+| `co_played` | Recordings directly before or after it in an NTS episode |
 | `cover_of`, `covered_by` | The original it covers; covers of it |
 | `remix_of`, `remixed_by` | The original it remixes; remixes of it |
 | `samples`, `sampled_by` | What it samples; what samples it |

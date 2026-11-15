@@ -118,13 +118,14 @@ def _identity(dossier: Dossier) -> list[Text | Table]:
 
 def _tags(dossier: Dossier) -> list[Text | Table]:
     """One wrapped line per scope and kind, strongest first, with the sources of the line."""
-    groups: dict[tuple[str, str], list[Tag]] = {}
+    groups: dict[tuple[str, str, str], list[Tag]] = {}
     for tag in dossier.tags:
-        groups.setdefault((tag.scope.value, tag.kind.value), []).append(tag)
+        groups.setdefault((tag.scope.value, tag.kind.value, tag.context_url or ""), []).append(tag)
 
     parts: list[Text | Table] = [_heading("Tags")]
-    for (scope, kind), tags in groups.items():
-        line = Text(f"{scope.replace('_', ' ')} {kind}s: ", style="bold")
+    for (scope, kind, context_url), tags in groups.items():
+        context = f" (episode: {context_url})" if context_url else ""
+        line = Text(f"{scope.replace('_', ' ')} {kind}s{context}: ", style="bold")
         ordered = sorted(tags, key=lambda tag: -(tag.weight or 0.0))
         line.append(", ".join(tag.name for tag in ordered), style="not bold")
         line.append(" — ")

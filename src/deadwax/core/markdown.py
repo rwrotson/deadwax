@@ -78,7 +78,8 @@ def _section[T](title: str, items: list[T], render: Callable[[T], list[str]]) ->
 
 def _tag(tag: Tag) -> list[str]:
     weight = f", {tag.weight:.2f}" if tag.weight is not None else ""
-    return [f"- {tag.name} ({tag.kind}, {tag.scope}{weight}) — {_sources(tag.sources)}"]
+    context = f", episode: {tag.context_url}" if tag.context_url else ""
+    return [f"- {tag.name} ({tag.kind}, {tag.scope}{weight}{context}) — {_sources(tag.sources)}"]
 
 
 def _credit(credit: Credit) -> list[str]:
