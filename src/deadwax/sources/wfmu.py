@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from urllib.parse import urlencode, urljoin
 
 from deadwax.core import (
@@ -16,19 +17,62 @@ from deadwax.core import (
     Relation,
     RelationKind,
     Scope,
-    SourceError,
     SourceGroup,
     Text,
     TextKind,
     Verdict,
     compare,
+    normalize_artist,
 )
 from deadwax.sources._base import HttpAdapter, search_key
 from deadwax.sources._html import parse_html, text_of
 from deadwax.sources._http import Profile
 
-SEARCH = "https://wfmu.org/searchadv.php?action=search"
+ARTISTS = "https://wfmu.org/artistbrowser.php"
 MIN_CELLS = 2
+MIN_INDEX_CELLS = 4
+MAX_PLAYLISTS = 10
+
+
+def _date(value: str | None) -> str | None:
+    if value is None:
+        return None
+    try:
+        return datetime.strptime(value, "%b %d %Y").replace(tzinfo=UTC).date().isoformat()
+    except ValueError:
+        return None
+
+
+def _artist_id(content: bytes, artist: str) -> str | None:
+    page = parse_html(content)
+    wanted = normalize_artist(artist)
+    for button in page.css('button[name="id"]'):
+        if normalize_artist(text_of(button) or "") == wanted:
+            return button.attributes.get("value")
+    return None
+
+
+def _plays(content: bytes, key: RecordKey) -> list[tuple[str, str | None]]:
+    page = parse_html(content)
+    found: dict[str, str | None] = {}
+    for row in page.css("tr"):
+        cells = row.css("td")
+        if len(cells) < MIN_INDEX_CELLS:
+            continue
+        artist = text_of(cells[0]) or ""
+        title = (text_of(cells[1]) or "").split(" (plus", maxsplit=1)[0].strip('" ')
+        if (
+            compare(
+                key,
+                RecordKey(artist=artist, title=title, kind=EntityKind.TRACK),
+            ).verdict
+            is not Verdict.MATCH
+        ):
+            continue
+        link = cells[-1].css_first('a[href*="/playlists/"]')
+        if link is not None and (href := link.attributes.get("href")):
+            found[urljoin("https://wfmu.org", href)] = _date(text_of(link))
+    return sorted(found.items(), key=lambda item: item[1] or "", reverse=True)
 
 
 class WfmuAdapter(HttpAdapter):
@@ -40,10 +84,12 @@ class WfmuAdapter(HttpAdapter):
     profile = Profile.BROWSER
     capabilities = frozenset({Capability.RELATIONS, Capability.TEXTS})
 
-    async def _playlist(self, url: str, key: RecordKey) -> Partial | None:
+    async def _playlist(self, url: str, key: RecordKey, date: str | None) -> Partial | None:
         detail = await self.client.get(url)
         playlist = parse_html(detail.content)
         title = text_of(playlist.css_first("title")) or "WFMU"
+        program = title.split(": Playlist", maxsplit=1)[0]
+        host = program.rsplit(" with ", maxsplit=1)[-1] if " with " in program else None
         relations: list[Relation] = []
         texts: list[Text] = []
         candidate: RecordCandidate | None = None
@@ -71,7 +117,7 @@ class WfmuAdapter(HttpAdapter):
             relations.append(
                 Relation(
                     kind=RelationKind.BROADCAST,
-                    target=Entity(type=EntityType.BROADCAST, name=title, url=url),
+                    target=Entity(type=EntityType.BROADCAST, name=program, date=date, url=url),
                     scope=Scope.RECORDING,
                     sources=source,
                 ),
@@ -82,7 +128,8 @@ class WfmuAdapter(HttpAdapter):
                     Text(
                         kind=TextKind.BROADCAST,
                         body=comment,
-                        publication=title,
+                        author=host,
+                        publication=program,
                         scope=Scope.RECORDING,
                         sources=source,
                     ),
@@ -96,33 +143,29 @@ class WfmuAdapter(HttpAdapter):
         key = search_key(query, context)
         if key is None or key.kind is EntityKind.ALBUM:
             raise NotFoundError("WFMU playlist search needs an artist and track title")
-        body = urlencode(
-            {
-                "searchlogic": "and",
-                "searchtext[Artist]": key.artist,
-                "searchtext[Song title]": key.title,
-            },
-        ).encode()
+        initial = key.artist[:1].upper()
+        index = await self.client.get(
+            ARTISTS,
+            params={"action": "artistlist", "initial": initial},
+        )
+        artist_id = _artist_id(index.content, key.artist)
+        if artist_id is None:
+            raise NotFoundError("artist absent from WFMU playlists", url=index.url)
         response = await self.client.request(
             "POST",
-            SEARCH,
+            ARTISTS,
+            params={"action": "artist"},
             headers={"content-type": "application/x-www-form-urlencoded"},
-            body=body,
+            body=urlencode({"id": artist_id}).encode(),
         )
-        page = parse_html(response.content)
-        content = text_of(page.body) or ""
-        if "cannot run searches at this time" in content:
-            raise SourceError("WFMU playlist search is temporarily unavailable", url=SEARCH)
-        urls = list(
-            dict.fromkeys(
-                urljoin("https://wfmu.org", href)
-                for anchor in page.css('a[href*="playlists/shows/"]')
-                if (href := anchor.attributes.get("href"))
-            ),
-        )
-        partials = [p for url in urls[:20] if (p := await self._playlist(url, key)) is not None]
+        plays = _plays(response.content, key)
+        partials = [
+            p
+            for url, date in plays[:MAX_PLAYLISTS]
+            if (p := await self._playlist(url, key, date)) is not None
+        ]
         if not partials:
-            raise NotFoundError("no WFMU playlist with this recording", url=SEARCH)
+            raise NotFoundError("no WFMU playlist with this recording", url=response.url)
         return Partial(
             source=self.name,
             candidate=partials[0].candidate,

@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–16 done (Boomkat and Norman Records remain access-limited).
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 done (Boomkat and Norman Records remain access-limited).
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -113,7 +113,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 14 | Done | Genius. |
 | 15 | Done | Reviews I: AllMusic, Album of the Year. |
 | 16 | Done | Reviews II: press adapter with per-site rules, Resident Advisor; RA DJ charts dropped after site redesign. |
-| 17 | In progress | Radio: NTS, WFMU; context tags. Mock-tested; live source acceptance blocked. |
+| 17 | Done | Radio: NTS, WFMU; context tags. |
 | 18 | Not started | Rate Your Music; browser-first fetching. |
 | 19 | Not started | 1001Tracklists, WhoSampled. |
 | 20 | Not started | Qualification. |
@@ -203,9 +203,9 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 ### Stage 17: radio
 
-- [ ] Model: tags of an episode or set marked as context rather than the track's own.
-- [ ] NTS: episodes that played the track as `broadcast`, neighbouring tracks, episode genres as context tags.
-- [ ] WFMU: playlists as `broadcast`, DJ comments as texts.
+- [x] Model: tags of an episode or set marked as context rather than the track's own.
+- [x] NTS: episodes that played the track as `broadcast`, neighbouring tracks, episode genres as context tags.
+- [x] WFMU: playlists as `broadcast`, DJ comments as texts.
 
 **Suggested message:** `feat(sources): add NTS and WFMU adapters`.
 
@@ -677,5 +677,13 @@ Live verification is incomplete: the public NTS `/api/v2/search` returned HTTP 2
 The dedicated visible Patchright profile opened NTS `/find?q=burial%20archangel` and its JSON search endpoint without a challenge. Both said that no episodes or tracks were found. It also opened WFMU's advanced search form, but a form submission for *Radiohead — Paranoid Android* still returned “Sorry, you cannot run searches at this time.” The browser therefore does not clear either search blocker.
 
 Direct known pages were available in the same browser. NTS's *Jumpin Jack Frost Presents: 30 years of Burial* episode returned an episode JSON document with `embeds.tracklist.results`, `genres[].value`, and an ISO `broadcast` timestamp. WFMU's *Wake with Clay Pigeon* playlist (2026-07-21) returned a real *Paranoid Android* row: the track title is in `.col_song_title font`, its DJ note is in `.col_comments font`, and the last table cell holds the play time. Corrected both parsers and updated the mocked tests to represent these verified structures. Full search-to-episode lookup remains unverified because both public searches returned no usable results. Stage 17 remains in progress.
+
+### 2026-11-15 — Stage 17 completion
+
+NTS's current site uses `/api/v2/search` with `version=2` and `types[]=track`; the earlier `type=track` request returned empty results. The v2 hits include `title`, `artists`, and `article.path`. The adapter now filters hits through the matching gate before reading up to ten matching episode tracklists. WFMU's basic and advanced forms still say searches cannot run, but its artist browser works: its initial index identifies the artist, and the artist's play listing gives titles, dates, and playlist links. The adapter now filters that listing before reading up to ten recent matching playlists and dates broadcasts so separate days do not merge. An HTTP-client POST required the action in explicit `params` to preserve it; a live lookup found that bug and confirmed the repair. No user-supplied playlist URL feature was added.
+
+Mock-tested: NTS v2 search, a rejected live version, episode genres and neighbouring tracks; WFMU artist index, play listing, a rejected live version, playlist comments and dates; both sources' blocked and not-found paths. Live no-cache lookups with 2 requests/s and a 90-second adapter timeout: *Paranoid Android* returned 2 NTS and 10 WFMU broadcasts without errors; both album check records correctly returned `not_found` without requesting song searches; *Кино — Группа крови* returned an NTS broadcast and WFMU `not_found`; *Missing (Todd Terry Remix)* returned 4 WFMU broadcasts and NTS `not_found`. Extra strong record *Burial — Archangel* returned 10 NTS and 6 WFMU broadcasts. A second no-cache *Archangel* lookup with the normal rate and 30-second timeout completed in 22.1 seconds with 16 broadcasts, 20 neighbouring-track relations, 30 context tags, and no errors. The full `poe test-live` suite was not run; live verification targeted Stage 17's five check records and strong record.
+
+`UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (909 tests, 97.04% branch coverage; format, lint, 33 import contracts, strict mypy). The strict docs build and `git diff --check` passed. Stage 17 is Done. No Stage 18 work started.
 
 Distinguish planned, implemented, mock-tested, and live-verified behaviour in every handoff.

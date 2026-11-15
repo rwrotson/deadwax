@@ -112,14 +112,14 @@ The README lists sources planned for later versions and those deadwax will not u
 ## NTS
 
 - **Group:** `radio`; opt-in.
-- **Access:** public NTS JSON search and episode endpoints. The track search returned no results for tested live queries on 2026-11-15, so extraction is currently verified only by mocked responses.
+- **Access:** public NTS JSON track search (`version=2`) and episode endpoints. Search results are checked by artist and title before at most ten matching episodes are read.
 - **Contributes:** matching episodes as `broadcast` relations, the immediately preceding and following tracks as `co_played` relations, and episode genres as tags with `context_url` set to the episode URL.
 
 ## WFMU
 
 - **Group:** `radio`; opt-in.
-- **Access:** public advanced playlist search and playlist HTML. The search returned “Sorry, you cannot run searches at this time” on 2026-11-15, so extraction is currently verified only by mocked responses.
-- **Contributes:** matching playlists as `broadcast` relations and comments attached to the matching row as `broadcast` texts.
+- **Access:** the public artist browser and playlist HTML. The basic and advanced search forms report that searches cannot run, but the artist browser still lists plays. Up to ten recent matching playlists are read and checked by artist, title, and version.
+- **Contributes:** dated playlists as `broadcast` relations and comments attached to the matching row as `broadcast` texts. A host is named as the text's author only when the program title identifies one.
 
 ## Spotify
 

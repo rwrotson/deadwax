@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from deadwax import EntityKind, HttpSettings, Query, RelationKind, SourcesConfig, lookup
+from deadwax import EntityKind, ErrorKind, HttpSettings, Query, RelationKind, SourcesConfig, lookup
 
 EPISODE = "https://www.nts.live/shows/example/episodes/example-2026"
 PLAYLIST = "https://wfmu.org/playlists/shows/12345"
@@ -11,7 +11,26 @@ PLAYLIST = "https://wfmu.org/playlists/shows/12345"
 async def test_nts_episode_has_context_genre_and_neighbours() -> None:
     def respond(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/api/v2/search":
-            return httpx.Response(200, json={"results": [{"episode": {"url": EPISODE}}]})
+            assert request.url.params["version"] == "2"
+            assert request.url.params["types[]"] == "track"
+            return httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {
+                            "title": "Archangel (Live)",
+                            "artists": [{"name": "Burial"}],
+                            "article": {"path": "/shows/wrong/episodes/live"},
+                        },
+                        {
+                            "title": "Archangel",
+                            "artists": [{"name": "Burial"}],
+                            "article": {"path": "/shows/example/episodes/example-2026"},
+                        },
+                    ],
+                },
+            )
+        assert str(request.url) == "https://www.nts.live/api/v2/shows/example/episodes/example-2026"
         return httpx.Response(
             200,
             json={
@@ -55,16 +74,36 @@ async def test_nts_episode_has_context_genre_and_neighbours() -> None:
 @pytest.mark.asyncio
 async def test_wfmu_playlist_comment() -> None:
     def respond(request: httpx.Request) -> httpx.Response:
-        if request.url.path.endswith("searchadv.php"):
-            return httpx.Response(200, text=f'<a href="{PLAYLIST}">Playlist</a>')
+        if request.url.path.endswith("artistbrowser.php"):
+            if request.method == "GET":
+                assert request.url.params["initial"] == "B"
+                return httpx.Response(
+                    200,
+                    text='<button name="id" value="50807">Burial</button>',
+                )
+            assert request.url.params["action"] == "artist"
+            assert request.content == b"id=50807"
+            return httpx.Response(
+                200,
+                text=(
+                    '<table><tr><td class="show">Burial</td>'
+                    '<td class="show">Archangel '
+                    "<font>(plus 0 other tracks on this show)</font></td>"
+                    '<td class="show">Example</td><td class="date">'
+                    '<a href="/playlists/shows/12345">Nov 15 2026</a></td></tr></table>'
+                ),
+            )
         return httpx.Response(
             200,
             text=(
-                '<title>WFMU: Example</title><table><tr><td class="col_artist">'
+                "<title>WFMU: Example with DJ Ada: Playlist from Nov 15 2026</title>"
+                '<table><tr><td class="col_artist">'
                 '<font>Burial</font></td><td class="col_song_title">'
                 '<font>Archangel</font><span>→ "Archangel" by "Burial"</span></td>'
                 '<td class="col_comments"><font>Host note.</font></td>'
-                '<td class="col_live_timestamps_flag">2:05:40</td></tr></table>'
+                '<td class="col_live_timestamps_flag">2:05:40</td></tr>'
+                '<tr><td class="col_artist"><font>Burial</font></td>'
+                '<td class="col_song_title"><font>Archangel (Live)</font></td></tr></table>'
             ),
         )
 
@@ -76,4 +115,57 @@ async def test_wfmu_playlist_comment() -> None:
     )
 
     assert [relation.kind for relation in dossier.relations] == [RelationKind.BROADCAST]
+    assert dossier.relations[0].target.date == "2026-11-15"
     assert [text.body for text in dossier.texts] == ["Host note."]
+    assert dossier.texts[0].author == "DJ Ada"
+    assert dossier.texts[0].publication == "WFMU: Example with DJ Ada"
+
+
+@pytest.mark.asyncio
+async def test_radio_search_drops_other_versions_and_missing_artists() -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "www.nts.live":
+            return httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {
+                            "title": "Archangel (Live)",
+                            "artists": [{"name": "Burial"}],
+                            "article": {"path": "/shows/example/episodes/live"},
+                        },
+                    ],
+                },
+            )
+        return httpx.Response(200, text='<button name="id" value="1">Another Artist</button>')
+
+    dossier = await lookup(
+        Query(kind=EntityKind.TRACK, artist="Burial", title="Archangel"),
+        SourcesConfig(http=HttpSettings(escalation=())),
+        include=("nts", "wfmu"),
+        transport=httpx.MockTransport(respond),
+    )
+
+    assert not dossier.found
+    assert {error.source: error.kind for error in dossier.errors} == {
+        "nts": ErrorKind.NOT_FOUND,
+        "wfmu": ErrorKind.NOT_FOUND,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["nts", "wfmu"])
+async def test_radio_search_reports_blocked_source(source: str) -> None:
+    def respond(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403, headers={"cf-mitigated": "challenge"})
+
+    dossier = await lookup(
+        Query(kind=EntityKind.TRACK, artist="Burial", title="Archangel"),
+        SourcesConfig(http=HttpSettings(escalation=(), retries=0)),
+        include=(source,),
+        transport=httpx.MockTransport(respond),
+    )
+
+    assert [(error.source, error.kind) for error in dossier.errors] == [
+        (source, ErrorKind.BLOCKED),
+    ]

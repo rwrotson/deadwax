@@ -72,8 +72,8 @@ Every source is described in detail in [the sources guide](https://rwrotson.gith
 | ListenBrainz | implemented | listen and listener counts, similar recordings and artists, CritiqueBrainz reviews | needs MusicBrainz IDs from the identity pass |
 | SecondHandSongs | implemented | first release date, writers, covers, the original of a cover, adaptations | songs only; about 10–20 requests a minute without `secondhandsongs.api_key` |
 | KEXP | implemented | the latest 25 plays as broadcasts with programs and hosts, host comments | |
-| NTS | experimental, opt-in | episode broadcasts, neighbouring tracks, episode genres marked as context | Public track search currently returns empty results for tested queries |
-| WFMU | experimental, opt-in | playlist broadcasts and DJ comments | Public search currently reports that searches cannot run |
+| NTS | implemented, opt-in | episode broadcasts, neighbouring tracks, episode genres marked as context | searches the current JSON track index; at most 10 matching episodes |
+| WFMU | implemented, opt-in | playlist broadcasts and DJ comments | searches the artist browser because the basic and advanced searches are unavailable; at most 10 recent matching playlists |
 | Spotify | implemented, needs `spotify.client_id` and `spotify.client_secret` | links, ISRC or barcode, ℗ and © lines; label, popularity, and previews when Spotify gives them; resolves Spotify URLs | `skipped` without credentials; development-mode apps get no label, popularity, or previews; no audio features |
 | YouTube | implemented, needs `youtube.api_key` | links to uploads of the record only, official channels first | about 100 lookups a day on the free quota |
 | Beatport | implemented, opt-in | tempo, key, genre and sub-genre, mix name as the version, ISRC, label and catalog number, remixers, DJ charts that list the track; resolves Beatport URLs | Cloudflare: needs the `stealth` or `browser` extra, else `blocked` |

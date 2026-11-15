@@ -46,6 +46,21 @@ def _episode_url(item: dict[str, object]) -> str | None:
     return urljoin("https://www.nts.live", value) if value else None
 
 
+def _hit_matches(hit: dict[str, object], key: RecordKey) -> bool:
+    artists = _items(hit.get("artists"))
+    artist = _string(artists[0].get("name")) if artists else None
+    title = _string(hit.get("title"))
+    if not artist or not title:
+        return False
+    return (
+        compare(
+            key,
+            RecordKey(artist=artist, title=title, kind=EntityKind.TRACK),
+        ).verdict
+        is Verdict.MATCH
+    )
+
+
 def _matching_positions(tracklist: list[dict[str, object]], key: RecordKey) -> list[int]:
     return [
         index
@@ -102,7 +117,7 @@ class NtsAdapter(HttpAdapter):
     capabilities = frozenset({Capability.RELATIONS, Capability.TAGS})
 
     async def _episode(self, hit: dict[str, object], key: RecordKey) -> Partial | None:
-        episode = _object(hit.get("episode")) or hit
+        episode = _object(hit.get("article"))
         url = _episode_url(episode)
         if not url or "/shows/" not in url or "/episodes/" not in url:
             return None
@@ -164,10 +179,17 @@ class NtsAdapter(HttpAdapter):
             raise NotFoundError("NTS track search needs an artist and track title")
         response = await self.client.get(
             f"{API}/search",
-            params={"q": f"{key.artist} {key.title}", "type": "track"},
+            params={
+                "q": f"{key.artist} {key.title}",
+                "version": "2",
+                "offset": "0",
+                "limit": "36",
+                "types[]": "track",
+            },
         )
         hits = _items(_object(json.loads(response.content)).get("results"))
-        partials = [p for hit in hits[:20] if (p := await self._episode(hit, key)) is not None]
+        matching = [hit for hit in hits if _hit_matches(hit, key)]
+        partials = [p for hit in matching[:10] if (p := await self._episode(hit, key)) is not None]
         if not partials:
             raise NotFoundError("no NTS episode with this recording", url=response.url)
         return Partial(
