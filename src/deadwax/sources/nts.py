@@ -121,7 +121,11 @@ class NtsAdapter(HttpAdapter):
             url=url,
         )
         source = [Provenance(source=self.name, url=url)]
-        date = _string(data.get("broadcast_date")) or _string(data.get("date"))
+        date = (
+            _string(data.get("broadcast"))
+            or _string(data.get("broadcast_date"))
+            or _string(data.get("date"))
+        )
         name = _string(data.get("name")) or _string(episode.get("name")) or "NTS"
         relations: list[Relation] = []
         tags: list[Tag] = []
@@ -140,7 +144,7 @@ class NtsAdapter(HttpAdapter):
         )
         relations.extend(_neighbours(tracklist, positions, source))
         for genre in _items(data.get("genres")):
-            label = _string(genre.get("name"))
+            label = _string(genre.get("value")) or _string(genre.get("name"))
             if label:
                 tags.append(
                     Tag(

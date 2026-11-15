@@ -672,4 +672,10 @@ The worktree was clean at the start. Added opt-in NTS and WFMU adapters, `co_pla
 
 Live verification is incomplete: the public NTS `/api/v2/search` returned HTTP 200 with an empty `results` list for Burial, Archangel, and a suggested popular term. WFMU's advanced playlist search returned HTTP 200 with “Sorry, you cannot run searches at this time.” No end-to-end live lookup on the five check records or a strong record succeeded. The recorded payloads are synthetic, so current extraction paths remain unverified against live result and playlist markup. Stage 17 remains in progress; do not begin Stage 18.
 
+### 2026-11-15 — Stage 17 headed-browser verification
+
+The dedicated visible Patchright profile opened NTS `/find?q=burial%20archangel` and its JSON search endpoint without a challenge. Both said that no episodes or tracks were found. It also opened WFMU's advanced search form, but a form submission for *Radiohead — Paranoid Android* still returned “Sorry, you cannot run searches at this time.” The browser therefore does not clear either search blocker.
+
+Direct known pages were available in the same browser. NTS's *Jumpin Jack Frost Presents: 30 years of Burial* episode returned an episode JSON document with `embeds.tracklist.results`, `genres[].value`, and an ISO `broadcast` timestamp. WFMU's *Wake with Clay Pigeon* playlist (2026-07-21) returned a real *Paranoid Android* row: the track title is in `.col_song_title font`, its DJ note is in `.col_comments font`, and the last table cell holds the play time. Corrected both parsers and updated the mocked tests to represent these verified structures. Full search-to-episode lookup remains unverified because both public searches returned no usable results. Stage 17 remains in progress.
+
 Distinguish planned, implemented, mock-tested, and live-verified behaviour in every handoff.

@@ -17,7 +17,8 @@ async def test_nts_episode_has_context_genre_and_neighbours() -> None:
             json={
                 "name": "Example",
                 "date": "2026-11-15",
-                "genres": [{"name": "Electronic"}],
+                "broadcast": "2026-11-15T20:00:00+00:00",
+                "genres": [{"value": "Electronic"}],
                 "embeds": {
                     "tracklist": {
                         "results": [
@@ -48,6 +49,7 @@ async def test_nts_episode_has_context_genre_and_neighbours() -> None:
         "after",
     }
     assert [(tag.name, tag.context_url) for tag in dossier.tags] == [("Electronic", EPISODE)]
+    assert dossier.relations[0].target.date == "2026-11-15"
 
 
 @pytest.mark.asyncio
@@ -58,8 +60,11 @@ async def test_wfmu_playlist_comment() -> None:
         return httpx.Response(
             200,
             text=(
-                "<title>WFMU: Example</title><table><tr><td>Burial</td>"
-                "<td>Archangel</td><td>Host note.</td></tr></table>"
+                '<title>WFMU: Example</title><table><tr><td class="col_artist">'
+                '<font>Burial</font></td><td class="col_song_title">'
+                '<font>Archangel</font><span>→ "Archangel" by "Burial"</span></td>'
+                '<td class="col_comments"><font>Host note.</font></td>'
+                '<td class="col_live_timestamps_flag">2:05:40</td></tr></table>'
             ),
         )
 

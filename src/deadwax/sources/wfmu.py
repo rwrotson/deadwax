@@ -51,8 +51,8 @@ class WfmuAdapter(HttpAdapter):
             cells = row.css("td")
             if len(cells) < MIN_CELLS:
                 continue
-            artist = text_of(cells[0]) or ""
-            song = text_of(cells[1]) or ""
+            artist = text_of(row.css_first(".col_artist font")) or text_of(cells[0]) or ""
+            song = text_of(row.css_first(".col_song_title font")) or text_of(cells[1]) or ""
             if (
                 compare(
                     key,
@@ -76,7 +76,8 @@ class WfmuAdapter(HttpAdapter):
                     sources=source,
                 ),
             )
-            if len(cells) > MIN_CELLS and (comment := text_of(cells[-1])):
+            comment = text_of(row.css_first(".col_comments font"))
+            if comment:
                 texts.append(
                     Text(
                         kind=TextKind.BROADCAST,
