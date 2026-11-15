@@ -76,16 +76,18 @@ class AlbumOfTheYearAdapter(SearchPageAdapter):
         """Read the album and its scores."""
         page = parse_html(content)
         title = text_of(page.css_first("h1.albumTitle, h1"))
-        artist = text_of(page.css_first(".artistTitle a, .artistTitle, .albumArtist a"))
+        artist = text_of(page.css_first(".albumHeadline .artist a")) or text_of(
+            page.css_first(".artistTitle a, .artistTitle, .albumArtist a"),
+        )
         if not title or not artist:
             raise SourceError("the Album of the Year page names no album", url=url)
         provenance = Provenance(source=self.name, url=url)
         scope = Scope.RELEASE_GROUP
         reviews = []
         links = []
-        for row in page.css(".criticReview, .critic-review, .reviewBlock"):
+        for row in page.css(".albumReviewRow, .criticReview, .critic-review, .reviewBlock"):
             publication = text_of(row.css_first(".publication, .source, .reviewSource"))
-            score = _score(text_of(row.css_first(".score, .rating")))
+            score = _score(text_of(row.css_first(".albumReviewRating, .score, .rating")))
             if not publication or score is None:
                 continue
             reviews.append(
@@ -98,7 +100,7 @@ class AlbumOfTheYearAdapter(SearchPageAdapter):
                     sources=[provenance],
                 ),
             )
-            link = row.css_first("a[href]")
+            link = row.css_first(".albumReviewLinks a[href]") or row.css_first("a[href]")
             href = attribute(link, "href")
             if href:
                 target = urljoin(url, href)
@@ -108,10 +110,12 @@ class AlbumOfTheYearAdapter(SearchPageAdapter):
                     )
         genres = [
             Tag(name=name, kind=TagKind.GENRE, scope=scope, sources=[provenance])
-            for node in page.css(".genre a, .genres a")
+            for node in page.css(
+                "#centerContent .detailRow a[href^='/genre/'], .genre a, .genres a",
+            )
             if (name := text_of(node))
         ]
-        user_score = _score(text_of(page.css_first(".userScore, .user-score")))
+        user_score = _score(text_of(page.css_first(".albumUserScore a, .userScore, .user-score")))
         metrics = (
             [
                 Metric(

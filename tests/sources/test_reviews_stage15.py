@@ -7,6 +7,29 @@ from deadwax.sources.albumoftheyear import AlbumOfTheYearAdapter
 from deadwax.sources.allmusic import AllMusicAdapter
 
 ALLMUSIC_PAGES = Path(__file__).resolve().parent.parent / "fixtures" / "allmusic" / "pages"
+AOTY_PAGES = Path(__file__).resolve().parent.parent / "fixtures" / "albumoftheyear" / "pages"
+
+
+def test_albumoftheyear_real_page_structure() -> None:
+    adapter = object.__new__(AlbumOfTheYearAdapter)
+    hits = adapter.search_hits(
+        (AOTY_PAGES / "search_ok_computer.html").read_bytes(),
+        "https://www.albumoftheyear.org/search/?q=Radiohead+OK+Computer",
+    )
+    result = adapter.read_page(
+        (AOTY_PAGES / "ok_computer.html").read_bytes(),
+        "https://www.albumoftheyear.org/album/362-radiohead-ok-computer.php",
+        None,
+    )
+
+    assert (hits[0].key.artist, hits[0].key.title) == ("Radiohead", "OK Computer")
+    assert result.candidate is not None
+    assert (result.candidate.artist, result.candidate.title) == ("Radiohead", "OK Computer")
+    assert len(result.texts) == 16
+    assert result.metrics[0].kind is MetricKind.USER_SCORE
+    assert result.metrics[0].value == 93
+    assert {tag.name for tag in result.tags} >= {"Alternative Rock", "Art Rock"}
+    assert any(link.publication == "Pitchfork" for link in result.review_links)
 
 
 def test_allmusic_real_page_structure() -> None:
