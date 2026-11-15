@@ -191,6 +191,12 @@ These shops are opt-in. Phonica uses Patchright headless by default and sends it
 - **Contributes:** full accessible review text, author, score when present, and review-page provenance from Pitchfork, The Quietus, and The Wire.
 - **Limits:** reads review links found by earlier sources; inaccessible pages and pages without a matching record contribute no text.
 
+## Resident Advisor
+
+- **Pass:** links; opt-in; group `press`.
+- **Contributes:** full available review text, author, and artist and label biographies from GraphQL for linked RA reviews.
+- **Limits:** requires a review link from an earlier source. [RA discontinued DJ charts](https://ra.co/news/74703), so no chart relations are extracted.
+
 ## Escalation ladder
 
 Bandcamp, Beatport, Hard Wax, Soundohm, and Juno pages, the song.link page, and Discogs review pages use browser-like headers, HTTP/2, and cookies. When the response is a challenge page (Cloudflare, Akamai, DataDome, PerimeterX, Fastly, Sucuri, AWS WAF, or a captcha on 403/429/503), the client switches to a stronger transport and keeps using it for that source:

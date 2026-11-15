@@ -1,4 +1,5 @@
 import contextlib
+import re
 from urllib.parse import urlsplit
 
 from deadwax.core import (
@@ -21,7 +22,7 @@ from deadwax.core import (
     compare,
 )
 from deadwax.sources._base import HttpAdapter, search_key
-from deadwax.sources._html import attribute, parse_html, text_of
+from deadwax.sources._html import Document, attribute, parse_html, text_of
 from deadwax.sources._http import Profile
 
 _SITES = {
@@ -39,14 +40,26 @@ def _site(url: str) -> tuple[str, str] | None:
     )
 
 
+def _identity(page: Document, publication: str) -> tuple[str | None, str | None]:
+    title = text_of(page.css_first("[itemprop='name'], h1"))
+    artist = text_of(page.css_first("[itemprop='byArtist'], .artist-links, .artist"))
+    if publication == "Pitchfork":
+        artist = text_of(page.css_first("[class*='ContentHeaderArtistWrapper']")) or artist
+    elif publication == "The Quietus" and title:
+        match = re.search(r"([^:]+?)[\u2019']s (.+)$", title)
+        if match is not None:
+            artist = match[1].strip()
+            title = match[2].strip()
+    return artist, title
+
+
 def _review(content: bytes, url: str, key: RecordKey) -> tuple[RecordCandidate, Text] | None:
     site = _site(url)
     if site is None:
         return None
     publication, selector = site
     page = parse_html(content)
-    title = text_of(page.css_first("[itemprop='name'], h1"))
-    artist = text_of(page.css_first("[itemprop='byArtist'], .artist-links, .artist"))
+    artist, title = _identity(page, publication)
     if not title or not artist:
         return None
     found = RecordCandidate(kind=key.kind, artist=artist, title=title, url=url)
@@ -56,7 +69,9 @@ def _review(content: bytes, url: str, key: RecordKey) -> tuple[RecordCandidate, 
     body = "\n\n".join(value for node in page.css(selector) if (value := text_of(node)))
     if not body:
         return None
-    author = text_of(page.css_first("[rel='author'], [itemprop='author'], .byline a"))
+    author = text_of(
+        page.css_first("[rel='author'], [itemprop='author'], .byline a, [class*='author']"),
+    )
     score = attribute(page.css_first("[itemprop='ratingValue']"), "content")
     rating = None
     if score:

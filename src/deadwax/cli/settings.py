@@ -100,6 +100,7 @@ class Settings(BaseSettings):
     allmusic: SourceSettings = Field(default_factory=SourceSettings)
     albumoftheyear: SourceSettings = Field(default_factory=SourceSettings)
     pressreviews: SourceSettings = Field(default_factory=SourceSettings)
+    residentadvisor: SourceSettings = Field(default_factory=SourceSettings)
     phonica: SourceSettings = Field(default_factory=SourceSettings)
     boomkat: SourceSettings = Field(
         default_factory=lambda: SourceSettings(browser_headless=False),

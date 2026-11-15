@@ -27,6 +27,7 @@ from deadwax.sources.norman import NormanAdapter
 from deadwax.sources.odesli import OdesliAdapter
 from deadwax.sources.phonica import PhonicaAdapter
 from deadwax.sources.press import PressAdapter
+from deadwax.sources.residentadvisor import ResidentAdvisorAdapter
 from deadwax.sources.secondhandsongs import SecondHandSongsAdapter
 from deadwax.sources.soundcloud import SoundCloudAdapter
 from deadwax.sources.soundohm import SoundohmAdapter
@@ -64,6 +65,7 @@ ADAPTERS: tuple[type[HttpAdapter], ...] = (
     AllMusicAdapter,
     AlbumOfTheYearAdapter,
     PressAdapter,
+    ResidentAdvisorAdapter,
 )
 
 

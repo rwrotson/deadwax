@@ -197,7 +197,7 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 - [ ] Decide with the user how much review text is kept, before the stage.
 - [ ] Press adapter: one adapter, per-site rules (Pitchfork, The Quietus, The Wire, and others agreed at the stage) reading review links from the context.
-- [ ] Resident Advisor through its GraphQL endpoint: reviews, artist and label bios, DJ charts as relations.
+- [ ] Resident Advisor through its GraphQL endpoint: reviews, artist and label bios. DJ charts were discontinued by RA's site redesign and are dropped from this stage.
 
 **Suggested message:** `feat(sources): add press review and Resident Advisor adapters`.
 
@@ -645,6 +645,14 @@ The no-cache, headed Patchright CLI lookup of *Radiohead — OK Computer* then c
 The user chose full available review text and Pitchfork, The Quietus, and The Wire for the press adapter. Added an opt-in `pressreviews` adapter in the links pass, with per-site HTML selectors, record matching, configuration, documentation, and synthetic extraction tests. It consumes review links from earlier passes. No real press page was captured, so those selectors and end-to-end extraction are not live-verified. The Resident Advisor GraphQL adapter, biographies, and DJ charts remain unimplemented. A sandboxed request could not resolve `ra.co`; an unsandboxed request to a public review returned HTTP 403, so the GraphQL operation and response shape could not be captured. The five-record and strong-record live acceptance runs were not performed.
 
 `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (896 tests, 97.38% branch coverage; format, lint, 33 import contracts, strict mypy). The strict documentation build and `git diff --check` passed. Stage 16 remains In progress until all deliverables are implemented and accepted.
+
+### 2026-11-15 — Stage 16 headed-browser follow-up
+
+The dedicated headed Patchright profile opened RA's *Burial — Untrue* review (HTTP 200). Its Next.js Apollo state contains `Review:4920`; the browser sent six GraphQL operations. A directly tested `review(id)` GraphQL query returned title, type, full content, author, artist biography, and label blurb. Added the opt-in `residentadvisor` adapter for linked review URLs. A live adapter lookup of *Burial — Untrue* through the library transport returned the matching album, a 2,760-character review, and a label biography. RA's official site-redesign FAQ says DJ charts are no longer supported; the current `/charts` page returned 404, so chart relations are dropped rather than fabricated.
+
+Headed Chrome also fetched Pitchfork's *Amnesiac* and The Quietus's *Tunes, 2011 to 2019* review pages (both HTTP 200). The first press parser failed on both; updated the site rules from their live markup. The parser now returns 12,819 and 17,289 characters respectively on those pages, with matching artist and title. Added small markup tests. The Wire has not been checked on a real review page, and the five-record acceptance runs remain pending. Stage 16 remains In progress.
+
+`UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (900 tests, 96.89% branch coverage; format, lint, 33 import contracts, strict mypy). The strict documentation build and `git diff --check` passed. The full live suite was not run; the live probes above targeted the new sources.
 
 > Read `AGENTS.md`, `docs/architecture.md`, and `DEADWAX_PLAN.md`. Inspect the branch, worktree, stage table, and latest evidence. Implement the first incomplete stage only, preserving accepted and standing decisions and import rules. Run the stage checks, append dated evidence, update the status only when acceptance passes, report an English commit message, stop at the stage boundary, and do not create commits.
 
