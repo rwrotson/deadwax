@@ -1,9 +1,11 @@
+import httpx
 import pytest
 
-from deadwax import EntityKind, MetricKind, RelationKind, TagKind, TextKind
+from deadwax import EntityKind, ErrorKind, MetricKind, Query, RelationKind, TagKind, TextKind
 from deadwax.core import RecordKey, SourceError
 from deadwax.sources._http import HttpResources
-from deadwax.sources.config import Escalation, SourcesConfig
+from deadwax.sources.config import Escalation, SourcesConfig, SourceSettings
+from deadwax.sources.lookup import lookup
 from deadwax.sources.rateyourmusic import RateYourMusicAdapter
 
 
@@ -37,6 +39,8 @@ def test_album_page_extracts_facts() -> None:
     ]
     assert result.metrics[1].value == 53021
     assert result.relations[0].kind is RelationKind.CHARTED_IN
+    assert result.relations[0].target.name == "1997"
+    assert result.relations[0].note == "#1"
     assert result.texts[0].kind is TextKind.USER
     assert result.texts[0].sources[0].url == "https://rateyourmusic.com/review/id/"
 
@@ -64,3 +68,54 @@ def test_browser_is_first_and_url_kind() -> None:
         parse_query("https://rateyourmusic.com/release/album/radiohead/ok-computer/").kind
         is EntityKind.ALBUM
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("search_body", "page_body", "error", "other_version"),
+    [
+        (b"<html></html>", b"", ErrorKind.NOT_FOUND, False),
+        (
+            b"<title>Just a moment...</title><div id='cf-browser-verification'></div>",
+            b"",
+            ErrorKind.BLOCKED,
+            False,
+        ),
+        (
+            b'<div class="search_result"><span class="artist">Radiohead</span>'
+            b'<a href="/release/album/radiohead/ok-computer-extended/">'
+            b"OK Computer (Extended Mix)</a></div>",
+            b'<h1 class="album_title">OK Computer (Extended Mix)</h1>'
+            b'<div class="album_artist">Radiohead</div>'
+            b'<div class="release_pri_genres"><a>Art Rock</a></div>',
+            None,
+            True,
+        ),
+    ],
+)
+async def test_lookup_failure_and_version_gate(
+    search_body: bytes,
+    page_body: bytes,
+    error: ErrorKind | None,
+    other_version: bool,
+) -> None:
+    config = SourcesConfig(
+        rateyourmusic=SourceSettings(html_transports=(Escalation.HTTPX,)),
+    )
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        content = page_body if "/release/" in request.url.path else search_body
+        status = 403 if error is ErrorKind.BLOCKED else 200
+        return httpx.Response(status, content=content)
+
+    dossier = await lookup(
+        Query(kind=EntityKind.ALBUM, artist="Radiohead", title="OK Computer"),
+        config,
+        include=["rateyourmusic"],
+        transport=httpx.MockTransport(respond),
+    )
+    if error is not None:
+        assert dossier.errors[0].kind is error
+    if other_version:
+        assert not dossier.tags
+        assert any(relation.kind is RelationKind.OTHER_VERSION for relation in dossier.relations)

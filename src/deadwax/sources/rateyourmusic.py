@@ -146,15 +146,18 @@ class RateYourMusicAdapter(SearchPageAdapter):
             chart_url = attribute(row, "href")
             label = text_of(row)
             if chart_url and label:
+                position = re.match(r"#\s*(\d+)\s+(?:for|in)\s+(.+)", label, re.IGNORECASE)
+                chart_name = position[2] if position is not None else label
+                note = f"#{position[1]}" if position is not None else label
                 relations.append(
                     Relation(
                         kind=RelationKind.CHARTED_IN,
                         target=Entity(
                             type=EntityType.CHART,
-                            name=label,
+                            name=chart_name,
                             url=urljoin(url, chart_url),
                         ),
-                        note=label,
+                        note=note,
                         scope=scope,
                         sources=[provenance],
                     ),
