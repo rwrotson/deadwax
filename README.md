@@ -85,7 +85,7 @@ Every source is described in detail in [the sources guide](https://rwrotson.gith
 | Norman Records | implemented, opt-in | release identity and genres from a product URL | Nodriver with a visible window; text search is unavailable |
 | SoundCloud | implemented, opt-in, needs `soundcloud.client_id` | uploader descriptions, genre and tags, plays, likes and reposts, notable reposting accounts, uploads absent elsewhere (edits, bootlegs) as other versions; resolves SoundCloud URLs | no new API apps: the web client's ID changes now and then and must be replaced by hand |
 | Genius | implemented, default, needs `genius.token` | song description, annotations, credits, song relations, full lyrics when available | API facts remain when the HTML page is blocked |
-| AllMusic | experimental, opt-in | review, rating, critic, styles, moods, themes, credits, similar albums | Live pages currently return Cloudflare 403 from the development network; extraction awaits saved-page verification |
+| AllMusic | experimental, opt-in | review, rating, critic, styles, moods, themes, credits; similar albums when available | The *OK Computer* search and album page were live-verified through a persistent Patchright profile; direct requests may be blocked |
 | Album of the Year | experimental, opt-in | critic scores, user score, genres, links to critic reviews | Live pages currently return Cloudflare 403 from the development network; extraction awaits saved-page verification |
 
 Names written in a non-Latin script are compared as written: a store that lists "Кино" as "Kino" is reported as `no_match`.

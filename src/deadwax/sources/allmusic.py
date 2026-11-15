@@ -1,4 +1,5 @@
 import contextlib
+import re
 from collections.abc import Mapping
 from urllib.parse import quote, urlsplit
 
@@ -56,7 +57,7 @@ class AllMusicAdapter(SearchPageAdapter):
         page = parse_html(content)
         kind = EntityKind.TRACK if "/songs/" in urlsplit(url).path else EntityKind.ALBUM
         found = []
-        for row in page.css(".search-results li, .search-results .result"):
+        for row in page.css(".search-results li, .search-results .result, div.album, div.song"):
             link = row.css_first("a.title, .title a, h4 a")
             title = text_of(link)
             artist = text_of(row.css_first(".artist, .artists"))
@@ -73,8 +74,12 @@ class AllMusicAdapter(SearchPageAdapter):
     def read_page(self, content: bytes, url: str, key: RecordKey | None) -> Partial:
         """Read the record's AllMusic page."""
         page = parse_html(content)
-        title = text_of(page.css_first("h1.album-title, h1.song-title, h1"))
-        artist = text_of(page.css_first(".album-artist, .song-artist, .artist-name"))
+        title = text_of(page.css_first(".albumTitleText")) or text_of(
+            page.css_first("h1.album-title, h1.song-title, h1"),
+        )
+        artist = text_of(
+            page.css_first("#albumArtists a, .album-artist, .song-artist, .artist-name"),
+        )
         if not title or not artist:
             raise SourceError("the AllMusic page names no record", url=url)
         scope = (
@@ -82,12 +87,22 @@ class AllMusicAdapter(SearchPageAdapter):
         )
         kind = EntityKind.TRACK if scope is Scope.RECORDING else EntityKind.ALBUM
         provenance = Provenance(source=self.name, url=url)
-        review = page.css_first(".review, .album-review, .song-review")
+        review = page.css_first("#review") or page.css_first(
+            ".album-review, .song-review, .review",
+        )
         paragraphs = review.css("p") if review is not None else []
         body = "\n\n".join(value for node in paragraphs if (value := text_of(node)))
-        critic = text_of(page.css_first(".review .author, .review-author, .review-byline"))
-        score_node = page.css_first(".allmusic-rating, .rating-allmusic")
+        critic = text_of(
+            page.css_first(
+                "#review .editorialAuthorLink, .review .author, .review-author, .review-byline",
+            ),
+        )
+        score_node = page.css_first(".allmusicRating, .allmusic-rating, .rating-allmusic")
         score = attribute(score_node, "data-rating") or attribute(score_node, "aria-label")
+        if not score and score_node is not None:
+            match = re.search(r"\bratingAllmusic(\d+)\b", attribute(score_node, "class") or "")
+            if match is not None:
+                score = str(int(match[1]) / 2)
         rating = None
         if score:
             with contextlib.suppress(ValueError):
@@ -110,8 +125,8 @@ class AllMusicAdapter(SearchPageAdapter):
         tags: list[Tag] = []
         for selector, tag_kind in (
             (".styles a", TagKind.STYLE),
-            (".moods a", TagKind.MOOD),
-            (".themes a", TagKind.THEME),
+            ('.moodColumn a[href*="/mood/"], .moods a', TagKind.MOOD),
+            ('.themeColumn a[href*="/theme/"], .themes a', TagKind.THEME),
         ):
             tags.extend(
                 Tag(name=name, kind=tag_kind, scope=scope, sources=[provenance])
@@ -121,8 +136,8 @@ class AllMusicAdapter(SearchPageAdapter):
         people = [
             Credit(role=role, name=name, scope=scope, sources=[provenance])
             for row in page.css(".credits .credit, .credits tr")
-            if (name := text_of(row.css_first(".name, td:first-child")))
-            and (role := text_of(row.css_first(".role, td:last-child")))
+            if (name := text_of(row.css_first(".name, td.singleCredit .artist a, td:first-child")))
+            and (role := text_of(row.css_first(".role, .artistCredits, td:last-child")))
         ]
         relations = [
             Relation(

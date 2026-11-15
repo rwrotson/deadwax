@@ -1,9 +1,33 @@
 from datetime import UTC, datetime
+from pathlib import Path
 
 from deadwax import EntityKind, MetricKind, Query, Rating, ReviewLink, Scope, Text, TextKind
 from deadwax.core import Partial, Provenance, RecordCandidate, merge
 from deadwax.sources.albumoftheyear import AlbumOfTheYearAdapter
 from deadwax.sources.allmusic import AllMusicAdapter
+
+ALLMUSIC_PAGES = Path(__file__).resolve().parent.parent / "fixtures" / "allmusic" / "pages"
+
+
+def test_allmusic_real_page_structure() -> None:
+    adapter = object.__new__(AllMusicAdapter)
+    hits = adapter.search_hits(
+        (ALLMUSIC_PAGES / "search_ok_computer.html").read_bytes(),
+        "https://www.allmusic.com/search/albums/OK%20Computer",
+    )
+    result = adapter.read_page(
+        (ALLMUSIC_PAGES / "ok_computer.html").read_bytes(),
+        "https://www.allmusic.com/album/ok-computer-mw0000024289",
+        None,
+    )
+
+    assert (hits[0].key.artist, hits[0].key.title) == ("Radiohead", "OK Computer")
+    assert result.candidate is not None
+    assert (result.candidate.artist, result.candidate.title) == ("Radiohead", "OK Computer")
+    assert result.texts[0].author == "Stephen Thomas Erlewine"
+    assert result.texts[0].rating == Rating(value=4.5, scale=5)
+    assert {tag.kind for tag in result.tags} == {"style", "mood", "theme"}
+    assert result.credits
 
 
 def test_allmusic_page_extracts_review_and_facets() -> None:

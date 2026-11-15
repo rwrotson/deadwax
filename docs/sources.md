@@ -177,7 +177,7 @@ These shops are opt-in. Phonica uses Patchright headless by default and sends it
 
 - **Pass:** enrichment; opt-in; group `press`.
 - **Contributes:** review text, score and critic; styles, moods, themes, credits, and similar albums.
-- **Limits:** direct requests currently meet Cloudflare 403 from the development network. The extraction selectors require verification against a saved page.
+- **Limits:** the *OK Computer* search and album page were verified through a persistent Patchright profile. Direct requests may still meet Cloudflare 403; similar-album extraction has not been verified on a live page.
 
 ## Album of the Year
 
