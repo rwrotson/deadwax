@@ -19,6 +19,7 @@ from deadwax.core import (
     NotFoundError,
     RateLimitedError,
     SourceError,
+    pause_adapter_timeout,
     trace,
 )
 from deadwax.sources._http.browser import BrowserFetcher
@@ -452,11 +453,15 @@ class HttpClient:
         ) or (fetcher.name == "nodriver" and self._settings.nodriver_profile_dir is not None)
         if not persistent:
             return await fetcher.fetch(request)
-        async with self._resources.profile_lock:
+        async with pause_adapter_timeout():
+            await self._resources.profile_lock.acquire()
+        try:
+            return await fetcher.fetch(request)
+        finally:
             try:
-                return await fetcher.fetch(request)
-            finally:
                 await fetcher.aclose()
+            finally:
+                self._resources.profile_lock.release()
 
     async def _attempt(
         self,

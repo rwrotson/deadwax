@@ -2,7 +2,8 @@ import asyncio
 import contextlib
 import logging
 import time
-from collections.abc import Callable, Collection, Sequence
+from collections.abc import AsyncIterator, Callable, Collection, Sequence
+from contextvars import ContextVar
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -22,6 +23,11 @@ from deadwax.core.query import Query
 
 logger = logging.getLogger(__name__)
 
+_adapter_deadline: ContextVar[asyncio.Timeout | None] = ContextVar(
+    "deadwax_adapter_deadline",
+    default=None,
+)
+
 _ERROR_KINDS: tuple[tuple[type[SourceError], ErrorKind], ...] = (
     (BlockedError, ErrorKind.BLOCKED),
     (RateLimitedError, ErrorKind.RATE_LIMITED),
@@ -40,6 +46,21 @@ def _failure(adapter: Adapter, kind: ErrorKind, reason: str, url: str | None = N
 
 def _milliseconds(start: float) -> int:
     return round((time.monotonic() - start) * 1000)
+
+
+@contextlib.asynccontextmanager
+async def pause_adapter_timeout() -> AsyncIterator[None]:
+    """Exclude a shared-resource queue wait from the current adapter timeout."""
+    timeout = _adapter_deadline.get()
+    if timeout is None or (deadline := timeout.when()) is None:
+        yield
+        return
+    started = asyncio.get_running_loop().time()
+    timeout.reschedule(None)
+    try:
+        yield
+    finally:
+        timeout.reschedule(deadline + asyncio.get_running_loop().time() - started)
 
 
 def _outcome(partial: Partial) -> dict[str, object]:
@@ -88,8 +109,12 @@ async def _call(
 
 async def _timed(adapter: Adapter, query: Query, context: LookupContext, seconds: float) -> Partial:
     try:
-        async with asyncio.timeout(seconds):
-            return await adapter.lookup(query, context)
+        async with asyncio.timeout(seconds) as timeout:
+            token = _adapter_deadline.set(timeout)
+            try:
+                return await adapter.lookup(query, context)
+            finally:
+                _adapter_deadline.reset(token)
     except TimeoutError:
         return _failure(adapter, ErrorKind.TIMEOUT, f"no answer within {seconds:g} s")
     except SourceError as error:

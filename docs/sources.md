@@ -19,7 +19,7 @@ Without `--sources`, a lookup runs the sources named by `DEADWAX_DEFAULT_SOURCES
 3. **Enrichment pass.** All other sources except Odesli run concurrently, at most `concurrency` at once. Each one uses the IDs and links from the identity pass first and falls back to its own search.
 4. **Links pass.** Odesli opens the song.link page of a streaming URL found by any earlier source, such as the Apple Music link from iTunes. YouTube searches uploads of the record.
 
-Each source runs under `adapter_timeout` (`--timeout`). Every candidate passes the version-aware matching gate described in [Output](output.md).
+Each source runs under `adapter_timeout` (`--timeout`). Waiting for another source to release a shared persistent browser profile does not consume that budget; active fetching and parsing do. A full lookup may take longer as browser sources queue for the profile. Every candidate passes the version-aware matching gate described in [Output](output.md).
 
 ## Tiers
 

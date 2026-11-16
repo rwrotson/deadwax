@@ -34,6 +34,7 @@ from deadwax.core import (
     Tag,
     expand_names,
     parse_query,
+    pause_adapter_timeout,
     run,
 )
 
@@ -341,6 +342,35 @@ async def test_all_in_include_runs_every_ready_source_except_excluded_ones() -> 
     )
 
     assert [len(adapter.calls) for adapter in adapters] == [1, 1, 0, 1]
+
+
+async def test_shared_resource_wait_does_not_consume_adapter_timeout() -> None:
+    lock = asyncio.Lock()
+    await lock.acquire()
+
+    async def release() -> None:
+        await asyncio.sleep(0.05)
+        lock.release()
+
+    async def wait_for_resource(query: Query, context: LookupContext) -> Partial:
+        async with pause_adapter_timeout():
+            await lock.acquire()
+        try:
+            await asyncio.sleep(0.005)
+            return found("waiting")
+        finally:
+            lock.release()
+
+    async with asyncio.TaskGroup() as group:
+        group.create_task(release())
+        result = group.create_task(
+            lookup(
+                [FakeAdapter("waiting", behaviour=wait_for_resource)],
+                options=LookupOptions(adapter_timeout=0.03),
+            ),
+        )
+
+    assert result.result() == []
 
 
 async def test_a_group_in_exclude_removes_its_members() -> None:

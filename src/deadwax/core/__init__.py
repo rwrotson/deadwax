@@ -68,7 +68,7 @@ from .normalize import (
     normalize_text,
     split_featuring,
 )
-from .orchestrator import LookupOptions, expand_names, run
+from .orchestrator import LookupOptions, expand_names, pause_adapter_timeout, run
 from .query import EntityKind, IdKind, Query, parse_query, recognize_url
 from .versions import ParsedTitle, classify_marker, parse_title
 
@@ -147,6 +147,7 @@ __all__ = [
     "normalize_text",
     "parse_query",
     "parse_title",
+    "pause_adapter_timeout",
     "recognize_url",
     "run",
     "split_featuring",

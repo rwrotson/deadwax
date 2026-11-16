@@ -263,6 +263,12 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
 
+### 2026-11-16 — Persistent browser profile queue timeouts (Stage 20 partial)
+
+The user's uncached `--sources all` run (`20261116T025317Z-450422`) took 69.6 seconds and reported seven adapter timeouts. Its journal shows Discogs completing seven API requests in about one second each before opening a review page; AllMusic and Album of the Year encountered HTML challenges; Phonica, Boomkat, WhoSampled, and 1001Tracklists ended without a completed HTTP request. The configured persistent Patchright profile serializes browser fetches through a shared lock, and the former 30-second adapter deadline included time spent waiting for that lock. The deadline now pauses only for this queue wait and resumes when the browser profile becomes available. The active fetch and parser retain their timeout. This does not claim that every source can finish active work in 30 seconds; 1001Tracklists already documents `--timeout 120` for its request rate.
+
+Verification: `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (934 offline tests, 96.66% coverage). A concurrency test waits longer than the active timeout for a shared resource and then completes within its active budget. Live lookup after the change remains unverified.
+
 ### 2026-11-16 — All source selector (Stage 20 partial)
 
 `--sources all` now expands to every registered adapter. The existing status filter still omits disabled sources and reports sources without required credentials as skipped; `--exclude` still removes selected sources. The selector also works in `DEADWAX_DEFAULT_SOURCES` and `--exclude`. CLI help, README, and source documentation describe it.
