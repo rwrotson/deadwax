@@ -219,7 +219,10 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
         str | None,
         typer.Option(
             "--sources",
-            help="Only these sources or groups, comma-separated; default: DEADWAX_DEFAULT_SOURCES.",
+            help=(
+                "Only these sources or groups, comma-separated; 'all' selects every source; "
+                "default: DEADWAX_DEFAULT_SOURCES."
+            ),
         ),
     ] = None,
     exclude: Annotated[

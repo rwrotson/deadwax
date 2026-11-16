@@ -108,6 +108,18 @@ def test_options_reach_the_lookup(fake: FakeLookup, tmp_path: Path) -> None:
     assert (include, exclude) == (["musicbrainz", "itunes"], ["deezer"])
 
 
+def test_all_sources_option_reaches_lookup(fake: FakeLookup) -> None:
+    result = runner.invoke(
+        app,
+        ["--track", "Die Fische - Fire of Love", "--sources", "all", "--no-cache"],
+    )
+
+    assert result.exit_code == 0, result.output
+    [(_, config, include, exclude)] = fake.calls
+    assert not config.cache.enabled
+    assert (include, exclude) == (["all"], ())
+
+
 def test_browser_flags_override_environment_for_one_lookup(
     fake: FakeLookup,
     monkeypatch: pytest.MonkeyPatch,

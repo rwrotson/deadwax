@@ -6,7 +6,7 @@ Its Access column shows the configured retrieval methods: API requests use httpx
 
 ## Groups and the default set
 
-Every source belongs to one group: `core` (the v1 sources), `shops`, `press`, `catalogues`, `radio`, `streaming`, or `samples`. `--sources` and `--exclude` take source and group names, comma-separated; `--sources shops --exclude boomkat` runs every shop except Boomkat. An unknown name is a usage error that lists the known sources and groups.
+Every source belongs to one group: `core` (the v1 sources), `shops`, `press`, `catalogues`, `radio`, `streaming`, or `samples`. `--sources` and `--exclude` take source and group names, comma-separated; `--sources all` selects every source, while `--sources shops --exclude boomkat` runs every shop except Boomkat. Disabled sources are still omitted, and sources missing credentials are reported as skipped. An unknown name is a usage error that lists the known sources and groups.
 
 Without `--sources`, a lookup runs the sources named by `DEADWAX_DEFAULT_SOURCES`, which also takes source and group names; the default is `core,listenbrainz,secondhandsongs,kexp,spotify,youtube,genius`. Sources with official or open APIs join the default set as they are added; sources that scrape shop, press, radio, and sample pages run only when named. `DEADWAX_<SOURCE>__ENABLED=false` turns a source off even when it is named.
 

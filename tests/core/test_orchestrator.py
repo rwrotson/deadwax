@@ -332,6 +332,17 @@ async def test_a_group_in_include_runs_only_its_members() -> None:
     assert [len(adapter.calls) for adapter in adapters] == [0, 1, 1, 0]
 
 
+async def test_all_in_include_runs_every_ready_source_except_excluded_ones() -> None:
+    adapters = grouped()
+
+    await lookup(
+        adapters,
+        options=LookupOptions(include=frozenset({"all"}), exclude=frozenset({"boomkat"})),
+    )
+
+    assert [len(adapter.calls) for adapter in adapters] == [1, 1, 0, 1]
+
+
 async def test_a_group_in_exclude_removes_its_members() -> None:
     adapters = grouped()
 
@@ -357,6 +368,10 @@ async def test_expand_names_maps_groups_to_their_sources() -> None:
 
     assert expand_names(["shops", "musicbrainz"], adapters) == {"juno", "boomkat", "musicbrainz"}
     assert expand_names(["samples"], adapters) == frozenset()
+    assert expand_names(["all"], adapters) == {adapter.name for adapter in adapters}
+    assert expand_names(["all", "shops"], adapters) == {adapter.name for adapter in adapters}
+    with pytest.raises(ConfigurationError, match="unknown sources: nonsense"):
+        expand_names(["all", "nonsense"], adapters)
     with pytest.raises(ConfigurationError, match="unknown sources: nts"):
         expand_names(["nts"], adapters)
 

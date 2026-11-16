@@ -263,6 +263,12 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
 
+### 2026-11-16 — All source selector (Stage 20 partial)
+
+`--sources all` now expands to every registered adapter. The existing status filter still omits disabled sources and reports sources without required credentials as skipped; `--exclude` still removes selected sources. The selector also works in `DEADWAX_DEFAULT_SOURCES` and `--exclude`. CLI help, README, and source documentation describe it.
+
+Verification: `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (933 offline tests, 96.65% coverage); `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run --group docs properdocs build --strict` passed. No live lookup was run. Stage 20 qualification remains open.
+
 ### 2026-11-16 — Disable sources without permitted HTML transports (Stage 20 partial)
 
 The global HTML allowlist can remove every transport of a source configured for Nodriver only, such as Norman Records. `SourcesConfig.html_transports()` now returns an empty tuple in this case; the adapter reports `disabled` with the reason `no permitted HTML transports`. Lookup omits the adapter without making a request or adding an error. `deadwax sources` shows the disabled reason and `HTML (no permitted transports)` in its access column. Sources with both API and HTML access are disabled entirely when their HTML transports are exhausted, as requested.

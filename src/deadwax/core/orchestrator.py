@@ -130,15 +130,17 @@ class LookupOptions(BaseModel):
 
 
 def expand_names(names: Collection[str], adapters: Sequence[Adapter]) -> frozenset[str]:
-    """Turn source and group names into the names of the adapters they denote."""
+    """Turn source, group, and all names into the adapters they denote."""
     sources = [adapter.name for adapter in adapters]
-    groups = [group.value for group in SourceGroup]
+    groups = [*[group.value for group in SourceGroup], "all"]
     unknown = sorted(set(names) - {*sources, *groups})
     if unknown:
         raise ConfigurationError(
             f"unknown sources: {', '.join(unknown)}; "
             f"known: {', '.join(sources)}; groups: {', '.join(groups)}",
         )
+    if "all" in names:
+        return frozenset(sources)
     return frozenset(
         adapter.name for adapter in adapters if {adapter.name, adapter.group.value} & set(names)
     )
