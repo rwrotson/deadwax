@@ -89,6 +89,7 @@ Every source is described in detail in [the sources guide](https://rwrotson.gith
 | Genius | implemented, default, needs `genius.token` | song description, annotations, credits, song relations, full lyrics when available | API facts remain when the HTML page is blocked |
 | AllMusic | experimental, opt-in | review, rating, critic, styles, moods, themes, credits; similar albums when available | The *OK Computer* search and album page were live-verified through a persistent Patchright profile; direct requests may be blocked |
 | Rate Your Music | experimental, opt-in | primary and secondary genres, descriptors, user rating and vote count, chart positions, up to ten visible full user reviews | requires express permission for automated access and the `browser` extra; live page parsing is unverified |
+| WhoSampled | implemented, opt-in | samples, covers and remixes; sample element and positions where shown | direct recording pages through the `browser` extra; the site's search path is excluded by robots.txt |
 | Album of the Year | experimental, opt-in | critic scores, user score, genres, links to critic reviews | Live pages currently return Cloudflare 403 from the development network; extraction awaits saved-page verification |
 | Press reviews | implemented, opt-in | full accessible review text, author, and score when present from linked Pitchfork, The Quietus, and The Wire pages | needs review links from earlier sources; all three sites were checked on live pages |
 | Resident Advisor | implemented, opt-in | full review text and associated artist and label biographies | finds reviews by GraphQL search or earlier review links; RA discontinued DJ charts |
@@ -102,7 +103,7 @@ Names written in a non-Latin script are compared as written: a store that lists 
 | Shops | Boomkat, Norman | access blocked by Cloudflare |
 | Catalogues and communities | Rate Your Music | Rate Your Music only through a browser |
 | Radio and mixes | 1001Tracklists | |
-| Samples | WhoSampled | needs a separate decision on its terms of service |
+| Samples | WhoSampled | opt-in; direct record pages, visible browser verification |
 
 Deferred: Phonica (Sucuri), Boomkat and Norman Records (Cloudflare), until access is solved.
 

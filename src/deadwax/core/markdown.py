@@ -123,7 +123,12 @@ def _relation(relation: Relation) -> list[str]:
     target = relation.target
     name = f"{target.artist} — {target.name}" if target.artist else target.name
     name = f"[{name}]({target.url})" if target.url else name
-    note = f" ({relation.note})" if relation.note else ""
+    details = [relation.note, relation.element]
+    if relation.recording_offset is not None:
+        details.append(f"recording {relation.recording_offset}s")
+    if relation.target_offset is not None:
+        details.append(f"target {relation.target_offset}s")
+    note = f" ({', '.join(item for item in details if item)})" if any(details) else ""
     return [f"- {relation.kind}: {name}{note} — {_sources(relation.sources)}"]
 
 

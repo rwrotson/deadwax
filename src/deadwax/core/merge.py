@@ -380,7 +380,18 @@ def _combine_relations(kept: Relation, other: Relation) -> Relation:
             "ids": other.target.ids | kept.target.ids,
         },
     )
-    return _combine(kept, other).model_copy(update={"target": target})
+    return _combine(kept, other).model_copy(
+        update={
+            "target": target,
+            "recording_offset": kept.recording_offset
+            if kept.recording_offset is not None
+            else other.recording_offset,
+            "target_offset": kept.target_offset
+            if kept.target_offset is not None
+            else other.target_offset,
+            "element": kept.element or other.element,
+        },
+    )
 
 
 # Targets that are events: the same name on another date is another entity.
@@ -395,6 +406,10 @@ def _relation_key(relation: Relation) -> Hashable:
         normalize_artist(target.artist or ""),
         normalize_text(target.name),
         target.date if target.type in _DATED_TARGETS else None,
+        (relation.recording_offset, relation.target_offset)
+        if relation.kind in {RelationKind.SAMPLES, RelationKind.SAMPLED_BY}
+        and relation.recording_offset is not None
+        else None,
     )
 
 

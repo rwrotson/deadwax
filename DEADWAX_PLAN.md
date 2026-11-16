@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Stage 19 is next when requested.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Stage 19 is in progress: WhoSampled is implemented; 1001Tracklists remains.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -223,7 +223,7 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 - [x] The user chose to include both sources despite the access restrictions noted in this plan.
 - [ ] 1001Tracklists: sets as `mix` relations, supporting DJs, neighbours in sets.
-- [ ] WhoSampled: samples used and sampled by with timestamp and element, covers, remixes.
+- [x] WhoSampled: samples used and sampled by with timestamp and element, covers, remixes.
 
 **Deferred until:** real track and set pages can be read for 1001Tracklists, and permitted search plus record pages can be read for WhoSampled. The user chose to defer an inaccessible source rather than ship a parser based only on synthetic fixtures.
 
@@ -721,3 +721,7 @@ The user chose to include both sources, to store sample offsets and elements as 
 ### 2026-11-16 — Stage 19 headed browser access and fixture handoff
 
 The user manually completed both sites' checks in visible Patchright Chromium. Reopening its persistent profile returned HTTP 200 for the 1001Tracklists *Daft Punk — One More Time* track page and WhoSampled's page for the same song. A 1001Tracklists set page, WhoSampled's sampled-by listing, and a sample detail page also returned HTTP 200. The system Chrome channel gave `ERR_INVALID_HANDLE`; the bundled Chromium channel worked. Four reduced fixtures under `tests/fixtures/1001tracklists/` and `tests/fixtures/whosampled/` retain real headings, set links, track rows, relation sections, and sample timing markup without page scripts or browser session data. The sample detail identifies “Multiple Elements” and displays offsets on both recordings. The adapters, structured relation fields, tests, documentation, and live lookups remain for the next continuation. WhoSampled's `/search/` remains excluded by its `robots.txt`; implement lookup through a verified record URL or another permitted route. Stage 19 is now in progress.
+
+### 2026-11-16 — Stage 19 WhoSampled adapter
+
+Added opt-in WhoSampled lookup through direct recording URLs; the site's `/search/` remains excluded by `robots.txt`. The adapter verifies the page identity before reading directional sample, cover, and remix relations. Linked sample pages supply the sound element and the first visible offsets on the queried and related recordings as optional structured `Relation` fields. Relation merge retains separate sample positions. README, source and output docs, CLI settings, environment example, and import contracts were updated. Mock transport tests using the real saved pages cover relations, positions, no page, blocked page, and rejection of another version. A no-cache live headed Patchright lookup of *Daft Punk — One More Time* through the manually verified profile returned 12 relations across `samples`, `sampled_by`, `covered_by`, and `remixed_by`, with no errors. The five v1 check records and a WhoSampled-specific song beyond this one remain for Stage 19 acceptance. `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (919 tests, 96.86% branch coverage; format, lint, 33 import contracts, strict mypy). The strict docs build passed. 1001Tracklists is the next part; no Stage 20 work started.

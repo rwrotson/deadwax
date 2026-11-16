@@ -150,6 +150,7 @@ _SERVICES = (
     ("allmusic.com", "allmusic"),
     ("albumoftheyear.org", "albumoftheyear"),
     ("rateyourmusic.com", "rateyourmusic"),
+    ("whosampled.com", "whosampled"),
     ("7digital.com", "7digital"),
 )
 

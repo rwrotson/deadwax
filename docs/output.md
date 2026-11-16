@@ -66,6 +66,8 @@ Relation kinds are directional:
 | `cover_of`, `covered_by` | The original it covers; covers of it |
 | `remix_of`, `remixed_by` | The original it remixes; remixes of it |
 | `samples`, `sampled_by` | What it samples; what samples it |
+
+Sample relations can carry `recording_offset` and `target_offset` in seconds, plus an `element` label. An absent value is left empty.
 | `reposted_by` | Accounts that reposted the upload (SoundCloud) |
 | `charted_by` | DJ charts that list the track, with the DJ as the target's artist (Beatport) |
 | `similar` | Similar records or artists according to a source |

@@ -168,7 +168,11 @@ def _relation_line(relation: Relation) -> Text:
     target = relation.target
     line = Text("  ")
     line.append(target.name, style=f"link {target.url}" if target.url else "")
-    details = [d for d in (target.artist, target.date, relation.note) if d]
+    details = [d for d in (target.artist, target.date, relation.note, relation.element) if d]
+    if relation.recording_offset is not None:
+        details.append(f"recording {relation.recording_offset}s")
+    if relation.target_offset is not None:
+        details.append(f"target {relation.target_offset}s")
     if details:
         line.append(f" ({', '.join(details)})")
     line.append(" — ")

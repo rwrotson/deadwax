@@ -128,6 +128,12 @@ The README lists sources planned for later versions and those deadwax will not u
 - **Contributes:** primary and secondary genres, descriptors, average user score and rating count, chart relations with displayed position, and up to ten visible full user reviews.
 - **Limits:** live page parsing is unverified while DNS access to RYM is unavailable in the development environment.
 
+## WhoSampled
+
+- **Group:** `samples`; opt-in.
+- **Access:** direct recording pages through the browser transport. The site's search path is excluded by `robots.txt`, so the adapter constructs the record URL from artist and title and verifies the page's identity.
+- **Contributes:** directional sample, cover, and remix relations; sample element and offsets from linked connection pages when shown.
+
 ## Spotify
 
 - **Group:** `streaming`; in the default set.

@@ -298,6 +298,7 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
         "nts": "ready",
         "wfmu": "ready",
         "rateyourmusic": "ready",
+        "whosampled": "ready",
     }
     assert "DEADWAX_DISCOGS__TOKEN" in table.stdout
     assert "DEADWAX_LASTFM__API_KEY" in table.stdout
@@ -311,6 +312,7 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
         ("streaming", True),
         ("streaming", False),
         ("shops", False),
+        ("samples", False),
     }
 
 

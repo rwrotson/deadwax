@@ -295,6 +295,20 @@ class Relation(Fact):
     kind: RelationKind
     target: Entity
     note: str | None = None
+    recording_offset: int | None = Field(
+        default=None,
+        ge=0,
+        description="Seconds into the queried recording",
+    )
+    target_offset: int | None = Field(
+        default=None,
+        ge=0,
+        description="Seconds into the related recording",
+    )
+    element: str | None = Field(
+        default=None,
+        description="Sound element identified in a sample connection",
+    )
 
 
 class Link(Attributed):
