@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 done (Boomkat and Norman Records remain access-limited).
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Stage 19 is next when requested.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -114,7 +114,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 15 | Done | Reviews I: AllMusic, Album of the Year. |
 | 16 | Done | Reviews II: press adapter with per-site rules, Resident Advisor; RA DJ charts dropped after site redesign. |
 | 17 | Done | Radio: NTS, WFMU; context tags. |
-| 18 | In progress (live access blocked) | Rate Your Music; browser-first fetching. |
+| 18 | Deferred (RYM access blocked) | Provisional Rate Your Music adapter and browser-first fetching; parser and live results unverified. |
 | 19 | Not started | 1001Tracklists, WhoSampled. |
 | 20 | Not started | Qualification. |
 
@@ -211,9 +211,11 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 ### Stage 18: Rate Your Music
 
-- [ ] Decide with the user on terms of service, before the stage; if declined, the stage is dropped.
-- [ ] Browser-first fetching for a source that never answers plain httpx.
-- [ ] Primary and secondary genres, descriptors as `descriptor` tags, rating with vote count, chart positions, user reviews.
+- [x] The user confirmed express permission for automated RYM access.
+- [x] Browser-first fetching for a source that never answers plain httpx.
+- [ ] Verify primary and secondary genres, descriptor tags, rating with vote count, chart positions, and user reviews against real RYM pages. The provisional parser is covered only by synthetic HTML and remains opt-in.
+
+**Deferred until:** RYM search and record pages can be captured and live lookups run. Do not mark this stage done from synthetic fixtures. Stage 19 may proceed independently when requested.
 
 **Suggested message:** `feat(sources): add Rate Your Music adapter`.
 
@@ -697,3 +699,15 @@ The user confirmed express RYM permission for automated access and chose full vi
 ### 2026-11-16 — Stage 18 offline failure paths
 
 Added isolated lookup tests for an empty search, a Cloudflare challenge, and a search hit for another version. The version test confirms that its genre is dropped and an `other_version` relation remains. Chart relations now name the chart separately from their position note. A live headed Patchright request to the direct *OK Computer* RYM URL also returned `blocked` ("Cloudflare challenge (tried browser)"), so bypassing search does not provide real markup. Stage 18 remains in progress pending rendered RYM search and record pages, real fixtures, and live acceptance. `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (915 tests, 97.01% branch coverage; format, lint, 33 import contracts, strict mypy). No documentation changed in this continuation; the previous strict docs build remains the latest docs check.
+
+### 2026-11-16 — Stage 18 headed manual challenge attempt
+
+At the user's request, opened a visible Patchright Chromium window with a dedicated persistent profile at `/private/tmp/deadwax-rym-profile` for manual challenge completion. Automatic navigation to the *OK Computer* RYM page failed with `net::ERR_HTTP_RESPONSE_CODE_FAILURE`; navigating in the open browser showed Chrome's `HTTP ERROR 503` page. The user confirmed that reloading did not help. There was no challenge widget to complete and no record markup to capture. The browser process was stopped; Stage 18 remains in progress. No code changed in this attempt.
+
+### 2026-11-16 — Stage 18 browser diagnosis
+
+An unsandboxed direct GET to the *OK Computer* RYM URL returned HTTP 403 with `cf-mitigated: challenge` and a Cloudflare "Just a moment" page. A directly launched isolated Google Chrome showed `ERR_INVALID_HANDLE` for both RYM and `example.com`, isolating that error to the managed browser process. Opening the URL in the user's ordinary Chrome did show the Cloudflare check, but after the user attempted it the browser moved to a `__wI_challenge_id` URL and showed `HTTP ERROR 503`. The RYM album page still did not load. The site-side challenge remains the live verification blocker; no adapter code was changed.
+
+### 2026-11-16 — Stage 18 deferred at user request
+
+A separate visible Chrome with a DevTools connection loaded `example.com`, but its RYM album tab returned a Cloudflare challenge followed by `HTTP ERROR 503`. The user also tried navigating manually in that browser; the album stopped opening. No RYM search or record HTML was captured, so parsing cannot be qualified. The user asked to defer this source. Keep the provisional opt-in adapter and tests, leave Stage 18 deferred, and make Stage 19 the next stage on request. No further RYM retries are planned until access changes.
