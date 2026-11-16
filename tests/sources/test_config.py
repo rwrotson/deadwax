@@ -29,6 +29,9 @@ def test_html_transport_defaults_and_overrides() -> None:
     )
     assert custom.html_transports("beatport") == (Escalation.NODRIVER, Escalation.HTTPX)
 
+    restricted = SourcesConfig(http=HttpSettings(escalation=()))
+    assert restricted.html_transports("norman") == ()
+
 
 def test_rates_use_source_defaults_and_overrides() -> None:
     config = SourcesConfig(musicbrainz=SourceSettings(rate=0.5))

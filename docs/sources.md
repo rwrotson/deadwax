@@ -2,7 +2,7 @@
 
 `deadwax sources` lists every source with its group, whether it is in the default set, its pass, what it contributes, and whether it can run. Each source has the settings `enabled`, `rate` (requests per second), `ttl` (cache lifetime), `user_agent`, and `proxy`, set as `DEADWAX_<SOURCE>__<SETTING>` or in a `[<source>]` TOML table; see [Configuration](configuration.md).
 
-Its Access column shows the configured retrieval methods: API requests use httpx; HTML pages use the listed transports in order. `impersonate` uses curl_cffi, `patchright` uses Patchright, and `nodriver` uses Nodriver. Browser transports show their configured `headed` or `headless` mode. The list does not check whether optional packages are installed or whether a site will accept a request. Flags on a separate lookup can override its browser mode.
+Its Access column shows the configured retrieval methods: API requests use httpx; HTML pages use the listed transports in order. `impersonate` uses curl_cffi, `patchright` uses Patchright, and `nodriver` uses Nodriver. Browser transports show their configured `headed` or `headless` mode. If the global allowlist leaves an HTML source with no transport, `sources` shows `HTML (no permitted transports)` and a disabled status; lookups omit that source, including any API work it could do. The list does not check whether optional packages are installed or whether a site will accept a request. Flags on a separate lookup can override its browser mode.
 
 ## Groups and the default set
 

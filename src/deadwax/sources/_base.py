@@ -74,6 +74,17 @@ class HttpAdapter(ABC):
         """Report whether the adapter is enabled and has what it needs."""
         if not self.settings.enabled:
             return SourceStatus(source=self.name, state=SourceState.DISABLED)
+        if Profile.BROWSER in (
+            self.profile,
+            *self.additional_profiles,
+        ) and not self.config.html_transports(
+            self.name,
+        ):
+            return SourceStatus(
+                source=self.name,
+                state=SourceState.DISABLED,
+                detail="no permitted HTML transports",
+            )
         missing = self.missing_credential()
         if missing is not None:
             return SourceStatus(

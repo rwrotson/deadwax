@@ -466,6 +466,37 @@ def test_describe_sources_reports_configured_access() -> None:
         assert sources[name].html_transports
 
 
+def test_describe_sources_disables_one_without_permitted_transports() -> None:
+    config = SourcesConfig.model_validate({"http": {"escalation": []}})
+
+    sources = {info.source: info for info in describe_sources(config)}
+
+    assert sources["norman"].html_transports == []
+    assert sources["norman"].status.state is SourceState.DISABLED
+    assert sources["norman"].status.detail == "no permitted HTML transports"
+    assert sources["musicbrainz"].status.ready
+
+
+@pytest.mark.asyncio
+async def test_lookup_does_not_request_a_source_without_permitted_transports() -> None:
+    config = SourcesConfig.model_validate({"http": {"escalation": []}})
+    requests: list[httpx.Request] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={})
+
+    dossier = await lookup(
+        PARANOID_ANDROID,
+        config,
+        include=["norman"],
+        transport=httpx.MockTransport(answer),
+    )
+
+    assert requests == []
+    assert dossier.errors == []
+
+
 def test_describe_sources() -> None:
     sources = {info.source: info for info in describe_sources()}
 

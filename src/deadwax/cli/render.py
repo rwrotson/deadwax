@@ -301,13 +301,13 @@ def _capabilities(info: SourceInfo) -> str:
 
 def _access(info: SourceInfo) -> str:
     parts = ["API (httpx)"] if info.api else []
-    if info.html_transports:
+    if info.browser_headless is not None:
         mode = "headless" if info.browser_headless else "headed"
         steps = [
             f"{step} [{mode}]" if step in {"patchright", "nodriver"} else step
             for step in info.html_transports
         ]
-        parts.append(f"HTML ({' → '.join(steps)})")
+        parts.append(f"HTML ({' → '.join(steps) if steps else 'no permitted transports'})")
     return "; ".join(parts)
 
 

@@ -327,6 +327,27 @@ def test_sources_command_marks_the_default_set(monkeypatch: pytest.MonkeyPatch) 
     assert defaults == ["musicbrainz", "deezer"]
 
 
+def test_sources_command_displays_unavailable_html_transport(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DEADWAX_HTTP__ESCALATION", "[]")
+    monkeypatch.setenv("COLUMNS", "200")
+
+    table = runner.invoke(app, ["sources"])
+    as_json = runner.invoke(app, ["sources", "--format", "json"])
+
+    assert table.exit_code == as_json.exit_code == 0
+    assert "HTML (no permitted transports)" in table.stdout
+    assert "disabled: no permitted HTML transports" in table.stdout
+    sources = {row["source"]: row for row in json.loads(as_json.stdout)}
+    assert sources["norman"]["html_transports"] == []
+    assert sources["norman"]["status"] == {
+        "source": "norman",
+        "state": "disabled",
+        "detail": "no permitted HTML transports",
+    }
+
+
 def test_unknown_default_source_is_a_usage_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DEADWAX_DEFAULT_SOURCES", "core,nonsense")
 

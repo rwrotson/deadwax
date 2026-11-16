@@ -419,7 +419,7 @@ class SourcesConfig(_Model):
             for step in selected
             if step in allowed or (step is Escalation.PATCHRIGHT and Escalation.BROWSER in allowed)
         )
-        if not result or len(result) != len(set(result)):
+        if len(result) != len(set(result)):
             raise ValueError(
                 f"{source}.html_transports must contain distinct permitted transports",
             )
