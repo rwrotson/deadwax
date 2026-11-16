@@ -104,7 +104,12 @@ class Settings(BaseSettings):
     nts: SourceSettings = Field(default_factory=SourceSettings)
     wfmu: SourceSettings = Field(default_factory=SourceSettings)
     rateyourmusic: SourceSettings = Field(default_factory=SourceSettings)
-    whosampled: SourceSettings = Field(default_factory=SourceSettings)
+    whosampled: SourceSettings = Field(
+        default_factory=lambda: SourceSettings(browser_headless=False),
+    )
+    tracklists: SourceSettings = Field(
+        default_factory=lambda: SourceSettings(browser_headless=False),
+    )
     phonica: SourceSettings = Field(default_factory=SourceSettings)
     boomkat: SourceSettings = Field(
         default_factory=lambda: SourceSettings(browser_headless=False),

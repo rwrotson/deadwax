@@ -55,6 +55,7 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.sources.albumoftheyear` | Read Album of the Year scores, genres, and review links |
 | `deadwax.sources.rateyourmusic` | Read Rate Your Music genres, ratings, charts, and reviews |
 | `deadwax.sources.whosampled` | Read recording samples, covers, and remixes |
+| `deadwax.sources.tracklists` | Read DJ sets containing a track |
 | `deadwax.sources.press` | Read linked reviews from Pitchfork, The Quietus, and The Wire |
 | `deadwax.sources.residentadvisor` | Read linked Resident Advisor reviews and biographies |
 | `deadwax.sources.soundcloud.adapter` | Read uploads and their reposters from SoundCloud (client ID) |

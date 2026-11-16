@@ -304,6 +304,7 @@ DEFAULT_RATES: dict[str, float] = {
     "wfmu": 0.5,
     "rateyourmusic": 0.5,
     "whosampled": 0.5,
+    "tracklists": 0.125,
 }
 
 DEFAULT_HTML_TRANSPORTS: tuple[Escalation, ...] = (
@@ -316,6 +317,7 @@ DEFAULT_HTML_TRANSPORTS: tuple[Escalation, ...] = (
 SOURCE_HTML_TRANSPORTS: dict[str, tuple[Escalation, ...]] = {
     "rateyourmusic": (Escalation.BROWSER,),
     "whosampled": (Escalation.BROWSER,),
+    "tracklists": (Escalation.BROWSER,),
     "phonica": (Escalation.BROWSER,),
     "boomkat": (Escalation.BROWSER,),
     "norman": (Escalation.NODRIVER,),
@@ -383,7 +385,8 @@ class SourcesConfig(_Model):
     nts: SourceSettings = SourceSettings()
     wfmu: SourceSettings = SourceSettings()
     rateyourmusic: SourceSettings = SourceSettings()
-    whosampled: SourceSettings = SourceSettings()
+    whosampled: SourceSettings = SourceSettings(browser_headless=False)
+    tracklists: SourceSettings = SourceSettings(browser_headless=False)
 
     def browser_headless(self, source: str) -> bool:
         """Return the browser mode selected for a source."""

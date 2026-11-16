@@ -34,6 +34,7 @@ from deadwax.sources.secondhandsongs import SecondHandSongsAdapter
 from deadwax.sources.soundcloud import SoundCloudAdapter
 from deadwax.sources.soundohm import SoundohmAdapter
 from deadwax.sources.spotify import SpotifyAdapter
+from deadwax.sources.tracklists import TracklistsAdapter
 from deadwax.sources.wfmu import WfmuAdapter
 from deadwax.sources.whosampled import WhoSampledAdapter
 from deadwax.sources.wikipedia import WikipediaAdapter
@@ -74,6 +75,7 @@ ADAPTERS: tuple[type[HttpAdapter], ...] = (
     WfmuAdapter,
     RateYourMusicAdapter,
     WhoSampledAdapter,
+    TracklistsAdapter,
 )
 
 

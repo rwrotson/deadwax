@@ -299,6 +299,7 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
         "wfmu": "ready",
         "rateyourmusic": "ready",
         "whosampled": "ready",
+        "tracklists": "ready",
     }
     assert "DEADWAX_DISCOGS__TOKEN" in table.stdout
     assert "DEADWAX_LASTFM__API_KEY" in table.stdout

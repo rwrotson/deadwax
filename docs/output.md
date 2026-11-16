@@ -62,7 +62,7 @@ Relation kinds are directional:
 | `label`, `label_release` | The label; its other releases |
 | `appears_on`, `compilation` | Releases and compilations containing the record |
 | `mix`, `broadcast` | DJ mixes and broadcasts containing it |
-| `co_played` | Recordings directly before or after it in an NTS episode |
+| `co_played` | Recordings directly before or after it in a radio episode or DJ set |
 | `cover_of`, `covered_by` | The original it covers; covers of it |
 | `remix_of`, `remixed_by` | The original it remixes; remixes of it |
 | `samples`, `sampled_by` | What it samples; what samples it |

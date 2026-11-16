@@ -95,6 +95,8 @@ _FORCED_EXPOSURE = re.compile(r"^forcedexposure\.com$")
 _ALLMUSIC = re.compile(r"^allmusic\.com$")
 _ALBUM_OF_THE_YEAR = re.compile(r"^albumoftheyear\.org$")
 _RATE_YOUR_MUSIC = re.compile(r"^rateyourmusic\.com$")
+_WHOSAMPLED = re.compile(r"^whosampled\.com$")
+_TRACKLISTS = re.compile(r"^1001tracklists\.com$")
 
 # A SoundCloud track page is '/<user>/<track>', optionally with a secret-link token; the
 # names below are site sections and profile tabs, not users and tracks. Sets ('/<user>/sets/')
@@ -133,6 +135,8 @@ _URL_RULES = (
     _UrlRule(_ALBUM_OF_THE_YEAR, re.compile(r"^/album/"), EntityKind.ALBUM),
     _UrlRule(_RATE_YOUR_MUSIC, re.compile(r"^/release/"), EntityKind.ALBUM),
     _UrlRule(_RATE_YOUR_MUSIC, re.compile(r"^/song/"), EntityKind.TRACK),
+    _UrlRule(_WHOSAMPLED, re.compile(r"^/[^/]+/[^/]+/?$"), EntityKind.TRACK),
+    _UrlRule(_TRACKLISTS, re.compile(r"^/track/[^/]+/[^/]+/"), EntityKind.TRACK),
     _UrlRule(_BANDCAMP, re.compile(r"^/album/"), EntityKind.ALBUM),
     _UrlRule(_BANDCAMP, re.compile(r"^/track/"), EntityKind.TRACK),
     _UrlRule(

@@ -128,10 +128,16 @@ The README lists sources planned for later versions and those deadwax will not u
 - **Contributes:** primary and secondary genres, descriptors, average user score and rating count, chart relations with displayed position, and up to ten visible full user reviews.
 - **Limits:** live page parsing is unverified while DNS access to RYM is unavailable in the development environment.
 
+## 1001Tracklists
+
+- **Group:** `radio`; opt-in.
+- **Access:** public track search form followed by track and set pages through a visible browser by default. The adapter waits eight seconds between requests by default; use `--timeout 120` for a lookup with up to five sets.
+- **Contributes:** up to five verified `mix` relations with set date and supporting DJ, plus immediate neighbours as `co_played` relations. Sets are checked against the track and version before contributing facts.
+
 ## WhoSampled
 
 - **Group:** `samples`; opt-in.
-- **Access:** direct recording pages through the browser transport. The site's search path is excluded by `robots.txt`, so the adapter constructs the record URL from artist and title and verifies the page's identity.
+- **Access:** direct recording pages through a visible browser by default. The site's search path is excluded by `robots.txt`, so the adapter constructs the record URL from artist and title and verifies the page's identity.
 - **Contributes:** directional sample, cover, and remix relations; sample element and offsets from linked connection pages when shown.
 
 ## Spotify

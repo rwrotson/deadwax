@@ -128,6 +128,12 @@ def test_text_query_requires_kind() -> None:
             EntityKind.ALBUM,
             {},
         ),
+        ("https://www.whosampled.com/Daft-Punk/One-More-Time/", EntityKind.TRACK, {}),
+        (
+            "https://www.1001tracklists.com/track/j4rvgx/daft-punk-one-more-time/index.html",
+            EntityKind.TRACK,
+            {},
+        ),
     ],
 )
 def test_url_kind_and_ids_are_recognized(

@@ -52,6 +52,14 @@ def _slug(value: str) -> str:
     return quote(re.sub(r"\s+", "-", value.strip()), safe="-'()")
 
 
+def _record_url(query: Query, key: RecordKey | None) -> str:
+    if query.url is not None and "whosampled.com" in query.url:
+        return query.url
+    if key is not None:
+        return f"{ROOT}/{_slug(key.artist)}/{_slug(key.title)}/"
+    raise NotFoundError("WhoSampled needs an artist and track title")
+
+
 class WhoSampledAdapter(HttpAdapter):
     """Read samples, covers, and remixes from a verified recording page."""
 
@@ -60,6 +68,10 @@ class WhoSampledAdapter(HttpAdapter):
     pass_ = Pass.ENRICH
     profile = Profile.BROWSER
     capabilities = frozenset({Capability.RELATIONS})
+
+    def resolves(self, query: Query) -> bool:
+        """Read a WhoSampled recording URL directly."""
+        return query.url is not None and "whosampled.com" in query.url
 
     async def _section_relations(self, section: Node, kind: RelationKind) -> list[Relation]:
         rows = section.css("tr")
@@ -107,20 +119,18 @@ class WhoSampledAdapter(HttpAdapter):
     async def lookup(self, query: Query, context: LookupContext) -> Partial:
         """Open a record directly because the site's search path is excluded by robots.txt."""
         key = search_key(query, context)
-        if key is None or key.kind is EntityKind.ALBUM:
+        if query.kind is EntityKind.ALBUM:
             raise NotFoundError("WhoSampled needs an artist and track title")
-        url = (
-            query.url
-            if query.url and "whosampled.com" in query.url
-            else f"{ROOT}/{_slug(key.artist)}/{_slug(key.title)}/"
-        )
+        url = _record_url(query, key)
         response = await self.client.get(url)
         page = parse_html(response.content)
         title = attribute(page.css_first('h1 meta[itemprop="name"]'), "content")
         if not title:
             raise SourceError("WhoSampled page names no recording", url=response.url)
-        artist = text_of(page.css_first("h1 a")) or key.artist
-        if (
+        artist = text_of(page.css_first("h1 a")) or (key.artist if key else None)
+        if artist is None:
+            raise SourceError("WhoSampled page names no artist", url=response.url)
+        if key is not None and (
             compare(key, RecordKey(artist=artist, title=title, kind=EntityKind.TRACK)).verdict
             is not Verdict.MATCH
         ):

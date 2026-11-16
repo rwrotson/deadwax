@@ -83,3 +83,22 @@ async def test_different_version_adds_no_facts() -> None:
     )
     assert not dossier.relations
     assert dossier.errors[0].kind is ErrorKind.NOT_FOUND
+
+
+@pytest.mark.asyncio
+async def test_direct_record_url_needs_no_search() -> None:
+    page = (FIXTURES / "whosampled.html").read_bytes()
+    sample = (FIXTURES / "sample.html").read_bytes()
+    config = SourcesConfig(whosampled=SourceSettings(html_transports=(Escalation.HTTPX,)))
+    dossier = await lookup(
+        Query(url="https://www.whosampled.com/Daft-Punk/One-More-Time/"),
+        config,
+        include=["whosampled"],
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(
+                200,
+                content=sample if "/sample/" in request.url.path else page,
+            ),
+        ),
+    )
+    assert any(item.kind is RelationKind.SAMPLES for item in dossier.relations)
