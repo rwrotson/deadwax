@@ -115,6 +115,9 @@ INFOS = [
             state=SourceState.MISSING_EXTRA,
             detail="deadwax[browser]",
         ),
+        api=True,
+        html_transports=["httpx", "patchright", "nodriver"],
+        browser_headless=False,
     ),
     SourceInfo(
         source="itunes",
@@ -146,6 +149,8 @@ def test_sources(output: OutputFormat) -> None:
             ("core", True),
             ("core", False),
         }
+        assert json.loads(text)[2]["html_transports"] == ["httpx", "patchright", "nodriver"]
+        assert json.loads(text)[2]["browser_headless"] is False
     else:
         assert "missing DEADWAX_LASTFM__API_KEY" in text
         assert "missing extra: deadwax[browser]" in text
@@ -153,6 +158,7 @@ def test_sources(output: OutputFormat) -> None:
         assert "identity, links" in text
         assert "core" in text
         assert "yes" in text
+        assert "API (httpx); HTML (httpx → patchright [headed] → nodriver [headed])" in text
 
 
 def test_env_variable() -> None:

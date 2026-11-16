@@ -299,12 +299,24 @@ def _capabilities(info: SourceInfo) -> str:
     return ", ".join(capability.value for capability in info.capabilities)
 
 
+def _access(info: SourceInfo) -> str:
+    parts = ["API (httpx)"] if info.api else []
+    if info.html_transports:
+        mode = "headless" if info.browser_headless else "headed"
+        steps = [
+            f"{step} [{mode}]" if step in {"patchright", "nodriver"} else step
+            for step in info.html_transports
+        ]
+        parts.append(f"HTML ({' → '.join(steps)})")
+    return "; ".join(parts)
+
+
 def print_sources(
     infos: Sequence[SourceInfo],
     output: OutputFormat,
     console: Console | None = None,
 ) -> None:
-    """Print the sources with their group, default membership, pass, capabilities, and status."""
+    """Print sources with their access methods, capabilities, and status."""
     console = console or Console()
     if output is OutputFormat.JSON:
         payload = [info.model_dump(mode="json") for info in infos]
@@ -313,8 +325,8 @@ def print_sources(
 
     if output is OutputFormat.MARKDOWN:
         lines = [
-            "| Source | Group | Default | Pass | Contributes | Status |",
-            "| --- | --- | --- | --- | --- | --- |",
+            "| Source | Group | Default | Pass | Access | Contributes | Status |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
         ]
         for info in infos:
             cells = (
@@ -322,6 +334,7 @@ def print_sources(
                 info.group.value,
                 _default(info),
                 info.pass_.value,
+                _access(info),
                 _capabilities(info),
                 _status(info).plain,
             )
@@ -329,13 +342,14 @@ def print_sources(
         console.out("\n".join(lines), highlight=False)
         return
 
-    table = _table("source", "group", "default", "pass", "contributes", "status")
+    table = _table("source", "group", "default", "pass", "access", "contributes", "status")
     for info in infos:
         table.add_row(
             info.source,
             info.group.value,
             _default(info),
             info.pass_.value,
+            Text(_access(info)),
             _capabilities(info),
             _status(info),
         )

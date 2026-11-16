@@ -49,6 +49,7 @@ class BandcampAdapter(HttpAdapter):
         },
     )
     profile = Profile.BROWSER
+    additional_profiles = (Profile.API,)
 
     def __init__(self, config: SourcesConfig, resources: HttpResources) -> None:
         super().__init__(config, resources)

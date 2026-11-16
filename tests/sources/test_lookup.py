@@ -440,6 +440,32 @@ def test_no_source_is_named_like_a_group() -> None:
     assert {info.source for info in describe_sources()}.isdisjoint(set(SourceGroup))
 
 
+def test_describe_sources_reports_configured_access() -> None:
+    config = SourcesConfig.model_validate(
+        {
+            "http": {"browser_headless": True},
+            "bandcamp": {"browser_headless": False, "html_transports": ["browser", "httpx"]},
+        },
+    )
+    sources = {info.source: info for info in describe_sources(config)}
+
+    assert sources["musicbrainz"].api
+    assert sources["musicbrainz"].html_transports == []
+    assert sources["deezer"].html_transports == [
+        "httpx",
+        "impersonate",
+        "patchright",
+        "nodriver",
+    ]
+    assert sources["deezer"].browser_headless is True
+    assert sources["bandcamp"].api
+    assert sources["bandcamp"].html_transports == ["patchright", "httpx"]
+    assert sources["bandcamp"].browser_headless is False
+    for name in ("discogs", "genius", "hardwax"):
+        assert sources[name].api
+        assert sources[name].html_transports
+
+
 def test_describe_sources() -> None:
     sources = {info.source: info for info in describe_sources()}
 

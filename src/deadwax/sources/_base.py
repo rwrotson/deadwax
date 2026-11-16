@@ -49,6 +49,7 @@ class HttpAdapter(ABC):
     capabilities: frozenset[Capability]
     requires: tuple[Requirement, ...] = ()
     profile: Profile = Profile.API
+    additional_profiles: tuple[Profile, ...] = ()
     # User-Agent replacing the profile's one unless the source's settings name another.
     default_user_agent: str | None = None
     secret_params: frozenset[str] = frozenset()

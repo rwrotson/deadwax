@@ -263,6 +263,12 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
 
+### 2026-11-16 — Source access display (Stage 20 partial)
+
+`deadwax sources` now reports configured API and HTML access in pretty, Markdown, and structured JSON output. HTML transports retain their configured order; the displayed `browser` transport is named `patchright`, and Patchright and Nodriver show the configured headed or headless mode. Discogs, Bandcamp, Hard Wax, and Genius report both API and HTML access. The command does not probe sites or installed optional transports. README and source documentation describe the output and correct the default set to include Genius.
+
+Verification: `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (928 offline tests, 96.65% coverage); `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run --group docs properdocs build --strict` passed. Stage 20 qualification, including live runs, build, and audit, remains open.
+
 ### 2026-11-13 — Per-source HTML transport selection (Stage 13 preparation)
 
 Decision: HTML sources choose an ordered list of transports. The built-in list is httpx, curl_cffi, Patchright, Nodriver, except Beatport (Nodriver first, provisionally) and Juno (curl_cffi first, live-verified in Stage 12). The global `http.escalation` setting now lists permitted optional transports. The former single-value cap is incompatible with this format.

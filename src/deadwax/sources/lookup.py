@@ -4,7 +4,7 @@ import httpx
 
 from deadwax.core import Dossier, LookupOptions, Query, SourceInfo, expand_names, run
 from deadwax.sources._base import HttpAdapter
-from deadwax.sources._http import HttpResources, open_cache
+from deadwax.sources._http import HttpResources, Profile, open_cache
 from deadwax.sources.albumoftheyear import AlbumOfTheYearAdapter
 from deadwax.sources.allmusic import AllMusicAdapter
 from deadwax.sources.bandcamp import BandcampAdapter
@@ -101,6 +101,20 @@ def describe_sources(config: SourcesConfig | None = None) -> list[SourceInfo]:
             capabilities=sorted(adapter.capabilities),
             requires=list(adapter.requires),
             status=adapter.status(),
+            api=Profile.API in (adapter.profile, *adapter.additional_profiles),
+            html_transports=(
+                [
+                    "patchright" if step.value == "browser" else step.value
+                    for step in config.html_transports(adapter.name)
+                ]
+                if Profile.BROWSER in (adapter.profile, *adapter.additional_profiles)
+                else []
+            ),
+            browser_headless=(
+                config.browser_headless(adapter.name)
+                if Profile.BROWSER in (adapter.profile, *adapter.additional_profiles)
+                else None
+            ),
         )
         for adapter in adapters
     ]

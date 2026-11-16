@@ -11,6 +11,7 @@ class HardWaxAdapter(SearchPageAdapter):
     """Shop text, store sections, and label of the record's Hard Wax release."""
 
     name = "hardwax"
+    additional_profiles = (Profile.API,)
     group = SourceGroup.SHOPS
     pass_ = Pass.ENRICH
     capabilities = frozenset(
