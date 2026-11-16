@@ -115,7 +115,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 16 | Done | Reviews II: press adapter with per-site rules, Resident Advisor; RA DJ charts dropped after site redesign. |
 | 17 | Done | Radio: NTS, WFMU; context tags. |
 | 18 | Deferred (RYM access blocked) | Provisional Rate Your Music adapter and browser-first fetching; parser and live results unverified. |
-| 19 | Not started | 1001Tracklists, WhoSampled. |
+| 19 | In progress (real pages captured) | 1001Tracklists, WhoSampled. |
 | 20 | Not started | Qualification. |
 
 Common acceptance for source stages 9–19, in addition to each stage's own:
@@ -221,9 +221,11 @@ Common acceptance for source stages 9–19, in addition to each stage's own:
 
 ### Stage 19: 1001Tracklists, WhoSampled
 
-- [ ] Decide with the user on terms of service for each, before the stage; a declined source is dropped.
+- [x] The user chose to include both sources despite the access restrictions noted in this plan.
 - [ ] 1001Tracklists: sets as `mix` relations, supporting DJs, neighbours in sets.
 - [ ] WhoSampled: samples used and sampled by with timestamp and element, covers, remixes.
+
+**Deferred until:** real track and set pages can be read for 1001Tracklists, and permitted search plus record pages can be read for WhoSampled. The user chose to defer an inaccessible source rather than ship a parser based only on synthetic fixtures.
 
 **Suggested message:** `feat(sources): add 1001Tracklists and WhoSampled adapters`.
 
@@ -711,3 +713,11 @@ An unsandboxed direct GET to the *OK Computer* RYM URL returned HTTP 403 with `c
 ### 2026-11-16 — Stage 18 deferred at user request
 
 A separate visible Chrome with a DevTools connection loaded `example.com`, but its RYM album tab returned a Cloudflare challenge followed by `HTTP ERROR 503`. The user also tried navigating manually in that browser; the album stopped opening. No RYM search or record HTML was captured, so parsing cannot be qualified. The user asked to defer this source. Keep the provisional opt-in adapter and tests, leave Stage 18 deferred, and make Stage 19 the next stage on request. No further RYM retries are planned until access changes.
+
+### 2026-11-16 — Stage 19 access check and deferral
+
+The user chose to include both sources, to store sample offsets and elements as structured relation fields, and to defer a source if its real pages cannot be verified. 1001Tracklists' public search form (`POST /search/result.php`, `main_search`, `search_selection=2`) returned real track results for *Daft Punk — One More Time*. Its linked track page returned HTTP 401 with “We need to validate your are real human!” in plain HTTP, with search-session cookies, and in headless Patchright. No track or set page could be captured. WhoSampled's `robots.txt` disallows `/search/`; its search URL returned HTTP 403. The published source pages needed to verify either extraction path are therefore unavailable. Neither adapter nor synthetic fixture was added. Stage 19 is deferred pending access to real pages through an allowed route. No code or documentation outside this plan changed; `git diff --check` passed. Code checks, docs build, and live lookups were skipped because no implementation was made.
+
+### 2026-11-16 — Stage 19 headed browser access and fixture handoff
+
+The user manually completed both sites' checks in visible Patchright Chromium. Reopening its persistent profile returned HTTP 200 for the 1001Tracklists *Daft Punk — One More Time* track page and WhoSampled's page for the same song. A 1001Tracklists set page, WhoSampled's sampled-by listing, and a sample detail page also returned HTTP 200. The system Chrome channel gave `ERR_INVALID_HANDLE`; the bundled Chromium channel worked. Four reduced fixtures under `tests/fixtures/1001tracklists/` and `tests/fixtures/whosampled/` retain real headings, set links, track rows, relation sections, and sample timing markup without page scripts or browser session data. The sample detail identifies “Multiple Elements” and displays offsets on both recordings. The adapters, structured relation fields, tests, documentation, and live lookups remain for the next continuation. WhoSampled's `/search/` remains excluded by its `robots.txt`; implement lookup through a verified record URL or another permitted route. Stage 19 is now in progress.
