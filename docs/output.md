@@ -78,7 +78,7 @@ Genius song lyrics appear as a full `lyrics` text with `work` scope when the pag
 ## Errors
 
 
-`errors` lists sources that contributed nothing or only part of what they could. Each has `source`, `kind`, `reason`, and sometimes `url`:
+`errors` lists sources that contributed nothing or only part of what they could. Each has `source`, `kind`, `reason`, and sometimes `url`. A `blocked` error also has `access` with the API flag, configured HTML transport order, and browser mode of that lookup. Terminal and Markdown errors show this in an Access column.
 
 | Kind | Meaning |
 |------|---------|

@@ -263,6 +263,12 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
 
+### 2026-11-16 — Blocked source access in lookup output (Stage 20 partial)
+
+Blocked errors now carry the source's access configuration from the same lookup, including API use, ordered HTML transports, and headed or headless browser mode. The terminal and Markdown error tables show an Access column; JSON serializes the structured `access` object. Other error kinds have an empty column. The access label is shared with `deadwax sources`, and the source details reflect one-run CLI overrides. README and source/output documentation describe the field.
+
+Verification: `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run poe check` passed (938 offline tests, 96.67% coverage); `UV_CACHE_DIR=/private/tmp/deadwax-uv-cache uv run --group docs properdocs build --strict` passed. Tests cover HTML-only and mixed API/HTML access, all output formats, and a mocked blocked lookup. No live request was made; Stage 20 qualification remains open.
+
 ### 2026-11-16 — Persistent browser profile queue timeouts (Stage 20 partial)
 
 The user's uncached `--sources all` run (`20261116T025317Z-450422`) took 69.6 seconds and reported seven adapter timeouts. Its journal shows Discogs completing seven API requests in about one second each before opening a review page; AllMusic and Album of the Year encountered HTML challenges; Phonica, Boomkat, WhoSampled, and 1001Tracklists ended without a completed HTTP request. The configured persistent Patchright profile serializes browser fetches through a shared lock, and the former 30-second adapter deadline included time spent waiting for that lock. The deadline now pauses only for this queue wait and resumes when the browser profile becomes available. The active fetch and parser retain their timeout. This does not claim that every source can finish active work in 30 seconds; 1001Tracklists already documents `--timeout 120` for its request rate.

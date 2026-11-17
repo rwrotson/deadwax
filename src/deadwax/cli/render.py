@@ -9,9 +9,11 @@ from rich.text import Text
 
 from deadwax import (
     Dossier,
+    ErrorKind,
     Provenance,
     Relation,
     RelationKind,
+    SourceAccess,
     Sourced,
     SourceInfo,
     SourceState,
@@ -231,9 +233,14 @@ def _review_links(dossier: Dossier) -> list[Text | Table]:
 
 
 def _errors(dossier: Dossier) -> list[Text | Table]:
-    table = _table("source", "problem", "reason")
+    table = _table("source", "problem", "reason", "access")
     for error in dossier.errors:
-        table.add_row(error.source, Text(error.kind.value, style="red"), error.reason)
+        table.add_row(
+            error.source,
+            Text(error.kind.value, style="red"),
+            error.reason,
+            Text(error.access.label) if error.kind is ErrorKind.BLOCKED and error.access else "",
+        )
     return [_heading("Errors"), table]
 
 
@@ -300,15 +307,11 @@ def _capabilities(info: SourceInfo) -> str:
 
 
 def _access(info: SourceInfo) -> str:
-    parts = ["API (httpx)"] if info.api else []
-    if info.browser_headless is not None:
-        mode = "headless" if info.browser_headless else "headed"
-        steps = [
-            f"{step} [{mode}]" if step in {"patchright", "nodriver"} else step
-            for step in info.html_transports
-        ]
-        parts.append(f"HTML ({' → '.join(steps) if steps else 'no permitted transports'})")
-    return "; ".join(parts)
+    return SourceAccess(
+        api=info.api,
+        html_transports=info.html_transports,
+        browser_headless=info.browser_headless,
+    ).label
 
 
 def print_sources(

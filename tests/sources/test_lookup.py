@@ -478,6 +478,31 @@ def test_describe_sources_disables_one_without_permitted_transports() -> None:
 
 
 @pytest.mark.asyncio
+async def test_blocked_error_carries_configured_access() -> None:
+    config = SourcesConfig.model_validate(
+        {
+            "http": {"escalation": [], "browser_headless": False},
+            "deezer": {"html_transports": ["httpx"]},
+        },
+    )
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            403,
+            content=b"<html><title>Just a moment...</title></html>",
+            request=request,
+        ),
+    )
+
+    dossier = await lookup(PARANOID_ANDROID, config, include=["deezer"], transport=transport)
+
+    [error] = dossier.errors
+    assert error.kind is ErrorKind.BLOCKED
+    assert error.access is not None
+    assert error.access.html_transports == ["httpx"]
+    assert error.access.browser_headless is False
+
+
+@pytest.mark.asyncio
 async def test_lookup_does_not_request_a_source_without_permitted_transports() -> None:
     config = SourcesConfig.model_validate({"http": {"escalation": []}})
     requests: list[httpx.Request] = []

@@ -150,8 +150,21 @@ def _review_link(link: ReviewLink) -> list[str]:
     return [f"- {link.publication or 'Review'}: {link.url} — {_sources(link.sources)}"]
 
 
-def _error(error: AdapterError) -> list[str]:
-    return [f"- {error.source}: {error.kind} — {error.reason}"]
+def _errors(errors: list[AdapterError]) -> list[str]:
+    if not errors:
+        return []
+    lines = [
+        "",
+        "## Errors",
+        "",
+        "| Source | Problem | Reason | Access |",
+        "| --- | --- | --- | --- |",
+    ]
+    for error in errors:
+        reason = error.reason.replace("|", "\\|")
+        access = error.access.label if error.access is not None else ""
+        lines.append(f"| {error.source} | {error.kind} | {reason} | {access} |")
+    return lines
 
 
 def to_markdown(dossier: Dossier) -> str:
@@ -168,6 +181,6 @@ def to_markdown(dossier: Dossier) -> str:
         *_section("Metrics", dossier.metrics, _metric),
         *_section("Links", dossier.links, _link),
         *_section("Review links", dossier.review_links, _review_link),
-        *_section("Errors", dossier.errors, _error),
+        *_errors(dossier.errors),
     ]
     return "\n".join(lines).rstrip() + "\n"

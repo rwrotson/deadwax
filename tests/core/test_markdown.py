@@ -188,7 +188,7 @@ def test_markdown_sections_and_sources() -> None:
     assert "*label, release*" in text
     assert "- label: [Hyperdub](https://hyperdub.net) (founded by Kode9)" in text
     assert "- similar: Burial — Rival Dealer — [bandcamp]" in text
-    assert "- lastfm: skipped — no API key" in text
+    assert "| lastfm | skipped | no API key |  |" in text
     assert "- listens: 1200 (release_group) — [bandcamp]" in text
     assert "- listeners: 0.5/1 (release) — [bandcamp]" in text
     assert "**discogs_master:** 89497" in text

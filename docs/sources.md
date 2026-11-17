@@ -4,6 +4,8 @@
 
 Its Access column shows the configured retrieval methods: API requests use httpx; HTML pages use the listed transports in order. `impersonate` uses curl_cffi, `patchright` uses Patchright, and `nodriver` uses Nodriver. Browser transports show their configured `headed` or `headless` mode. If the global allowlist leaves an HTML source with no transport, `sources` shows `HTML (no permitted transports)` and a disabled status; lookups omit that source, including any API work it could do. The list does not check whether optional packages are installed or whether a site will accept a request. Flags on a separate lookup can override its browser mode.
 
+Lookup errors marked `blocked` carry the source's access configuration for that run. The terminal and Markdown error tables show it in an Access column; JSON has a structured `access` field with `api`, `html_transports`, and `browser_headless`.
+
 ## Groups and the default set
 
 Every source belongs to one group: `core` (the v1 sources), `shops`, `press`, `catalogues`, `radio`, `streaming`, or `samples`. `--sources` and `--exclude` take source and group names, comma-separated; `--sources all` selects every source, while `--sources shops --exclude boomkat` runs every shop except Boomkat. Disabled sources are still omitted, and sources missing credentials are reported as skipped. An unknown name is a usage error that lists the known sources and groups.

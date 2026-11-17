@@ -5,11 +5,14 @@ import pytest
 from rich.console import Console
 
 from deadwax import (
+    AdapterError,
     Capability,
     Dossier,
+    ErrorKind,
     Pass,
     Query,
     Requirement,
+    SourceAccess,
     SourceGroup,
     SourceInfo,
     SourceState,
@@ -82,6 +85,46 @@ def test_json_and_markdown(dossier: Dossier) -> None:
     assert rendered(dossier, OutputFormat.MARKDOWN).startswith(
         "# Everything but the Girl — Missing",
     )
+
+
+@pytest.mark.parametrize("output", list(OutputFormat))
+def test_blocked_error_shows_configured_access(dossier: Dossier, output: OutputFormat) -> None:
+    blocked = AdapterError(
+        source="deezer",
+        kind=ErrorKind.BLOCKED,
+        reason="Akamai block",
+        access=SourceAccess(html_transports=["httpx", "patchright"], browser_headless=False),
+    )
+    mixed = AdapterError(
+        source="discogs",
+        kind=ErrorKind.BLOCKED,
+        reason="reviews: Cloudflare challenge",
+        access=SourceAccess(
+            api=True,
+            html_transports=["httpx", "patchright"],
+            browser_headless=True,
+        ),
+    )
+    missing = AdapterError(source="kexp", kind=ErrorKind.NOT_FOUND, reason="no plays")
+    dossier = dossier.model_copy(update={"errors": [blocked, mixed, missing]})
+
+    output_text = rendered(dossier, output)
+
+    if output is OutputFormat.JSON:
+        errors = json.loads(output_text)["errors"]
+        assert errors[0]["access"] == {
+            "api": False,
+            "html_transports": ["httpx", "patchright"],
+            "browser_headless": False,
+        }
+        assert errors[1]["access"]["api"] is True
+        assert errors[2]["access"] is None
+    else:
+        assert "HTML (httpx → patchright [headed])" in output_text
+        assert "API (httpx); HTML (httpx → patchright [headless])" in output_text
+        assert "no plays" in output_text
+        if output is OutputFormat.MARKDOWN:
+            assert "| Source | Problem | Reason | Access |" in output_text
 
 
 INFOS = [

@@ -68,7 +68,9 @@ def _outcome(partial: Partial) -> dict[str, object]:
     candidate = partial.candidate
     return {
         "outcome": "error" if partial.errors else "ok",
-        "errors": [error.model_dump(mode="json", exclude={"source"}) for error in partial.errors],
+        "errors": [
+            error.model_dump(mode="json", exclude={"source", "access"}) for error in partial.errors
+        ],
         "candidate": None if candidate is None else candidate.model_dump(mode="json"),
         "facts": {
             "tags": len(partial.tags),

@@ -24,6 +24,8 @@ deadwax runs --failed
 
 A text query must state `--album` or `--track`; a URL implies its kind. `--sources` and `--exclude` take source and group names (`core`, `shops`, `press`, `catalogues`, `radio`, `streaming`, `samples`), or `all` for every source; without `--sources`, the sources of `DEADWAX_DEFAULT_SOURCES` (default `core,listenbrainz,secondhandsongs,kexp,spotify,youtube,genius`) run. `deadwax sources` shows configured API or HTML access, including ordered HTML transports and the headed or headless mode of Patchright and Nodriver. Other options: `--exclude`, `--format pretty|json|markdown`, `--no-cache`, `--timeout`, `--config`, `--verbose` (or `--debug`) for diagnostic stderr logs. Normal runs print the dossier and its error summary without logs. Exit codes: 0 found, 1 unexpected error, 2 usage or configuration error, 3 nothing matched.
 
+`blocked` errors show the source's access configuration for that lookup in terminal and Markdown tables, and as structured data in JSON.
+
 Every `lookup` and `sources` call is journaled in the user log directory: one JSON Lines file of trace events per run (HTTP requests, every comparison with its scores and failed checks, search picks, each source's outcome, the merge's verdicts) and a summary line per run. `deadwax runs` lists runs (`--failed`, `--no-match`, `--source`, `--kind`, `--query`), and `deadwax runs ID` shows one run's timeline; see [the run journal](https://rwrotson.github.io/deadwax/runs/). `DEADWAX_RUNS__ENABLED=false` turns it off.
 
 ```python

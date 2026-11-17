@@ -2,7 +2,16 @@ from collections.abc import Collection
 
 import httpx
 
-from deadwax.core import Dossier, LookupOptions, Query, SourceInfo, expand_names, run
+from deadwax.core import (
+    Dossier,
+    ErrorKind,
+    LookupOptions,
+    Query,
+    SourceAccess,
+    SourceInfo,
+    expand_names,
+    run,
+)
 from deadwax.sources._base import HttpAdapter
 from deadwax.sources._http import HttpResources, Profile, open_cache
 from deadwax.sources.albumoftheyear import AlbumOfTheYearAdapter
@@ -84,6 +93,22 @@ def build_adapters(config: SourcesConfig, resources: HttpResources) -> list[Http
     return [adapter(config, resources) for adapter in ADAPTERS]
 
 
+def _access(adapter: HttpAdapter, config: SourcesConfig) -> SourceAccess:
+    html = Profile.BROWSER in (adapter.profile, *adapter.additional_profiles)
+    return SourceAccess(
+        api=Profile.API in (adapter.profile, *adapter.additional_profiles),
+        html_transports=(
+            [
+                "patchright" if step.value == "browser" else step.value
+                for step in config.html_transports(adapter.name)
+            ]
+            if html
+            else []
+        ),
+        browser_headless=config.browser_headless(adapter.name) if html else None,
+    )
+
+
 def describe_sources(config: SourcesConfig | None = None) -> list[SourceInfo]:
     """List the sources with their group, pass, capabilities, requirements, and status.
 
@@ -101,20 +126,7 @@ def describe_sources(config: SourcesConfig | None = None) -> list[SourceInfo]:
             capabilities=sorted(adapter.capabilities),
             requires=list(adapter.requires),
             status=adapter.status(),
-            api=Profile.API in (adapter.profile, *adapter.additional_profiles),
-            html_transports=(
-                [
-                    "patchright" if step.value == "browser" else step.value
-                    for step in config.html_transports(adapter.name)
-                ]
-                if Profile.BROWSER in (adapter.profile, *adapter.additional_profiles)
-                else []
-            ),
-            browser_headless=(
-                config.browser_headless(adapter.name)
-                if Profile.BROWSER in (adapter.profile, *adapter.additional_profiles)
-                else None
-            ),
+            **_access(adapter, config).model_dump(),
         )
         for adapter in adapters
     ]
@@ -145,7 +157,15 @@ async def lookup(
     )
 
     try:
-        return await run(query, adapters, options)
+        dossier = await run(query, adapters, options)
+        by_name = {adapter.name: adapter for adapter in adapters}
+        errors = [
+            error.model_copy(update={"access": _access(by_name[error.source], config)})
+            if error.kind is ErrorKind.BLOCKED
+            else error
+            for error in dossier.errors
+        ]
+        return dossier.model_copy(update={"errors": errors})
     finally:
         for adapter in adapters:
             await adapter.aclose()

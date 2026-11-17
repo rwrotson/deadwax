@@ -327,6 +327,27 @@ class ReviewLink(Attributed):
     url: str
 
 
+class SourceAccess(_Model):
+    """Configured routes used to obtain a source's answers."""
+
+    api: bool = False
+    html_transports: list[str] = Field(default_factory=list)
+    browser_headless: bool | None = None
+
+    @property
+    def label(self) -> str:
+        """Describe the configured routes in their attempt order."""
+        parts = ["API (httpx)"] if self.api else []
+        if self.browser_headless is not None:
+            mode = "headless" if self.browser_headless else "headed"
+            steps = [
+                f"{step} [{mode}]" if step in {"patchright", "nodriver"} else step
+                for step in self.html_transports
+            ]
+            parts.append(f"HTML ({' → '.join(steps) if steps else 'no permitted transports'})")
+        return "; ".join(parts)
+
+
 class AdapterError(_Model):
     """Adapter that did not answer, or answered only in part, and why."""
 
@@ -334,6 +355,7 @@ class AdapterError(_Model):
     kind: ErrorKind
     reason: str
     url: str | None = None
+    access: SourceAccess | None = None
 
 
 class CandidateLabel(_Model):
