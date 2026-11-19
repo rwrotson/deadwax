@@ -320,7 +320,7 @@ DEFAULT_RATES: dict[str, float] = {
     "boomkat": 0.5,
     "norman": 0.5,
     "pressreviews": 0.5,
-    "residentadvisor": 0.5,
+    "ra": 0.5,
     "nts": 0.5,
     "wfmu": 0.5,
     "rateyourmusic": 0.5,
@@ -402,7 +402,7 @@ class SourcesConfig(_Model):
     boomkat: SourceSettings = SourceSettings(browser_headless=False)
     norman: SourceSettings = SourceSettings(browser_headless=False)
     pressreviews: SourceSettings = SourceSettings()
-    residentadvisor: SourceSettings = SourceSettings()
+    ra: SourceSettings = SourceSettings()
     nts: SourceSettings = SourceSettings()
     wfmu: SourceSettings = SourceSettings()
     rateyourmusic: SourceSettings = SourceSettings()

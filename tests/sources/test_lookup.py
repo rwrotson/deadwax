@@ -9,6 +9,7 @@ from deadwax import (
     Dossier,
     EntityKind,
     ErrorKind,
+    HttpSettings,
     IdKind,
     LinkTarget,
     MetricKind,
@@ -428,7 +429,7 @@ def test_describe_sources_marks_groups_and_the_default_set() -> None:
         "allmusic",
         "albumoftheyear",
         "pressreviews",
-        "residentadvisor",
+        "ra",
         "nts",
         "wfmu",
         "rateyourmusic",
@@ -548,7 +549,7 @@ def test_describe_sources() -> None:
         "wikipedia", "listenbrainz", "secondhandsongs", "kexp", "youtube", "soundcloud",
         "beatport", "hardwax", "soundohm", "juno", "forcedexposure", "bleep", "phonica",
         "boomkat", "norman", "genius",
-        "allmusic", "albumoftheyear", "pressreviews", "residentadvisor", "nts", "wfmu",
+        "allmusic", "albumoftheyear", "pressreviews", "ra", "nts", "wfmu",
         "rateyourmusic", "whosampled", "tracklists",
     ]  # fmt: skip
     assert sources["musicbrainz"].pass_ is Pass.IDENTITY
@@ -635,3 +636,53 @@ async def test_explicit_recording_is_the_original(replay: Replay, config: Source
     }
     assert RelationKind.SAMPLED_BY in relation_kinds(dossier)
     assert dossier.metrics
+
+
+@pytest.mark.asyncio
+async def test_radio_search_drops_other_versions_and_missing_artists() -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "www.nts.live":
+            return httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {
+                            "title": "Archangel (Live)",
+                            "artists": [{"name": "Burial"}],
+                            "article": {"path": "/shows/example/episodes/live"},
+                        },
+                    ],
+                },
+            )
+        return httpx.Response(200, text='<button name="id" value="1">Another Artist</button>')
+
+    dossier = await lookup(
+        Query(kind=EntityKind.TRACK, artist="Burial", title="Archangel"),
+        SourcesConfig(http=HttpSettings(escalation=())),
+        include=("nts", "wfmu"),
+        transport=httpx.MockTransport(respond),
+    )
+
+    assert not dossier.found
+    assert {error.source: error.kind for error in dossier.errors} == {
+        "nts": ErrorKind.NOT_FOUND,
+        "wfmu": ErrorKind.NOT_FOUND,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["nts", "wfmu"])
+async def test_radio_search_reports_blocked_source(source: str) -> None:
+    def respond(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403, headers={"cf-mitigated": "challenge"})
+
+    dossier = await lookup(
+        Query(kind=EntityKind.TRACK, artist="Burial", title="Archangel"),
+        SourcesConfig(http=HttpSettings(escalation=(), retries=0)),
+        include=(source,),
+        transport=httpx.MockTransport(respond),
+    )
+
+    assert [(error.source, error.kind) for error in dossier.errors] == [
+        (source, ErrorKind.BLOCKED),
+    ]

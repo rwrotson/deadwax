@@ -100,7 +100,7 @@ class Settings(BaseSettings):
     allmusic: SourceSettings = Field(default_factory=SourceSettings)
     albumoftheyear: SourceSettings = Field(default_factory=SourceSettings)
     pressreviews: SourceSettings = Field(default_factory=SourceSettings)
-    residentadvisor: SourceSettings = Field(default_factory=SourceSettings)
+    ra: SourceSettings = Field(default_factory=SourceSettings)
     nts: SourceSettings = Field(default_factory=SourceSettings)
     wfmu: SourceSettings = Field(default_factory=SourceSettings)
     rateyourmusic: SourceSettings = Field(default_factory=SourceSettings)

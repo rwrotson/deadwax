@@ -40,24 +40,28 @@ import-linter enforces the rules marked *contract* with `uv run poe lint-imports
 | `sources` | the `deadwax.core` package, `deadwax.sources.*` within R4 | `deadwax.core.<module>` |
 | `core` | `deadwax.core.*` within R5 | any other `deadwax` layer |
 
-### R4. Inside `sources` (contract, added with the modules)
+### R4. Inside `sources` (contract)
 
 From top to bottom:
 
 ```
-deadwax.sources.lookup        composition: builds adapters and runs the orchestrator
-musicbrainz | itunes | deezer | odesli | discogs | bandcamp | lastfm | wikipedia | listenbrainz | secondhandsongs | kexp | spotify | youtube | soundcloud | beatport | hardwax | soundohm | juno | bleep | forcedexposure | phonica | boomkat | norman | genius | allmusic | albumoftheyear | press | residentadvisor | nts | wfmu | rateyourmusic | whosampled | tracklists
-deadwax.sources._base | _html adapter base class, service names of URLs, search keys | HTML and JSON-LD helpers
+deadwax.sources.lookup                  composition: builds adapters and runs the orchestrator
+deadwax.sources.adapters                one package per source
+deadwax.sources._search                 search keys, search hits, `SearchPageAdapter`, `track_on_release`
+deadwax.sources._adapter | services | _html   `HttpAdapter` | service names of URLs | HTML and JSON-LD helpers
 deadwax.sources._http
 deadwax.sources.config
 ```
 
-Adapters are independent: they never import each other, and data found by one adapter reaches another only through `LookupContext`. A helper needed by two adapters moves down into `_base`, `_html`, or `_http`; `_base` and `_html` are independent of each other. An adapter that grows into a package gets its own layers contract with `adapter`, `parse`, `models` (`musicbrainz`, `discogs`, `bandcamp`, `lastfm`, `wikipedia`, `listenbrainz`, `secondhandsongs`, `kexp`, `spotify`, `soundcloud`, `beatport`, `hardwax`; `soundohm` and `juno` without `models`).
+Every adapter is a package `deadwax.sources.adapters.<name>`, named after its source, with the modules `adapter` (the adapter class and its requests), `parse` (pure functions from responses to facts), and optionally `models` (Pydantic models of JSON responses), layered in that order (contract "R4: adapter package modules"). Its tests live in `tests/sources/adapters/<name>/` and its recorded responses in `tests/fixtures/<name>/`.
+
+Adapters are independent (contract "R4: adapters are independent"): they never import each other, and data found by one adapter reaches another only through `LookupContext`. A helper needed by two adapters moves down into `_search`, `_adapter`, `services`, `_html`, or `_http`.
 
 Inside `deadwax.sources._http` (contract "R8: HTTP stack modules"), from top to bottom:
 
 ```
 client
+sessions
 impersonate | browser | nodriver | plain | cache
 challenge | profiles | ratelimit | retry | messages
 ```

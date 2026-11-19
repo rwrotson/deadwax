@@ -306,7 +306,7 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
         "allmusic": "ready",
         "albumoftheyear": "ready",
         "pressreviews": "ready",
-        "residentadvisor": "ready",
+        "ra": "ready",
         "nts": "ready",
         "wfmu": "ready",
         "rateyourmusic": "ready",

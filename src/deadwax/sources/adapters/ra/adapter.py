@@ -1,0 +1,110 @@
+import json
+
+from deadwax.core import (
+    Capability,
+    LookupContext,
+    NotFoundError,
+    Partial,
+    Pass,
+    Query,
+    RecordKey,
+    SourceError,
+    SourceGroup,
+    Text,
+    Verdict,
+    compare,
+)
+from deadwax.sources._adapter import HttpAdapter
+from deadwax.sources._http import Profile
+from deadwax.sources._search import search_key
+from deadwax.sources.adapters.ra import parse
+
+
+class ResidentAdvisorAdapter(HttpAdapter):
+    """Read linked RA reviews and associated artist and label biographies."""
+
+    name = "ra"
+    group = SourceGroup.PRESS
+    pass_ = Pass.LINKS
+    profile = Profile.BROWSER
+    capabilities = frozenset({Capability.TEXTS})
+
+    async def _graphql(
+        self,
+        operation: str,
+        variables: dict[str, str],
+        query: str,
+    ) -> dict[str, object]:
+        payload = json.dumps(
+            {
+                "operationName": operation,
+                "variables": variables,
+                "query": query,
+            },
+        ).encode()
+        response = await self.client.request(
+            "POST",
+            "https://ra.co/graphql",
+            headers={"content-type": "application/json"},
+            body=payload,
+        )
+        try:
+            root = parse.as_object(json.loads(response.content))
+        except (ValueError, UnicodeDecodeError) as error:
+            raise SourceError(
+                "invalid Resident Advisor GraphQL response",
+                url=response.url,
+            ) from error
+        if root.get("errors"):
+            raise SourceError("Resident Advisor GraphQL returned errors", url=response.url)
+        return parse.as_object(root.get("data"))
+
+    async def _search_url(self, key: RecordKey) -> str | None:
+        data = await self._graphql(
+            "DEADWAX_SEARCH",
+            {"term": f"{key.artist} {key.title}"},
+            parse.SEARCH_QUERY,
+        )
+        results = data.get("search")
+        for value in results if isinstance(results, list) else []:
+            hit = parse.as_object(value)
+            name = parse.as_text(hit.get("value"))
+            path = parse.as_text(hit.get("contentUrl"))
+            if not name or not path or parse.review_id(f"https://ra.co{path}") is None:
+                continue
+            artist, separator, title = name.partition(" - ")
+            found_key = RecordKey(artist=artist, title=title, kind=key.kind)
+            if separator and compare(key, found_key).verdict is Verdict.MATCH:
+                return f"https://ra.co{path}"
+        return None
+
+    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+        """Query RA for a linked review and keep facts matching the record."""
+        key = search_key(query, context)
+        if key is None:
+            raise NotFoundError("no record identity for Resident Advisor")
+        links = [link.url for link in context.review_links if parse.review_id(link.url)]
+        if not links:
+            found = await self._search_url(key)
+            if found is None:
+                raise NotFoundError("no matching Resident Advisor review")
+            links = [found]
+        texts: list[Text] = []
+        candidate = None
+        for url in dict.fromkeys(links):
+            review_id = parse.review_id(url)
+            if review_id is None:
+                continue
+            record = parse.as_object(
+                (await self._graphql("DEADWAX_REVIEW", {"id": review_id}, parse.QUERY)).get(
+                    "review",
+                ),
+            )
+            extracted = parse.extract(record, key, url)
+            if extracted is None:
+                continue
+            candidate, found_texts = extracted
+            texts.extend(found_texts)
+        if not texts:
+            raise NotFoundError("no matching Resident Advisor review")
+        return Partial(source=self.name, candidate=candidate, texts=texts)

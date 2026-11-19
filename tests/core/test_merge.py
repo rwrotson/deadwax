@@ -23,6 +23,7 @@ from deadwax.core import (
     RecordCandidate,
     Relation,
     RelationKind,
+    ReviewLink,
     Scope,
     Tag,
     TagKind,
@@ -631,3 +632,36 @@ def test_short_or_unrelated_texts_stay_apart() -> None:
         (TextKind.SHOP, 1),
         (TextKind.SHOP, 1),
     ]
+
+
+def test_review_score_merges_and_rejected_links_do_not_leak() -> None:
+    query = Query(kind=EntityKind.ALBUM, artist="Radiohead", title="OK Computer")
+    candidate = RecordCandidate(kind=EntityKind.ALBUM, artist="Radiohead", title="OK Computer")
+    source = Provenance(source="allmusic", url="https://www.allmusic.com/album/ok-computer")
+    wiki = Provenance(source="wikipedia", url="https://en.wikipedia.org/wiki/OK_Computer")
+    review = Text(
+        kind=TextKind.REVIEW,
+        body="A textured guitar record.",
+        publication="AllMusic",
+        rating=Rating(value=4.5, scale=5),
+        scope=Scope.RELEASE_GROUP,
+        sources=[source],
+    )
+    score = review.model_copy(update={"body": "", "sources": [wiki]})
+    other = RecordCandidate(kind=EntityKind.ALBUM, artist="Radiohead", title="OK Computer (Live)")
+    dossier = merge(
+        query,
+        [
+            Partial(source="wikipedia", candidate=candidate, texts=[score]),
+            Partial(source="allmusic", candidate=candidate, texts=[review]),
+            Partial(
+                source="albumoftheyear",
+                candidate=other,
+                review_links=[ReviewLink(url="https://pitchfork.com/other", sources=[source])],
+            ),
+        ],
+        generated_at=datetime(2026, 11, 14, tzinfo=UTC),
+    )
+    assert len(dossier.texts) == 1
+    assert {item.source for item in dossier.texts[0].sources} == {"wikipedia", "allmusic"}
+    assert dossier.review_links == []

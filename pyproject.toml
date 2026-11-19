@@ -295,127 +295,18 @@ layers = [
 name = "R4: sources modules"
 type = "layers"
 containers = ["deadwax.sources"]
-layers = [
-    "lookup",
-    "musicbrainz | itunes | deezer | odesli | discogs | bandcamp | lastfm | wikipedia | listenbrainz | secondhandsongs | kexp | spotify | youtube | soundcloud | beatport | hardwax | soundohm | juno | bleep | forcedexposure | phonica | boomkat | norman | genius | allmusic | albumoftheyear | press | residentadvisor | nts | wfmu | rateyourmusic | whosampled | tracklists",
-    "_base | _html",
-    "_http",
-    "config",
-]
+layers = ["lookup", "adapters", "_search", "_adapter | services | _html", "_http", "config"]
 
 [[tool.importlinter.contracts]]
-name = "R8: MusicBrainz adapter modules"
-type = "layers"
-containers = ["deadwax.sources.musicbrainz"]
-layers = ["adapter", "parse", "models"]
+name = "R4: adapters are independent"
+type = "independence"
+modules = ["deadwax.sources.adapters.*"]
 
 [[tool.importlinter.contracts]]
-name = "R8: Bandcamp adapter modules"
+name = "R4: adapter package modules"
 type = "layers"
-containers = ["deadwax.sources.bandcamp"]
-layers = ["adapter", "parse", "models"]
-
-[[tool.importlinter.contracts]]
-name = "R8: Discogs adapter modules"
-type = "layers"
-containers = ["deadwax.sources.discogs"]
-layers = ["adapter", "parse", "models"]
-
-[[tool.importlinter.contracts]]
-name = "R8: Last.fm adapter modules"
-type = "layers"
-containers = ["deadwax.sources.lastfm"]
-layers = ["adapter", "parse", "models"]
-
-[[tool.importlinter.contracts]]
-name = "R8: Wikipedia adapter modules"
-type = "layers"
-containers = ["deadwax.sources.wikipedia"]
-layers = ["adapter", "parse", "models"]
-
-[[tool.importlinter.contracts]]
-name = "R8: ListenBrainz adapter modules"
-type = "layers"
-containers = ["deadwax.sources.listenbrainz"]
-layers = ["adapter", "parse", "models"]
-
-[[tool.importlinter.contracts]]
-name = "R8: SecondHandSongs adapter modules"
-type = "layers"
-containers = ["deadwax.sources.secondhandsongs"]
-layers = ["adapter", "parse", "models"]
-
-[[tool.importlinter.contracts]]
-name = "R8: KEXP adapter modules"
-type = "layers"
-containers = ["deadwax.sources.kexp"]
-layers = ["adapter", "parse", "models"]
-
-[[tool.importlinter.contracts]]
-name = "R8: Spotify adapter modules"
-type = "layers"
-containers = ["deadwax.sources.spotify"]
-layers = ["adapter", "parse", "models"]
-
-[[tool.importlinter.contracts]]
-name = "R8: SoundCloud adapter modules"
-type = "layers"
-containers = ["deadwax.sources.soundcloud"]
-layers = ["adapter", "parse", "models"]
-
-[[tool.importlinter.contracts]]
-name = "R8: Beatport adapter modules"
-type = "layers"
-containers = ["deadwax.sources.beatport"]
-layers = ["adapter", "parse", "models"]
-
-[[tool.importlinter.contracts]]
-name = "R8: Hard Wax adapter modules"
-type = "layers"
-containers = ["deadwax.sources.hardwax"]
-layers = ["adapter", "parse", "models"]
-
-[[tool.importlinter.contracts]]
-name = "R8: Soundohm adapter modules"
-type = "layers"
-containers = ["deadwax.sources.soundohm"]
-layers = ["adapter", "parse"]
-
-[[tool.importlinter.contracts]]
-name = "R8: Juno adapter modules"
-type = "layers"
-containers = ["deadwax.sources.juno"]
-layers = ["adapter", "parse"]
-
-[[tool.importlinter.contracts]]
-name = "R8: Phonica adapter modules"
-type = "layers"
-containers = ["deadwax.sources.phonica"]
-layers = ["adapter", "parse", "models"]
-
-[[tool.importlinter.contracts]]
-name = "R8: Boomkat adapter modules"
-type = "layers"
-containers = ["deadwax.sources.boomkat"]
-layers = ["adapter", "parse"]
-
-[[tool.importlinter.contracts]]
-name = "R8: Norman Records adapter modules"
-type = "layers"
-containers = ["deadwax.sources.norman"]
-layers = ["adapter", "parse"]
-
-[[tool.importlinter.contracts]]
-name = "R8: Bleep adapter modules"
-type = "layers"
-containers = ["deadwax.sources.bleep"]
-layers = ["adapter", "parse"]
-
-[[tool.importlinter.contracts]]
-name = "R8: Forced Exposure adapter modules"
-type = "layers"
-containers = ["deadwax.sources.forcedexposure"]
-layers = ["adapter", "parse"]
+containers = ["deadwax.sources.adapters.*"]
+layers = ["adapter", "parse", "(models)"]
 
 [[tool.importlinter.contracts]]
 name = "R8: HTTP stack modules"

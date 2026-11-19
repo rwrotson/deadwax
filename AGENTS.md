@@ -142,7 +142,8 @@ from deadwax import Dossier  # inside deadwax.cli
 src/deadwax/__init__.py  — Public API re-exported with __all__; NullHandler on the "deadwax" logger
 src/deadwax/core/        — Models, query parsing, normalization, matching, merge, adapter protocol,
                            orchestrator, DeadwaxError hierarchy (Pydantic only)
-src/deadwax/sources/     — Adapters, HTTP stack (rate limits, retries, cache, escalation), lookup()
+src/deadwax/sources/     — Adapter packages (adapters/<name>/), HTTP stack (rate limits, retries, cache,
+                           escalation), lookup()
 src/deadwax/logs/        — LogSettings and opt-in setup_logging() for applications (`deadwax[logs]`)
 src/deadwax/cli/         — Typer app, its DEADWAX_* Settings, rendering, composition root (`deadwax[cli]`)
 src/deadwax/main.py      — `deadwax` console script; reports a missing `cli` extra
@@ -152,7 +153,7 @@ Follow the import rules R1–R9 in `docs/architecture.md`; import-linter contrac
 
 - Layers from top to bottom: `main`, `cli`, `logs | sources` (independent siblings), `core`. A layer imports only layers below it.
 - `main`, `cli`, and `logs` import library names only from `deadwax`. `sources` imports the core only from the `deadwax.core` package, never its submodules.
-- Inside `sources`, adapters never import each other; shared code lives in `_html`, `_http`, or `config`, and data passes between adapters only through `LookupContext`. Inside `core`, modules follow the order given in R5.
+- Inside `sources`, each adapter is a package `sources/adapters/<name>/` (`adapter`, `parse`, optional `models`); adapters never import each other; shared code lives in `_search`, `_adapter`, `services`, `_html`, `_http`, or `config`, and data passes between adapters only through `LookupContext`. Inside `core`, modules follow the order given in R5.
 - Third-party packages are confined: core uses only Pydantic; httpx and selectolax only in `sources`; curl_cffi and playwright only in their `sources._http` modules and imported lazily; structlog only in `logs`; Typer, rich, Pydantic Settings, platformdirs only in `cli`. Never import a transitive dependency.
 - Import a module or package whose name starts with `_` only from modules in the same package and its subpackages.
 - A new module that belongs to an intra-package layer contract (R4, R5) is added to that contract in the same change; import-linter fails on layers that do not exist yet.
@@ -183,7 +184,7 @@ Library code logs through stdlib `logging.getLogger(__name__)` so records follow
 
 ### Testing
 
-`tests/` mirrors the package (`core/`, `logs/`, `cli/`, `test_main.py`); `tests/test_package.py` covers the public API, import-time behaviour, and the missing-extra message.
+`tests/` mirrors the package (`core/`, `logs/`, `cli/`, `sources/` with `sources/adapters/<name>/`, `test_main.py`); `tests/test_package.py` covers the public API, import-time behaviour, and the missing-extra message.
 
 Tests never use the network: pytest-socket disables sockets (Unix sockets stay allowed for xdist), and source tests turn escalation off because curl_cffi opens sockets pytest-socket cannot block. The exception is `tests/integration/`, which is collected only with `--live` (`poe test-live`) and checks invariants of real lookups, not exact values. Adapters receive their HTTP client, and tests serve recorded responses from `tests/fixtures/<source>/` through `httpx.MockTransport`. Async tests use pytest-asyncio in strict mode.
 

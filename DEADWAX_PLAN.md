@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Stage 20 is next when requested.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1 done, R-2 is next.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -47,7 +47,7 @@ Carried from the v1 decision log, where each has its date and reason. They apply
 - Excluded and disabled adapters produce no error; a missing key or extra gives `skipped`; unknown names in include/exclude raise `ConfigurationError`.
 - Every source has `user_agent` and `proxy` settings (`direct` bypasses the environment proxy). The CLI exposes every `SourcesConfig` section; each field is described and listed in `.env.example`.
 - Default API contact is the repository URL.
-- Shared adapter code lives in `sources/_base.py`, `_html`, `_http`; adapters never import each other. An adapter that grows becomes a package with its own layers contract.
+- Shared adapter code lives in `sources/_search.py`, `_adapter.py`, `services.py`, `_html`, `_http`; adapters never import each other. Every adapter is a package `sources/adapters/<name>/` (since R-1).
 - `deadwax` imports `deadwax.sources` lazily.
 - Captcha widget markers count as a challenge only on 403/429/503; interstitial markers on any status.
 - With `http.escalation` unset, a step that cannot run ends the ladder: the page is `blocked`. An explicitly chosen step that cannot run is a `ConfigurationError`.
@@ -116,12 +116,18 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 17 | Done | Radio: NTS, WFMU; context tags. |
 | 18 | Deferred (RYM access blocked) | Provisional Rate Your Music adapter and browser-first fetching; parser and live results unverified. |
 | 19 | Done (WhoSampled access intermittent) | 1001Tracklists, WhoSampled. |
+| R-1 | Done | Layout: adapters in `sources/adapters/`, one package per adapter, tests per source, `_base` split, source `ra`, fixtures `tracklists`. |
+| R-2 | Not started | Shared helpers: `prose()`, JSON through models, adapter access description. |
+| R-3 | Not started | Service catalogue in `sources/services.py`; `service` and default `resolves()` on every adapter; URL rules leave the core. |
+| R-4 | Not started | Source defaults in settings, `LookupConfig` with a `sources` section shared by the CLI, resolved settings for `HttpClient`, registry. |
+| R-5 | Not started | Core: `Facts` base, `deadline` module, access label out of the core, nested `SourceInfo.access`, shared formatters. |
+| R-6 | Not started | Trace event names, repository cleanup, journal split, architecture docs. |
 | 20 | Not started | Qualification. |
 
 Common acceptance for source stages 9–19, in addition to each stage's own:
 
 - The adapter declares its `group`. An open-API source of the agreed default set (ListenBrainz, SecondHandSongs, KEXP, Spotify, YouTube, Genius) is added to `DEFAULT_SOURCES` in `sources/config.py` in its stage; other sources stay opt-in.
-- An HTML source that searches and reads one page builds on `SearchPageAdapter` in `sources/_base.py`, or the evidence says why not.
+- An HTML source that searches and reads one page builds on `SearchPageAdapter` in `sources/_search.py` (formerly `_base.py`), or the evidence says why not.
 
 - Fixture tests for every extraction path, and for not found, blocked, and a missing key where one applies.
 - The matching gate drops a candidate of another version (tested).
@@ -229,6 +235,17 @@ Both sources were verified on real pages after the user completed headed-browser
 
 **Suggested message:** `feat(sources): add 1001Tracklists and WhoSampled adapters`.
 
+### Structural refactoring R-1–R-6
+
+Agreed with the user on 2026-11-19 after a structure review. Goal: one source of truth per source, less duplication, cleaner layer boundaries. Breaking changes to the public API and `DEADWAX_*` names are allowed (0.1.0, never released); such commits carry `!`. Each stage passes `uv run poe check` and the strict docs build, changes no lookup behaviour unless stated, and ends with evidence and a commit suggestion.
+
+- **R-1 (layout, no logic changes).** All adapters move to `deadwax.sources.adapters`; each is a package with `adapter`, `parse`, and optionally `models`. `_base.py` splits into `_adapter.py` (`HttpAdapter`) and `_search.py` (search helpers, `SearchPageAdapter`, `track_on_release`). The package of adapter `pressreviews` is named `pressreviews` (the source keeps its name: `press` is a group name); source `residentadvisor` is renamed `ra` (`DEADWAX_RA__*`); fixtures `1001tracklists` move to `tracklists`. Tests mirror the packages in `tests/sources/adapters/<name>/`; stage-named test files are split per source. import-linter: one independence contract over the adapters and one layers contract with containers for their modules replace the per-adapter R8 contracts.
+- **R-2 (shared helpers).** `prose()` in `_html`; JSON of NTS, Resident Advisor, and Genius read through Pydantic models; `HttpAdapter.access()` replaces `lookup._access`.
+- **R-3 (service catalogue).** `sources/services.py` holds each service's hosts and URL rules, replacing `_SERVICES` and the core's `_URL_RULES`; the core keeps a generic `recognize_url(url, rules)`; URL query parsing moves to sources while `deadwax.parse_query` stays public. Every adapter declares `service`; the default `resolves()` uses it.
+- **R-4 (configuration).** Per-source rate, HTML transports, and browser mode become defaults of that source's settings; `SourcesConfig` becomes `LookupConfig` with a typed `sources` section (`DEADWAX_SOURCES__<NAME>__*`) that the CLI reuses instead of repeating fields; `HttpClient` receives resolved settings of its source; the adapter list moves to `sources/registry.py` with a test that it matches the settings; `Escalation.PATCHRIGHT` is normalized in one validator. Per-source settings classes leave `deadwax.__all__`.
+- **R-5 (core).** `Facts` base shared by `Partial` and `Dossier`; adapter time budget in `core/deadline.py`; `SourceAccess.label` moves to CLI rendering; `SourceInfo.access` nested; shared text formatters for Markdown and rich output.
+- **R-6 (cleanup).** Trace event names as an enum used by sources and the run renderer; decide on `plans/phonica-search.patch` (referenced above); closed v2 stages archived to `plans/v2.md`; `docs/architecture.md` rewritten for the registry and adapter packages.
+
 ### Stage 20: qualification
 
 - [ ] README source tiers and docs pages for every v2 source.
@@ -262,6 +279,23 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 ## Progress evidence and decision log
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
+
+### 2026-11-19 — R-1 evidence (layout)
+
+Changed:
+- All 33 adapters live in `deadwax.sources.adapters.<name>`; the 14 former single modules (albumoftheyear, allmusic, deezer, genius, itunes, nts, odesli, pressreviews, rateyourmusic, ra, tracklists, wfmu, whosampled, youtube) are packages with `adapter`, `parse`, and `models` where they had Pydantic models. Module-level helpers moved to `parse` unchanged; helpers used across modules lost their underscore and got a docstring. Album of the Year, AllMusic, Rate Your Music, and 1001Tracklists moved their `search_hits` and `read_page` bodies to `parse.search_hits` and `parse.page_partial`, as the shop adapters already did. Deezer, iTunes, Odesli, YouTube, and the four above name their source through a `SOURCE` constant instead of the adapter class.
+- `sources/_base.py` split into `_adapter.py` (`HttpAdapter`), `_search.py` (search helpers, `SearchPageAdapter`, `track_on_release`), and `services.py` (`service_for_url`, `link_target`).
+- import-linter: R4 lists `adapters` instead of 33 names; "R4: adapters are independent" (independence over `deadwax.sources.adapters.*`) and "R4: adapter package modules" (layers `adapter`, `parse`, `(models)` over every adapter package) replace the 20 per-adapter R8 contracts. A temporary cross-adapter import and a `parse` → `adapter` import each broke the new contracts as expected.
+- Tests: `tests/sources/adapters/<name>/`; stage files were split per source, the review-score merge test moved to `tests/core/test_merge.py`, and the two-source radio tests to `tests/sources/test_lookup.py`; `test_base.py` became `test_search.py` and `test_services.py`.
+- Docs: `docs/architecture.md` R4, `docs/reference/index.md`, AGENTS.md layout and testing notes.
+
+Decisions:
+- (agent) The press adapter keeps the source name `pressreviews`: `press` is a `SourceGroup`, so `--sources press` could not select the adapter alone. Its package is `pressreviews`, so name, module, settings key, and fixtures agree.
+- (user) Source `residentadvisor` is renamed `ra`: settings `ra`, `DEADWAX_RA__*`, provenance `ra`. Breaking for configuration.
+
+Checks: `uv run poe check` passed (fmt-check, lint, lint-imports 16 contracts kept, mypy, 999 tests, coverage 96.79%); `uv run --group docs properdocs build --strict` passed; `uv sync --locked --all-groups` passed; `deadwax sources` lists `ra`, `pressreviews`, and `tracklists`. Lookup behaviour is unchanged apart from the `ra` name; no live runs.
+
+**Suggested message:** `refactor(sources)!: move adapters into per-source packages and rename residentadvisor to ra`.
 
 ### 2026-11-19 — Alternative titles, refusals without fallback, WFMU deadline (Stage 20 partial)
 
