@@ -99,7 +99,6 @@ async def test_mainstream_track(replay: Replay, config: SourcesConfig) -> None:
     }
     assert "alternative rock" in tags_from(dossier, "discogs")
     assert errors(dossier) == {
-        "deezer": ErrorKind.BLOCKED,
         "discogs": ErrorKind.BLOCKED,
         "genius": ErrorKind.SKIPPED,
     }
@@ -415,6 +414,7 @@ def test_describe_sources_marks_groups_and_the_default_set() -> None:
     }
     assert [info.source for info in infos if info.default] == ["musicbrainz", "deezer"]
     assert [info.source for info in describe_sources() if not info.default] == [
+        "deezer",
         "soundcloud",
         "beatport",
         "hardwax",

@@ -140,8 +140,5 @@ def test_default_sources_from_a_toml_list(tmp_path: Path) -> None:
 
 
 def test_default_source_set_matches_the_library() -> None:
-    assert (
-        load_settings().default_sources
-        == SourcesConfig().default_sources
-        == ("core", "listenbrainz", "secondhandsongs", "kexp", "spotify", "youtube", "genius")
-    )
+    assert load_settings().default_sources == SourcesConfig().default_sources
+    assert "deezer" not in load_settings().default_sources

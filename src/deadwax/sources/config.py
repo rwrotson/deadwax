@@ -53,9 +53,15 @@ def _split_names(value: object) -> object:
 # Source and group names, given as a sequence or as one comma-separated string.
 type SourceNames = Annotated[tuple[str, ...], BeforeValidator(_split_names)]
 
-# Sources a lookup runs when no source list is given.
+# Sources a lookup runs when no source list is given. Deezer is left out: Akamai blocks its pages.
 DEFAULT_SOURCES: tuple[str, ...] = (
-    "core",
+    "musicbrainz",
+    "itunes",
+    "odesli",
+    "bandcamp",
+    "wikipedia",
+    "lastfm",
+    "discogs",
     "listenbrainz",
     "secondhandsongs",
     "kexp",

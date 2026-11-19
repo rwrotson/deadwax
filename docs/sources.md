@@ -10,7 +10,7 @@ Lookup errors marked `blocked` carry the source's access configuration for that 
 
 Every source belongs to one group: `core` (the v1 sources), `shops`, `press`, `catalogues`, `radio`, `streaming`, or `samples`. `--sources` and `--exclude` take source and group names, comma-separated; `--sources all` selects every source, while `--sources shops --exclude boomkat` runs every shop except Boomkat. Disabled sources are still omitted, and sources missing credentials are reported as skipped. An unknown name is a usage error that lists the known sources and groups.
 
-Without `--sources`, a lookup runs the sources named by `DEADWAX_DEFAULT_SOURCES`, which also takes source and group names; the default is `core,listenbrainz,secondhandsongs,kexp,spotify,youtube,genius`. Sources with official or open APIs join the default set as they are added; sources that scrape shop, press, radio, and sample pages run only when named. `DEADWAX_<SOURCE>__ENABLED=false` turns a source off even when it is named.
+Without `--sources`, a lookup runs the sources named by `DEADWAX_DEFAULT_SOURCES`, which also takes source and group names; the default is `musicbrainz,itunes,odesli,bandcamp,wikipedia,lastfm,discogs,listenbrainz,secondhandsongs,kexp,spotify,youtube,genius`. Sources with official or open APIs join the default set as they are added; sources that scrape shop, press, radio, and sample pages run only when named. `DEADWAX_<SOURCE>__ENABLED=false` turns a source off even when it is named.
 
 `DEADWAX_CONCURRENCY` (default 8) caps how many sources of one lookup run at once. A source's `adapter_timeout` starts when it begins running, not while it waits for a slot.
 
@@ -51,6 +51,7 @@ The README lists sources planned for later versions and those deadwax will not u
 ## Deezer
 
 - **Access:** public HTML at `www.deezer.com`, without an API key.
+- **Default:** not in the default set, because Akamai blocks its pages; it runs when named (`--sources deezer` or `--sources core`).
 - **Finds the record by:** a Deezer URL from the query or earlier sources, else HTML search and verification of the linked record pages.
 - **Contributes:** Deezer links, and ISRC, barcode, label, and genres when present in the page's embedded data.
 - **Limits:** HTML may be blocked on some networks or omit fields; no API fallback is used. Behind a refused proxy, see [Proxies](#proxies).
