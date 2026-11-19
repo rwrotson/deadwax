@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from enum import StrEnum
 
-from deadwax.core.events import trace
+from deadwax.core.events import TraceEvent, trace
 from deadwax.core.models import VersionInfo, VersionKind
 from deadwax.core.normalize import normalize_artist, normalize_text, split_artists
 from deadwax.core.query import EntityKind
@@ -154,7 +154,7 @@ def compare(reference: RecordKey, candidate: RecordKey) -> Match:
 
     trace(
         logger,
-        "match.compare",
+        TraceEvent.MATCH_COMPARE,
         reference=reference.describe(),
         candidate=candidate.describe(),
         artist_score=round(artist_score, 3),

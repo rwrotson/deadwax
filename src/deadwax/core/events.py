@@ -2,10 +2,41 @@ import logging
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
+from enum import StrEnum
 from types import MappingProxyType
 
 # Name of the record attribute that carries an event's structured fields.
 TRACE_ATTRIBUTE = "deadwax"
+
+
+class TraceEvent(StrEnum):
+    """Name of a structured debug event in the run journal."""
+
+    RUN_START = "run.start"
+    RUN_SETTINGS = "run.settings"
+    RUN_END = "run.end"
+    RUN_CRASH = "run.crash"
+    QUERY_PARSED = "query.parsed"
+    LOOKUP_SELECTED = "lookup.selected"
+    LOOKUP_RESOLVER = "lookup.resolver"
+    LOOKUP_KIND_ADOPTED = "lookup.kind_adopted"
+    PASS_START = "pass.start"  # noqa: S105 -- an event name, not a password
+    ADAPTER_END = "adapter.end"
+    MATCH_COMPARE = "match.compare"
+    MERGE_REFERENCE = "merge.reference"
+    MERGE_JUDGE = "merge.judge"
+    HTTP_REQUEST = "http.request"
+    HTTP_RETRY = "http.retry"
+    HTTP_CHALLENGE = "http.challenge"
+    HTTP_HEADED_FALLBACK = "http.headed_fallback"
+    HTTP_PAGE_INCOMPLETE = "http.page_incomplete"
+    HTTP_STEP_DROPPED = "http.step_dropped"
+    HTTP_STEP_FAILED = "http.step_failed"
+    SEARCH_PICK = "search.pick"
+    SEARCH_RANKED = "search.ranked"
+    PARSE_UNRECOGNIZED = "parse.unrecognized"
+    WFMU_TRUNCATED = "wfmu.truncated"
+
 
 _scope: ContextVar[Mapping[str, object]] = ContextVar(
     "deadwax_trace_scope",
@@ -28,10 +59,10 @@ def trace_scope(**fields: object) -> Iterator[None]:
         _scope.reset(token)
 
 
-def trace(logger: logging.Logger, event: str, /, **fields: object) -> None:
+def trace(logger: logging.Logger, event: TraceEvent, /, **fields: object) -> None:
     """Log a structured debug event; fields must be JSON values and are skipped when unused."""
     if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(event, extra={TRACE_ATTRIBUTE: {**_scope.get(), **fields}}, stacklevel=2)
+        logger.debug(event.value, extra={TRACE_ATTRIBUTE: {**_scope.get(), **fields}}, stacklevel=2)
 
 
 class TraceFilter(logging.Filter):

@@ -22,6 +22,7 @@ from deadwax.core import (
     TagKind,
     Text,
     TextKind,
+    TraceEvent,
     trace,
 )
 from deadwax.sources._html import attribute, parse_html, text_of
@@ -68,7 +69,7 @@ def page_partial(content: bytes, url: str, key: RecordKey | None) -> Partial:
         body = text_of(page.css_first("body")) or ""
         trace(
             logger,
-            "parse.unrecognized",
+            TraceEvent.PARSE_UNRECOGNIZED,
             url=url,
             title=text_of(page.css_first("title")),
             snippet=body[:_SNIPPET_CHARS],

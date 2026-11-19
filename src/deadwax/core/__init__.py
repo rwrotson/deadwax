@@ -21,7 +21,7 @@ from .errors import (
     RateLimitedError,
     SourceError,
 )
-from .events import TRACE_ATTRIBUTE, TraceFilter, trace, trace_fields, trace_scope
+from .events import TRACE_ATTRIBUTE, TraceEvent, TraceFilter, trace, trace_fields, trace_scope
 from .matching import Match, RecordKey, Verdict, artist_similarity, compare, title_similarity
 from .merge import QUERY_SOURCE, build_identity, merge
 from .models import (
@@ -132,6 +132,7 @@ __all__ = [
     "TagKind",
     "Text",
     "TextKind",
+    "TraceEvent",
     "TraceFilter",
     "UrlRule",
     "Verdict",

@@ -16,6 +16,7 @@ from deadwax.core import (
     Identity,
     Provenance,
     Sourced,
+    TraceEvent,
     text_query,
     trace,
     trace_scope,
@@ -66,11 +67,11 @@ def names(journal: RunJournal) -> list[object]:
 def test_a_run_writes_its_events_and_an_index_line(settings: RunLogSettings) -> None:
     with run_journal(settings, label="test", argv=["deadwax", "x"]) as run:
         with trace_scope(source="itunes"):
-            trace(library, "adapter.end", outcome="ok", errors=[])
-        trace(library, "adapter.end", source="discogs", errors=[{"kind": "not_found"}])
+            trace(library, TraceEvent.ADAPTER_END, outcome="ok", errors=[])
+        trace(library, TraceEvent.ADAPTER_END, source="discogs", errors=[{"kind": "not_found"}])
         logging.getLogger("httpx").info("request sent")
         logging.getLogger("httpx").warning("slow answer")
-        run.event("query.parsed", artist="Everything but the Girl")
+        run.event(TraceEvent.QUERY_PARSED, artist="Everything but the Girl")
         run.record(dossier())
 
     assert run.path is not None
@@ -162,7 +163,7 @@ def test_logging_is_restored_and_later_records_are_not_journaled(
 
     with run_journal(settings) as run:
         assert package.level == logging.DEBUG
-    trace(library, "after.close")
+    trace(library, TraceEvent.HTTP_REQUEST)
 
     assert (
         package.level,
@@ -170,7 +171,7 @@ def test_logging_is_restored_and_later_records_are_not_journaled(
         package.handlers,
         logging.getLogger().handlers,
     ) == before
-    assert "after.close" not in names(run)
+    assert TraceEvent.HTTP_REQUEST not in names(run)
 
 
 def test_the_application_sees_only_records_at_its_own_level(
@@ -180,11 +181,11 @@ def test_the_application_sees_only_records_at_its_own_level(
     caplog.set_level(logging.INFO)
 
     with run_journal(settings) as run:
-        trace(library, "debug.event")
+        trace(library, TraceEvent.HTTP_REQUEST)
         library.warning("warning.event")
 
     assert [r.getMessage() for r in caplog.records if r.name == library.name] == ["warning.event"]
-    assert {"debug.event", "warning.event"} <= set(names(run))
+    assert {TraceEvent.HTTP_REQUEST, "warning.event"} <= set(names(run))
 
 
 @pytest.mark.asyncio
@@ -192,7 +193,7 @@ async def test_concurrent_runs_write_separate_files(settings: RunLogSettings) ->
     async def job(label: str) -> RunJournal:
         async with run_journal(settings, label=label) as run:
             for _ in range(3):
-                trace(library, "job.step", job=label)
+                trace(library, TraceEvent.HTTP_REQUEST, job=label)
                 await asyncio.sleep(0)
         return run
 
@@ -200,7 +201,7 @@ async def test_concurrent_runs_write_separate_files(settings: RunLogSettings) ->
 
     for run in (first, second):
         assert run.path is not None
-        steps = [e["job"] for e in read_events(run.path) if e["event"] == "job.step"]
+        steps = [e["job"] for e in read_events(run.path) if e["event"] == TraceEvent.HTTP_REQUEST]
         assert steps == [run.label] * 3
     assert len(read_runs(settings.dir)) == 2  # type: ignore[arg-type]
 
@@ -212,20 +213,20 @@ def test_hooks_stay_until_the_last_journal_closes(settings: RunLogSettings) -> N
     outer = run_journal(settings)
     outer.open()
     with run_journal(settings) as inner:
-        trace(library, "inner.event")
+        trace(library, TraceEvent.MATCH_COMPARE)
     assert package.level == logging.DEBUG
-    trace(library, "outer.event")
+    trace(library, TraceEvent.MERGE_JUDGE)
     outer.close()
 
     assert package.level == level
-    assert "inner.event" in names(inner)
-    assert "outer.event" in names(outer)
-    assert "inner.event" not in names(outer)
+    assert TraceEvent.MATCH_COMPARE in names(inner)
+    assert TraceEvent.MERGE_JUDGE in names(outer)
+    assert TraceEvent.MATCH_COMPARE not in names(outer)
 
 
 def test_a_disabled_journal_writes_nothing(tmp_path: Path) -> None:
     with run_journal(RunLogSettings(enabled=False, dir=tmp_path)) as run:
-        run.event("ignored")
+        run.event(TraceEvent.QUERY_PARSED)
 
     assert run.path is None
     assert run.close() is None

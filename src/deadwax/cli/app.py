@@ -16,6 +16,7 @@ from deadwax import (
     EntityKind,
     InvalidQueryError,
     PerSourceSettings,
+    TraceEvent,
     describe_sources,
     lookup,
     parse_query,
@@ -142,7 +143,7 @@ def _journal(ctx: typer.Context, settings: Settings, command: str) -> Iterator[R
     """Journal one command run; its exit code gives the outcome."""
     argv = list(ctx.meta.get(_ARGV_KEY, []))
     with run_journal(settings.run_log(), command=command, argv=argv) as journal:
-        journal.event("run.settings", settings=settings.model_dump(mode="json"))
+        journal.event(TraceEvent.RUN_SETTINGS, settings=settings.model_dump(mode="json"))
         try:
             yield journal
         except typer.Exit as exit_:
@@ -259,7 +260,7 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
         kind = EntityKind.ALBUM if album else EntityKind.TRACK if track else None
         try:
             parsed = parse_query(query, kind)
-            journal.event("query.parsed", query=parsed.model_dump(mode="json"))
+            journal.event(TraceEvent.QUERY_PARSED, query=parsed.model_dump(mode="json"))
             dossier: Dossier = asyncio.run(
                 lookup(
                     parsed,

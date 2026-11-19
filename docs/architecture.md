@@ -1,6 +1,6 @@
 # Architecture
 
-The core models a query and its dossier, matches and merges facts, and runs adapters; it knows nothing about HTTP, settings loading, logging setup, or the command line. `sources` implements adapters and the HTTP stack on top of the core. Each outer layer adds one application concern, and its third-party packages come from an optional extra.
+The core models a query and its dossier, matches and merges facts, and runs adapters; it knows nothing about HTTP, web services, settings loading, logging setup, or the command line. `sources` implements one adapter package per source, the service catalogue, per-source settings, and the HTTP stack on top of the core. Each outer layer adds one application concern, and its third-party packages come from an optional extra.
 
 ## Layers
 
@@ -11,8 +11,8 @@ Layers are listed from top to bottom. A layer may import any layer below it and 
 | Entry point | `deadwax/main.py` | `deadwax` console script; reports a missing `cli` extra | — | base |
 | CLI | `deadwax/cli/` | Composition root: loads `DEADWAX_*` settings, sets up logging, calls the library, renders output, maps errors to exit codes | Pydantic Settings, Typer, rich, platformdirs | `deadwax[cli]` |
 | Logging setup | `deadwax/logs/` | `LogSettings`, the opt-in `setup_logging()`, and the run journal (`run_journal()`) for applications | structlog | `deadwax[logs]` |
-| Sources | `deadwax/sources/` | Adapters, HTTP stack (rate limits, retries, cache, escalation), `lookup()` | httpx, selectolax; curl_cffi, Patchright, Nodriver | base; `deadwax[stealth]`, `deadwax[browser]`, `deadwax[nodriver]` |
-| Core | `deadwax/core/` | Models, query parsing, normalization, matching, merge, adapter protocol, orchestrator, `DeadwaxError` hierarchy | Pydantic | base |
+| Sources | `deadwax/sources/` | Adapter packages and their registry, per-source settings (`LookupConfig`), service catalogue and URL queries (`parse_query`), HTTP stack (rate limits, retries, cache, escalation), `lookup()` | httpx, selectolax; curl_cffi, Patchright, Nodriver | base; `deadwax[stealth]`, `deadwax[browser]`, `deadwax[nodriver]` |
+| Core | `deadwax/core/` | Models, text queries and generic URL rules, normalization, matching, merge, adapter protocol, orchestrator, adapter deadline, trace events, `DeadwaxError` hierarchy | Pydantic | base |
 
 `deadwax/__init__.py` re-exports the supported names with `__all__` and attaches a `NullHandler` to the `deadwax` logger. `deadwax.logs` raises a `ModuleNotFoundError` that names the `logs` extra when structlog is missing.
 
@@ -63,7 +63,7 @@ Every adapter declares `service`: the name of the catalogue service whose pages 
 
 Adapters are independent (contract "R4: adapters are independent"): they never import each other, and data found by one adapter reaches another only through `LookupContext`. A helper needed by two adapters moves down into `_search`, `_adapter`, `services`, `_html`, or `_http`.
 
-Inside `deadwax.sources._http` (contract "R8: HTTP stack modules"), from top to bottom:
+Inside `deadwax.sources._http` (contract "R4: HTTP stack modules"), from top to bottom:
 
 ```
 client
@@ -87,9 +87,9 @@ query
 errors | events | deadline
 ```
 
-`events` holds `trace()` and `trace_scope()`, which every other core module may use. `deadline` holds the adapter time budget that the orchestrator sets and adapters read or pause.
+`events` holds `TraceEvent`, `trace()`, and `trace_scope()`, which every other core module may use. An event name is a `TraceEvent` member; a new event is added to the enum and to the table in `docs/runs.md`. `deadline` holds the adapter time budget that the orchestrator sets and adapters read or pause.
 
-A change to this order is recorded in the decision log of `DEADWAX_PLAN.md`.
+A change to this order is recorded in the progress evidence of `DEADWAX_PLAN.md`.
 
 ### R6. Third-party packages (contract)
 
@@ -123,6 +123,24 @@ curl_cffi, Patchright, and Nodriver are imported inside the function that needs 
 ### R9. Code outside the package
 
 Tests may import internal modules to test them; CLI tests go through `deadwax.cli.app`. `docs/` scripts import only `deadwax` and `deadwax.cli.settings`. Development scripts in `scripts/` import only `deadwax` and `deadwax.sources`.
+
+## Lookup flow
+
+1. `deadwax.lookup(query, config)` (`sources/lookup.py`) opens the cache and shared browser sessions, and `registry.build_adapters` constructs every adapter of `ADAPTERS` with its settings section and an `HttpClient` built from `LookupConfig.client_settings(name)`.
+2. The orchestrator (`core/orchestrator.py`) selects adapters from `include`, `exclude`, and the default set; disabled ones produce no error, adapters without a key or extra are `skipped`.
+3. For a URL query, the first adapter whose `resolves()` accepts it runs alone and its candidate becomes the reference; a URL whose kind only a request reveals takes the kind it found.
+4. The remaining adapters run pass by pass (`identity`, `enrichment`, `links`), concurrently within a pass up to `concurrency`, each under its time budget (`core/deadline.py`). Each pass receives a `LookupContext` with the identity, links, and review links of a merge of the earlier passes.
+5. `merge` passes every partial through the matching gate: a candidate of another version becomes an `other_version` relation and a `version` discrepancy; an unrelated candidate is a `no_match` error. The result is the `Dossier`; a `blocked` error gets the adapter's access description.
+
+Each step emits `TraceEvent` events through `trace()`; the run journal (`deadwax.logs.run_journal`) records them.
+
+## Adding a source
+
+1. A settings class in `sources/config.py` with the source's defaults (rate, HTML transports, browser mode, credentials) and a field in `PerSourceSettings`.
+2. A package `sources/adapters/<name>/` with `adapter`, `parse`, and optionally `models`; the adapter declares `name`, `group`, `pass_`, `service`, and `requires`. An HTML source that searches and reads one page builds on `SearchPageAdapter`.
+3. The service's hosts and URL rules in `sources/services.py` when the adapter reads its own pages.
+4. An entry in `ADAPTERS` (`sources/registry.py`), in resolver order.
+5. Recorded responses in `tests/fixtures/<name>/`, tests in `tests/sources/adapters/<name>/`, a line per setting in `.env.example`, a credentials section in README when it needs one, and the source in `docs/sources.md` and the README tables.
 
 ## Public API
 

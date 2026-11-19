@@ -24,6 +24,7 @@ from deadwax.core import (
     SourceError,
     Tag,
     TagKind,
+    TraceEvent,
     VersionInfo,
     classify_marker,
     trace,
@@ -56,7 +57,7 @@ def page_props(content: bytes, url: str) -> PageProps:
     except ValueError:
         trace(
             logger,
-            "parse.unrecognized",
+            TraceEvent.PARSE_UNRECOGNIZED,
             url=url,
             length=len(text),
             head=text[:_SNIPPET_CHARS],

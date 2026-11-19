@@ -18,6 +18,7 @@ from deadwax.core import (
     Relation,
     RelationKind,
     Scope,
+    TraceEvent,
     Verdict,
     compare,
     trace,
@@ -76,7 +77,7 @@ def pick_hit(reference: RecordKey, hits: Iterable[SearchHit]) -> SearchHit | Non
 
     trace(
         logger,
-        "search.pick",
+        TraceEvent.SEARCH_PICK,
         reference=reference.describe(),
         hits=seen[:TRACED_HITS],
         compared=len(seen),

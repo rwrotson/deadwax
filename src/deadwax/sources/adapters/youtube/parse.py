@@ -8,6 +8,7 @@ from deadwax.core import (
     LinkTarget,
     Provenance,
     RecordKey,
+    TraceEvent,
     Verdict,
     compare,
     normalize_artist,
@@ -97,7 +98,7 @@ def matching_links(
             sources=[Provenance(source=SOURCE, url=url)],
         )
         found.append((rank, index, link))
-    trace(logger, "search.ranked", reference=reference.describe(), hits=seen)
+    trace(logger, TraceEvent.SEARCH_RANKED, reference=reference.describe(), hits=seen)
     return [link for _, _, link in sorted(found, key=lambda entry: entry[:2])][:LINKS]
 
 

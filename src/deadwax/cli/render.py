@@ -17,6 +17,7 @@ from deadwax import (
     SourceInfo,
     SourceState,
     Tag,
+    TraceEvent,
 )
 from deadwax.cli.markdown import to_markdown
 from deadwax.cli.text import access_label, number, rating, relation_details, version_text
@@ -583,26 +584,29 @@ def _run_end(event: Mapping[str, object]) -> Text:
     return text
 
 
+# Line that the timeline adds before a source's comparisons against a new reference.
+_REFERENCE = "reference"
+
 _EVENT_RENDERERS: dict[str, Callable[[Mapping[str, object]], Text]] = {
-    "run.start": _run_start,
-    "query.parsed": _query,
-    "lookup.selected": _selected,
-    "pass.start": _pass,
-    "http.request": _request,
-    "http.retry": _retry,
-    "http.challenge": _challenge,
-    "match.compare": _compare,
-    "reference": _reference,
-    "search.pick": _pick,
-    "search.ranked": _pick,
-    "adapter.end": _adapter_end,
-    "merge.reference": _merge_reference,
-    "merge.judge": _judge,
-    "run.end": _run_end,
+    TraceEvent.RUN_START: _run_start,
+    TraceEvent.QUERY_PARSED: _query,
+    TraceEvent.LOOKUP_SELECTED: _selected,
+    TraceEvent.PASS_START: _pass,
+    TraceEvent.HTTP_REQUEST: _request,
+    TraceEvent.HTTP_RETRY: _retry,
+    TraceEvent.HTTP_CHALLENGE: _challenge,
+    TraceEvent.MATCH_COMPARE: _compare,
+    _REFERENCE: _reference,
+    TraceEvent.SEARCH_PICK: _pick,
+    TraceEvent.SEARCH_RANKED: _pick,
+    TraceEvent.ADAPTER_END: _adapter_end,
+    TraceEvent.MERGE_REFERENCE: _merge_reference,
+    TraceEvent.MERGE_JUDGE: _judge,
+    TraceEvent.RUN_END: _run_end,
 }
 
 # Events that the timeline leaves to --format json.
-_QUIET_EVENTS = frozenset({"run.settings"})
+_QUIET_EVENTS = frozenset({TraceEvent.RUN_SETTINGS})
 
 
 def _event_line(event: Mapping[str, object]) -> Text:
@@ -625,7 +629,7 @@ def _event_line(event: Mapping[str, object]) -> Text:
         if isinstance(exception := event.get("exception"), str):
             text = Text(f"{name}\n{exception}", style="red")
     source = event.get("source")
-    if isinstance(source, str) and name not in {"pass.start", "lookup.selected"}:
+    if isinstance(source, str) and name not in {TraceEvent.PASS_START, TraceEvent.LOOKUP_SELECTED}:
         return Text.assemble("  ", (f"[{source}] ", "cyan"), text)
     return text
 
@@ -650,16 +654,18 @@ def print_run(
             event
             for event in shown
             if event.get("stage") != "context"
-            and not (event.get("stage") == "final" and event.get("event") == "match.compare")
+            and not (
+                event.get("stage") == "final" and event.get("event") == TraceEvent.MATCH_COMPARE
+            )
         ]
     lines: list[Text] = []
     references: dict[object, str] = {}
     for event in shown:
-        if event.get("event") == "match.compare":
+        if event.get("event") == TraceEvent.MATCH_COMPARE:
             source, reference = event.get("source"), _key(event.get("reference"))
             if references.get(source) != reference:
                 references[source] = reference
-                lines.append(_event_line({**event, "event": "reference", "reference": reference}))
+                lines.append(_event_line({**event, "event": _REFERENCE, "reference": reference}))
         lines.append(_event_line(event))
     if output is OutputFormat.MARKDOWN:
         body = "\n".join(line.plain for line in lines)

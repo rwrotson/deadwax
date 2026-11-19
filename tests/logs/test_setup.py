@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from deadwax.core import trace, trace_scope
+from deadwax.core import TraceEvent, trace, trace_scope
 from deadwax.logs import LogSettings, setup_logging
 from deadwax.logs.setup import _AppConsoleHandler, _AppFileHandler
 
@@ -222,7 +222,7 @@ def test_console_shows_trace_event_fields(
     setup_logging(LogSettings(level="DEBUG", format="json"))
 
     with trace_scope(source="itunes"):
-        trace(logging.getLogger("deadwax.tests"), "sample.event", score=1)
+        trace(logging.getLogger("deadwax.tests"), TraceEvent.SEARCH_PICK, score=1)
 
     event = json.loads(capsys.readouterr().err.splitlines()[-1])
-    assert (event["event"], event["source"], event["score"]) == ("sample.event", "itunes", 1)
+    assert (event["event"], event["source"], event["score"]) == ("search.pick", "itunes", 1)

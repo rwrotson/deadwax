@@ -21,6 +21,7 @@ from deadwax.core import (
     NotFoundError,
     RateLimitedError,
     SourceError,
+    TraceEvent,
     pause_adapter_timeout,
     trace,
 )
@@ -346,7 +347,7 @@ class HttpClient:
             }
         if error is not None:
             fields["error"] = {"type": type(error).__name__, "message": str(error)}
-        trace(logger, "http.request", **fields)
+        trace(logger, TraceEvent.HTTP_REQUEST, **fields)
 
     async def _request(self, request: Request, exchange: _Exchange) -> Response:
         """Return the response from the cache or the source, without checking its status."""
@@ -443,7 +444,7 @@ class HttpClient:
                 if level == len(self._steps) - 1:
                     raise
                 self._unavailable.append(f"{self._label(step)} failed: {error}")
-                trace(logger, "http.step_failed", step=step, reason=str(error))
+                trace(logger, TraceEvent.HTTP_STEP_FAILED, step=step, reason=str(error))
                 level += 1
                 continue
             except SourceError as error:
@@ -461,7 +462,7 @@ class HttpClient:
             challenged = challenged or challenge
             if challenge and self._falls_back(step, reason):
                 self._headed = True
-                trace(logger, "http.headed_fallback", url=safe_url, fetcher=label)
+                trace(logger, TraceEvent.HTTP_HEADED_FALLBACK, url=safe_url, fetcher=label)
                 continue
             level += 1
         unavailable = f"; {'; '.join(self._unavailable)}" if self._unavailable else ""
@@ -471,20 +472,26 @@ class HttpClient:
     def _problem(self, response: Response, safe_url: str, label: str) -> tuple[str, bool] | None:
         """Return why a page is unusable and whether it is a challenge, or None when usable."""
         if challenge := detect_challenge(response.status, response.headers, response.content):
-            trace(logger, "http.challenge", url=safe_url, challenge=challenge, fetcher=label)
+            trace(
+                logger,
+                TraceEvent.HTTP_CHALLENGE,
+                url=safe_url,
+                challenge=challenge,
+                fetcher=label,
+            )
             return challenge, True
         if (
             self.spec.required_marker is not None
             and self.spec.required_marker not in response.content
         ):
-            trace(logger, "http.page_incomplete", url=safe_url, fetcher=label)
+            trace(logger, TraceEvent.HTTP_PAGE_INCOMPLETE, url=safe_url, fetcher=label)
             return "required page state missing", False
         return None
 
     async def _drop_step(self, level: int, error: ConfigurationError) -> None:
         """Skip one unavailable transport and continue with the next."""
         step = self._steps[level]
-        trace(logger, "http.step_dropped", step=step, reason=str(error))
+        trace(logger, TraceEvent.HTTP_STEP_DROPPED, step=step, reason=str(error))
         self._unavailable.append(f"{step} unavailable: {error}")
         del self._steps[level]
         self._level = min(self._level, max(len(self._steps) - 1, 0))
@@ -549,7 +556,7 @@ class HttpClient:
                 if attempt >= self._policy.retries:
                     raise
                 delay = self._policy.backoff(attempt, rng)
-                trace(logger, "http.retry", url=safe_url, error=str(error), delay_s=delay)
+                trace(logger, TraceEvent.HTTP_RETRY, url=safe_url, error=str(error), delay_s=delay)
             else:
                 if attempt >= self._policy.retries or not self._should_retry(response):
                     return response
@@ -557,6 +564,12 @@ class HttpClient:
                 delay = self._policy.delay(attempt, retry_after, rng, self._resources.now())
                 if delay > self._policy.max_wait:
                     raise RateLimitedError(f"asked to wait {delay:.0f} s", url=safe_url)
-                trace(logger, "http.retry", url=safe_url, status=response.status, delay_s=delay)
+                trace(
+                    logger,
+                    TraceEvent.HTTP_RETRY,
+                    url=safe_url,
+                    status=response.status,
+                    delay_s=delay,
+                )
             await self._resources.sleep(delay)
             attempt += 1

@@ -8,7 +8,7 @@ deadwax is a typed Python library and command that, for one track or album, coll
 
 The base install depends on Pydantic, httpx, and selectolax. Extras: `logs` (structlog setup for applications), `cli` (Typer command with Pydantic Settings, rich, platformdirs), `stealth` (curl_cffi TLS impersonation), `browser` (Playwright).
 
-Implementation is staged. `DEADWAX_PLAN.md` is the specification and multi-session handoff journal: read it before work, implement only the first incomplete stage, append dated evidence, and stop at the stage boundary. The v1 plan, its stage evidence, and full decision log are archived in `plans/v1.md`; read it only for history or before changing a v1 adapter.
+Implementation is staged. `DEADWAX_PLAN.md` is the specification and multi-session handoff journal: read it before work, implement only the first incomplete stage, append dated evidence, and stop at the stage boundary. The v1 plan, its stage evidence, and full decision log are archived in `plans/v1.md`, closed v2 stages and the v2 decision log in `plans/v2.md`; read them only for history or before changing an adapter of that version.
 
 Distribution name: `deadwax` | Python package: `deadwax` | Environment prefix: `DEADWAX_`
 

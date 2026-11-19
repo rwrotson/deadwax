@@ -28,6 +28,7 @@ from deadwax import (
     Dossier,
     ErrorKind,
     Query,
+    TraceEvent,
     TraceFilter,
 )
 from deadwax.logs.settings import RunLogSettings
@@ -133,7 +134,7 @@ class _RunSink(logging.FileHandler):
         if record.levelno >= logging.WARNING:
             self.warnings += 1
         fields = getattr(record, TRACE_ATTRIBUTE, None)
-        if record.msg == "adapter.end" and isinstance(fields, Mapping):
+        if record.msg == TraceEvent.ADAPTER_END and isinstance(fields, Mapping):
             source, errors = fields.get("source"), fields.get("errors")
             if isinstance(source, str):
                 first = errors[0] if isinstance(errors, list) and errors else None
@@ -294,10 +295,10 @@ class RunJournal:
         self._sink: _RunSink | None = None
         self._token: Token[str | None] | None = None
 
-    def event(self, name: str, /, **fields: object) -> None:
+    def event(self, name: TraceEvent, /, **fields: object) -> None:
         """Write an event of the caller's own to the run; fields must be JSON values."""
         if self._sink is not None:
-            logger.debug(name, extra={TRACE_ATTRIBUTE: fields}, stacklevel=2)
+            logger.debug(name.value, extra={TRACE_ATTRIBUTE: fields}, stacklevel=2)
 
     def record(self, dossier: Dossier) -> None:
         """Keep the run's dossier for its summary and its last event."""
@@ -327,7 +328,7 @@ class RunJournal:
         _journals.add(self.run_id, sink)
         self._token = _current_run.set(self.run_id)
         self.event(
-            "run.start",
+            TraceEvent.RUN_START,
             command=self.command,
             label=self.label,
             argv=self.argv,
@@ -345,12 +346,12 @@ class RunJournal:
 
         outcome, exit_code = self._final_outcome(error)
         if outcome is RunOutcome.CRASH and error is not None:
-            logger.debug("run.crash", exc_info=error, extra={TRACE_ATTRIBUTE: {}})
+            logger.debug(TraceEvent.RUN_CRASH.value, exc_info=error, extra={TRACE_ATTRIBUTE: {}})
         summary = self._summary(sink, root, outcome, exit_code)
         fields: dict[str, object] = {"summary": summary.model_dump(mode="json")}
         if self.settings.dossier and self._dossier is not None:
             fields["dossier"] = self._dossier.model_dump(mode="json")
-        self.event("run.end", **fields)
+        self.event(TraceEvent.RUN_END, **fields)
 
         _journals.remove(self.run_id)
         if self._token is not None:

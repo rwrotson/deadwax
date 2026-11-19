@@ -53,14 +53,16 @@ Each event line holds `event`, `level`, `logger`, `timestamp`, `run_id`, and the
 | `lookup.selected`, `lookup.resolver`, `lookup.kind_adopted` | ready, skipped (with reasons), and unselected sources; the URL resolver; the kind it found |
 | `pass.start` | sources of the pass and the context it starts from |
 | `http.request` | method, URL, status, cache `hit`/`miss`/`blocked`/`off`, transports, attempts, duration, size, SHA-256, error |
-| `http.retry`, `http.challenge`, `http.step_dropped` | retries with their cause and delay; bot challenges; unavailable transports |
+| `http.retry`, `http.challenge`, `http.step_dropped`, `http.step_failed` | retries with their cause and delay; bot challenges; unavailable transports; transports that failed to start |
+| `http.headed_fallback`, `http.page_incomplete` | a challenge retried in a visible browser; a page without its required state |
 | `match.compare` | reference and candidate (artist, title, kind, version), scores, verdict, failed checks (`artist`, `title`, `kind`) |
 | `search.pick`, `search.ranked` | search hits with their verdicts and the one picked |
+| `parse.unrecognized`, `wfmu.truncated` | URL, title, and a snippet of a page the parser does not recognize; WFMU playlists left unread when time runs out |
 | `adapter.end` | outcome, errors, candidate, fact counts, duration, time waited for a slot |
 | `merge.reference`, `merge.judge` | the merge's reference; verdict and scores per source |
 | `run.crash`, `run.end` | traceback; the summary line and the final dossier (`DEADWAX_RUNS__DOSSIER`) |
 
-Other library debug messages and warnings of other libraries, such as httpx, are recorded too.
+The names are the values of `deadwax.TraceEvent`; `trace()` accepts only its members. Other library debug messages and warnings of other libraries, such as httpx, are recorded too.
 
 ## Queries
 

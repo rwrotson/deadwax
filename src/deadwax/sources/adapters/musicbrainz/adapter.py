@@ -17,6 +17,7 @@ from deadwax.core import (
     Relation,
     Scope,
     SourceGroup,
+    TraceEvent,
     parse_title,
     trace,
 )
@@ -59,7 +60,7 @@ def _trace_ranked(
     """Record how a search was narrowed to the entities that match the reference."""
     trace(
         logger,
-        "search.ranked",
+        TraceEvent.SEARCH_RANKED,
         query=query,
         results=results,
         matched=[{"id": entity.id, "title": entity.title} for entity in ranked[:TRACED_HITS]],

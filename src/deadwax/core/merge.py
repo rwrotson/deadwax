@@ -3,7 +3,7 @@ from collections.abc import Callable, Hashable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from deadwax.core.events import trace, trace_scope
+from deadwax.core.events import TraceEvent, trace, trace_scope
 from deadwax.core.matching import RecordKey, Verdict, compare
 from deadwax.core.models import (
     AdapterError,
@@ -130,7 +130,7 @@ def _judge(reference: RecordKey | None, partials: Iterable[Partial]) -> _Judgeme
             match = compare(reference, _candidate_key(candidate))
             trace(
                 logger,
-                "merge.judge",
+                TraceEvent.MERGE_JUDGE,
                 verdict=match.verdict,
                 artist_score=round(match.artist_score, 3),
                 title_score=round(match.title_score, 3),
@@ -625,7 +625,7 @@ def merge(
     reference = _reference(query, partials)
     trace(
         logger,
-        "merge.reference",
+        TraceEvent.MERGE_REFERENCE,
         reference=None if reference is None else reference.describe(),
         partials=len(partials),
     )

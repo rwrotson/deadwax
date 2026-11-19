@@ -16,7 +16,7 @@ from deadwax.core.errors import (
     RateLimitedError,
     SourceError,
 )
-from deadwax.core.events import trace, trace_scope
+from deadwax.core.events import TraceEvent, trace, trace_scope
 from deadwax.core.merge import merge
 from deadwax.core.models import AdapterError, Dossier, ErrorKind, Partial
 from deadwax.core.query import Query
@@ -81,7 +81,7 @@ async def _call(
             partial = await _timed(adapter, query, context, seconds)
         trace(
             logger,
-            "adapter.end",
+            TraceEvent.ADAPTER_END,
             duration_ms=_milliseconds(started),
             slot_wait_ms=round((started - queued) * 1000),
             **_outcome(partial),
@@ -170,7 +170,7 @@ def _select(
 
     trace(
         logger,
-        "lookup.selected",
+        TraceEvent.LOOKUP_SELECTED,
         include=None if options.include is None else sorted(options.include),
         exclude=sorted(options.exclude),
         ready=[adapter.name for adapter in ready],
@@ -213,7 +213,7 @@ class _Run:
         identity = context.identity
         trace(
             logger,
-            "pass.start",
+            TraceEvent.PASS_START,
             sources=[adapter.name for adapter in adapters],
             query=self.query.model_dump(mode="json"),
             identity={
@@ -247,7 +247,7 @@ class _Run:
         candidate = self.partials[0].candidate
         if candidate is not None and candidate.kind is not None:
             self.query = self.query.model_copy(update={"kind": candidate.kind})
-            trace(logger, "lookup.kind_adopted", kind=candidate.kind)
+            trace(logger, TraceEvent.LOOKUP_KIND_ADOPTED, kind=candidate.kind)
 
 
 async def run(
@@ -265,7 +265,11 @@ async def run(
     resolver = None
     if query.url is not None:
         resolver = next((adapter for adapter in ready if adapter.resolves(query)), None)
-        trace(logger, "lookup.resolver", source=None if resolver is None else resolver.name)
+        trace(
+            logger,
+            TraceEvent.LOOKUP_RESOLVER,
+            source=None if resolver is None else resolver.name,
+        )
     if resolver is not None:
         await lookup.run([resolver], "resolve")
         lookup.adopt_kind()

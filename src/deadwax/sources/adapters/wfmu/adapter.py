@@ -20,6 +20,7 @@ from deadwax.core import (
     SourceGroup,
     Text,
     TextKind,
+    TraceEvent,
     Verdict,
     adapter_time_left,
     compare,
@@ -123,7 +124,7 @@ class WfmuAdapter(HttpAdapter):
         for read, (url, date) in enumerate(plays):
             left = adapter_time_left()
             if partials and left is not None and left < parse.PLAYLIST_RESERVE:
-                trace(logger, "wfmu.truncated", read=read, remaining=len(plays) - read)
+                trace(logger, TraceEvent.WFMU_TRUNCATED, read=read, remaining=len(plays) - read)
                 break
             if (partial := await self._playlist(url, key, date)) is not None:
                 partials.append(partial)

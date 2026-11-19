@@ -318,7 +318,7 @@ containers = ["deadwax.sources.adapters.*"]
 layers = ["adapter", "parse", "(models)"]
 
 [[tool.importlinter.contracts]]
-name = "R8: HTTP stack modules"
+name = "R4: HTTP stack modules"
 type = "layers"
 containers = ["deadwax.sources._http"]
 layers = [
