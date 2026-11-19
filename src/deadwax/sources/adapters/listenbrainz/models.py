@@ -31,6 +31,27 @@ class SimilarArtist(ApiModel):
     score: float | None = None
 
 
+class RadioRecording(ApiModel):
+    """Recording LB Radio picked for a similar artist."""
+
+    recording_mbid: str
+    similar_artist_mbid: str | None = None
+    similar_artist_name: str | None = None
+
+
+class Named(ApiModel):
+    """Recording or artist credit with an optional name."""
+
+    name: str | None = None
+
+
+class RecordingMetadata(ApiModel):
+    """Title and artist credit of a recording from the metadata endpoint."""
+
+    recording: Named | None = None
+    artist: Named | None = None
+
+
 class User(ApiModel):
     """Author of a CritiqueBrainz review."""
 
@@ -58,3 +79,5 @@ class ReviewList(ApiModel):
 popularity_list = TypeAdapter(list[Popularity])
 similar_recordings = TypeAdapter(list[SimilarRecording])
 similar_artists = TypeAdapter(list[SimilarArtist])
+radio = TypeAdapter(dict[str, list[RadioRecording]])
+metadata = TypeAdapter(dict[str, RecordingMetadata])

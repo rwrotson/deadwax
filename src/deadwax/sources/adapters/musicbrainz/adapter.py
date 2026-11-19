@@ -75,7 +75,7 @@ class _TrackSources:
     group: models.ReleaseGroup | None
     work: models.Work | None
     is_cover: bool
-    members: list[Relation]
+    artist_relations: list[Relation]
 
 
 class MusicBrainzAdapter(HttpAdapter):
@@ -206,7 +206,7 @@ class MusicBrainzAdapter(HttpAdapter):
         _trace_ranked(query, len(found.release_groups), ranked)
         return (EntityKind.ALBUM, ranked[0].id) if ranked else None
 
-    async def _members(
+    async def _artist_relations(
         self,
         artist_credit: list[models.ArtistCredit],
         context: LookupContext,
@@ -218,7 +218,7 @@ class MusicBrainzAdapter(HttpAdapter):
             f"artist/{artist_credit[0].artist.id}",
             inc="artist-rels",
         )
-        return p.member_relations(artist)
+        return p.artist_relations(artist)
 
     async def _track_sources(self, mbid: str, context: LookupContext) -> _TrackSources:
         recording = await self._get(models.Recording, f"recording/{mbid}", inc=_RECORDING_INC)
@@ -243,7 +243,7 @@ class MusicBrainzAdapter(HttpAdapter):
             group=group,
             work=work,
             is_cover=performance is not None and "cover" in performance.attributes,
-            members=await self._members(recording.artist_credit, context),
+            artist_relations=await self._artist_relations(recording.artist_credit, context),
         )
 
     def _track_partial(self, found: _TrackSources) -> Partial:
@@ -257,7 +257,7 @@ class MusicBrainzAdapter(HttpAdapter):
         relations = [
             *p.recording_relations(recording.relations, Scope.RECORDING, url),
             *p.appearances(recording.releases, None, url),
-            *found.members,
+            *found.artist_relations,
         ]
 
         if release is not None:
@@ -291,7 +291,7 @@ class MusicBrainzAdapter(HttpAdapter):
             release = await self._get(models.Release, f"release/{main.id}", inc=_ALBUM_RELEASE_INC)
 
         people = p.artist_credits(group.relations, Scope.RELEASE_GROUP, url)
-        relations = await self._members(group.artist_credit, context)
+        relations = await self._artist_relations(group.artist_credit, context)
         links = p.links(group.relations, LinkTarget.ALBUM, url)
         review_links = p.review_links(group.relations, url)
         if release is not None:

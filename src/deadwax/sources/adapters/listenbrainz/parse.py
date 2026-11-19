@@ -93,6 +93,47 @@ def similar_artists(
     ]
 
 
+def radio_seeds(
+    found: dict[str, list[models.RadioRecording]],
+    artist: str,
+) -> list[models.RadioRecording]:
+    """LB Radio recordings in response order, without those of the seed artist."""
+    return [
+        item for items in found.values() for item in items if item.similar_artist_mbid != artist
+    ]
+
+
+def radio_recordings(
+    found: Iterable[models.RadioRecording],
+    names: dict[str, models.RecordingMetadata],
+    url: str,
+) -> list[Relation]:
+    """Recordings by similar artists whose titles the metadata endpoint resolved."""
+    sources = [Provenance(source=SOURCE, url=url)]
+    result = []
+    for item in found:
+        entry = names.get(item.recording_mbid)
+        title = entry.recording.name if entry and entry.recording else None
+        if not title:
+            continue
+        credit = entry.artist.name if entry and entry.artist else None
+        result.append(
+            Relation(
+                kind=RelationKind.SIMILAR_ARTIST_RECORDING,
+                target=Entity(
+                    type=EntityType.RECORDING,
+                    name=title,
+                    artist=credit or item.similar_artist_name or None,
+                    url=f"{MUSICBRAINZ}/recording/{item.recording_mbid}",
+                    ids={IdKind.MUSICBRAINZ_RECORDING: item.recording_mbid},
+                ),
+                scope=Scope.ARTIST,
+                sources=sources,
+            ),
+        )
+    return result
+
+
 def published(value: str | None) -> str | None:
     """Convert 'Fri, 26 Sep 2014 16:31:32 GMT' to an ISO date."""
     if not value:

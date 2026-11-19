@@ -6,6 +6,7 @@ import pytest
 from deadwax.core import (
     Capability,
     EntityKind,
+    EntityType,
     Identity,
     LookupContext,
     NotFoundError,
@@ -80,7 +81,17 @@ async def test_track() -> None:
     ]
     assert partial.tags[1].sources[0].url == "https://www.last.fm/music/Band"
     assert [t.body for t in partial.texts] == ["About the song."]
-    assert [(r.target.name, r.target.artist) for r in partial.relations] == [("Next", "Other")]
+    assert [(r.target.type, r.target.name, r.scope) for r in partial.relations] == [
+        (EntityType.RECORDING, "Next", Scope.RECORDING),
+        (EntityType.ARTIST, "Kin", Scope.ARTIST),
+    ]
+    assert partial.relations[0].target.artist == "Other"
+    assert partial.relations[1].sources[0].url == "https://www.last.fm/music/Band"
+    similar_artists = next(r for r in seen if r.url.params["method"] == "artist.getSimilar")
+    assert (similar_artists.url.params["artist"], similar_artists.url.params["limit"]) == (
+        "Band",
+        "10",
+    )
     first = seen[0].url.params
     assert (first["method"], first["autocorrect"], first["api_key"]) == (
         "track.getInfo",
@@ -163,7 +174,11 @@ def test_artist_page(url: str | None, artist: str | None) -> None:
     ("query", "facet", "methods"),
     [
         (TRACK, Capability.TAGS, {"track.getInfo", "track.getTopTags", "artist.getTopTags"}),
-        (TRACK, Capability.RELATIONS, {"track.getInfo", "track.getSimilar"}),
+        (
+            TRACK,
+            Capability.RELATIONS,
+            {"track.getInfo", "track.getSimilar", "artist.getSimilar"},
+        ),
         (TRACK, Capability.TEXTS, {"track.getInfo"}),
         (ALBUM, Capability.TAGS, {"album.getInfo", "album.getTopTags", "artist.getTopTags"}),
         (ALBUM, Capability.RELATIONS, {"album.getInfo", "artist.getSimilar"}),

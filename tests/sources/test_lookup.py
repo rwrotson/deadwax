@@ -8,6 +8,7 @@ from deadwax import (
     CacheSettings,
     Dossier,
     EntityKind,
+    EntityType,
     ErrorKind,
     HttpSettings,
     IdKind,
@@ -96,6 +97,19 @@ async def test_mainstream_track(replay: Replay, config: LookupConfig) -> None:
     assert {RelationKind.MEMBER, RelationKind.COVERED_BY, RelationKind.SAMPLED_BY} <= (
         relation_kinds(dossier)
     )
+    leads = {
+        (source.source, relation.kind, relation.target.type)
+        for relation in dossier.relations
+        for source in relation.sources
+    }
+    assert {
+        ("listenbrainz", RelationKind.SIMILAR_ARTIST_RECORDING, EntityType.RECORDING),
+        ("lastfm", RelationKind.SIMILAR, EntityType.ARTIST),
+        ("musicbrainz", RelationKind.ASSOCIATED, EntityType.ARTIST),
+    } <= leads
+    assert ("The Smile", "subgroup") in {
+        (r.target.name, r.note) for r in dossier.relations if r.kind is RelationKind.ASSOCIATED
+    }
     assert {"spotify", "deezer", "tidal", "apple_music", "discogs", "bandcamp"} <= {
         link.service for link in dossier.links
     }

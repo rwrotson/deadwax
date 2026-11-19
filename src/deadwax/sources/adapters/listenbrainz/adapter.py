@@ -35,9 +35,14 @@ SIMILAR_RECORDINGS = 20
 SIMILAR_ARTISTS = 10
 REVIEWS = "10"
 
+# LB Radio: easy mode over the whole popularity range; titles resolved 40 at a time, once.
+RADIO_MODE = "easy"
+RADIO_POPULARITY = ("0", "100")
+METADATA_BATCH = 40
+
 
 class ListenBrainzAdapter(HttpAdapter):
-    """Listen counts, similar recordings and artists, and CritiqueBrainz reviews by MBID."""
+    """Listen counts, similar recordings and artists, LB Radio, and CritiqueBrainz reviews."""
 
     name = "listenbrainz"
     pass_ = Pass.ENRICH
@@ -79,6 +84,35 @@ class ListenBrainzAdapter(HttpAdapter):
         found = models.similar_artists.validate_json(response.content)
         return p.similar_artists(found, p.page("artist", artist), SIMILAR_ARTISTS)
 
+    async def _radio(self, artist: str | None) -> list[Relation]:
+        if artist is None:
+            return []
+        settings = self.config.sources.listenbrainz
+        begin, end = RADIO_POPULARITY
+        response = await self.client.get(
+            f"{API}/lb-radio/artist/{artist}",
+            params={
+                "mode": RADIO_MODE,
+                "max_similar_artists": str(settings.radio_artists),
+                "max_recordings_per_artist": str(settings.radio_per_artist),
+                "pop_begin": begin,
+                "pop_end": end,
+            },
+        )
+        seeds = p.radio_seeds(models.radio.validate_json(response.content), artist)
+        seeds = seeds[:METADATA_BATCH]
+        if not seeds:
+            return []
+        response = await self.client.get(
+            f"{API}/metadata/recording/",
+            params={
+                "recording_mbids": ",".join(item.recording_mbid for item in seeds),
+                "inc": "artist",
+            },
+        )
+        names = models.metadata.validate_json(response.content)
+        return p.radio_recordings(seeds, names, p.page("artist", artist))
+
     async def _reviews(self, entity_type: str, mbid: str | None, scope: Scope) -> list[Text]:
         if mbid is None:
             return []
@@ -109,6 +143,7 @@ class ListenBrainzAdapter(HttpAdapter):
             similar = models.similar_recordings.validate_json(response.content)
             relations = p.similar_recordings(similar, url, SIMILAR_RECORDINGS)
             relations += await self._similar_artists(artist)
+            relations += await self._radio(artist)
         texts: list[Text] = []
         if context.wants(Capability.TEXTS):
             texts = await self._reviews("recording", recording, Scope.RECORDING)

@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md). Closed v2 stages (8–17, 19, R-1–R-5), their evidence, and the v2 decision log are archived in [`plans/v2.md`](plans/v2.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1–R-6 done. Stages M-1–M-3 (2026-11-20, requests and data for the mixhound consumer) run before Stage 20; M-1 done, M-2 is next.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1–R-6 done. Stages M-1–M-3 (2026-11-20, requests and data for the mixhound consumer) run before Stage 20; M-1 and M-2 done, M-3 is next.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -125,7 +125,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Sections of closed
 | R-5 | Done | Core: `Facts` base, `deadline` module, access label out of the core, nested `SourceInfo.access`, shared formatters. |
 | R-6 | Done | Trace event names, repository cleanup, journal split, architecture docs. |
 | M-1 | Done | Requests by facets, the long-lived `Deadwax` client. |
-| M-2 | Not started | Leads: LB Radio, Last.fm similar artists for tracks, MusicBrainz associated artists. |
+| M-2 | Done | Leads: LB Radio, Last.fm similar artists for tracks, MusicBrainz associated artists. |
 | M-3 | Not started | Bandcamp stream previews, ISRC in queries. |
 | 20 | Not started | Qualification. |
 
@@ -214,6 +214,30 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 ## Progress evidence and decision log
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
+
+### 2026-11-20 — M-2 evidence (leads)
+
+Changed:
+- `RelationKind.SIMILAR_ARTIST_RECORDING` and `RelationKind.ASSOCIATED` in `core/models.py`; the CLI renders relation kinds generically, so only `docs/output.md` gained rows (and the sample-offset note moved below the relation table it had split).
+- ListenBrainz: for a track with an artist MBID and `relations` wanted, `GET /1/lb-radio/artist/{mbid}` (`mode=easy`, `max_similar_artists`, `max_recordings_per_artist`, `pop_begin=0`, `pop_end=100`); list values flattened in response order, the seed artist's recordings dropped, at most 40 resolved through `GET /1/metadata/recording/?inc=artist`; unnamed items dropped. Relations `similar_artist_recording`, target recording with MB URL and ID, scope `artist`, provenance the LB artist page. Settings `sources.listenbrainz.radio_artists` (8) and `radio_per_artist` (2) with `.env.example` lines.
+- Last.fm: `artist.getSimilar` (10) also for tracks, after `track.getSimilar`; one `_similar_artists` helper for tracks and albums.
+- MusicBrainz: `member_relations` → `artist_relations`; `member of band` stays `member`/`project`; is person, collaboration, supporting / vocal / instrumental supporting musician, subgroup, founder, artist rename, tribute, and producer give `associated` with `note` = type, or `type: attributes`; response order kept.
+- Docs: `output.md`, `sources.md` (MusicBrainz, Last.fm, ListenBrainz), `requests.md` example, README source table.
+- Tests: LB Radio parameters and settings, seed artist dropped, 40-MBID cap, empty radio and seed-only radio make no metadata request, no radio without an artist MBID or for albums or without `relations`; Last.fm track similar artists and facet skipping; `artist_relations` mapping and order; the `paranoid_android` replay yields all three lead types.
+- Fixtures: `listenbrainz` (13 scenarios) and `lastfm` (10 scenarios) re-recorded live on 2026-11-20 with `uv run --env-file .env python scripts/record_fixtures.py --live listenbrainz,lastfm`; existing replay assertions held on the newer data. The Last.fm key does not appear in the fixtures.
+
+Decisions:
+- (agent) MusicBrainz fixtures are not re-recorded: the adapter already requested `artist/{id}?inc=artist-rels`, and the 12 recorded responses contain the needed types (`artist rename`, `subgroup`, `supporting musician`, `tribute`, `founder`, `instrumental supporting musician`, `collaboration`, `is person`) and excluded ones (`married`, `parent`, `involved with`). Keeping them keeps the MBIDs that ListenBrainz requests depend on.
+- (agent) The radio target's artist is the recording's artist credit from the metadata endpoint, falling back to LB Radio's similar-artist name: live, a recording listed for Green Day is credited to the *American Idiot* cast. V1 used the similar-artist name.
+- (agent) No special error handling for LB Radio: an artist without radio data answers `200 {}` live (checked with the nil MBID), which gives no relations.
+- (observation) `tribute` relations of MusicBrainz are mostly tribute bands of the artist (backward direction); they are kept as in V1, with the type in the note so consumers can rank or drop them.
+
+Observations:
+- `scripts/record_fixtures.py` forwards every source without fixtures to the network whatever `--live` says, because the recording lookup includes every group. The run therefore also sent plain requests to Beatport, Juno, Bleep, Forced Exposure, AllMusic, Album of the Year, NTS, WFMU, RA, and one artist site (`djtramaine713.com`), and wrote fixture directories for them and Last.fm fixtures for three scenarios that had none; all of these untracked files were deleted. Restricting the recorder to the live sources plus those with fixtures is left for a later change.
+
+Checks: `uv sync --all-groups --locked`; `uv run poe check` passed (fmt-check, lint, lint-imports 16 contracts kept, mypy, 1104 tests, coverage 96.97%); `uv run --group docs properdocs build --strict` passed. Live (2026-11-20): `deadwax lookup "Radiohead - Paranoid Android" --track --sources musicbrainz,listenbrainz,lastfm --facets identity,relations --no-cache -f json` gave 12 `similar_artist_recording` (ListenBrainz), 10 similar artists and 20 similar tracks (Last.fm), 12 `associated` and 5 `member` (MusicBrainz), no errors. Mock-tested only: the 40-MBID cap, the seed-only and empty radio paths, and attribute notes on associated relations.
+
+**Suggested message:** `feat(sources)!: add LB Radio, Last.fm similar artists for tracks, and MusicBrainz associated artists`.
 
 ### 2026-11-20 — M-1 evidence (requests and client)
 

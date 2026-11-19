@@ -75,6 +75,10 @@ class RelationKind(StrEnum):
 
     MEMBER = "member"
     PROJECT = "project"
+
+    # Another artist-to-artist relation; the note names its MusicBrainz type.
+    ASSOCIATED = "associated"
+
     LABEL = "label"
     LABEL_RELEASE = "label_release"
     APPEARS_ON = "appears_on"
@@ -96,6 +100,10 @@ class RelationKind(StrEnum):
     CHARTED_IN = "charted_in"
 
     SIMILAR = "similar"
+
+    # A recording by an artist similar to the record's artist (ListenBrainz LB Radio).
+    SIMILAR_ARTIST_RECORDING = "similar_artist_recording"
+
     CO_PLAYED = "co_played"
     OTHER_VERSION = "other_version"
 

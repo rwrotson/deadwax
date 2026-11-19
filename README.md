@@ -60,7 +60,7 @@ Every source is described in detail in [the sources guide](https://rwrotson.gith
 
 | Source | Status | Contributes | Caveats |
 |--------|--------|-------------|---------|
-| MusicBrainz | implemented | identity, ISRCs, labels, credits, tags and genres, members, covers, remixes, samples, appearances on releases and compilations, streaming links, Discogs and Wikidata IDs; resolves MusicBrainz URLs, and Spotify URLs when Spotify has no credentials | the only identity-pass source; the public server is often busy (retried) |
+| MusicBrainz | implemented | identity, ISRCs, labels, credits, tags and genres, members and associated artists, covers, remixes, samples, appearances on releases and compilations, streaming links, Discogs and Wikidata IDs; resolves MusicBrainz URLs, and Spotify URLs when Spotify has no credentials | the only identity-pass source; the public server is often busy (retried) |
 | iTunes Search | implemented | Apple Music links and previews, release date, genre; resolves Apple Music URLs | about 20 requests a minute |
 | Deezer | implemented | Deezer links, plus ISRC, barcode, label, and genres when present in HTML; resolves Deezer URLs | not in the default set (Akamai blocks its pages); HTML can omit fields; no API fallback |
 | Odesli (song.link) | implemented | links on every platform Odesli matches, with the title and ISRC or UPC; resolves streaming URLs | no public API since 2026-07-31: reads the song.link page of a streaming link from the query or an earlier source (MusicBrainz, iTunes, Deezer), else `not_found` |
@@ -71,9 +71,9 @@ Every source is described in detail in [the sources guide](https://rwrotson.gith
 |--------|--------|-------------|---------|
 | Discogs | implemented; search needs `sources.discogs.token` | genres and styles, credits with roles and tracks, notes, labels with catalog numbers, barcodes, other versions of the master, compilations, the label's other releases, members, groups, aliases, user reviews; resolves Discogs URLs | without a token reads only the IDs MusicBrainz gives (25 requests a minute); sends httpx's User-Agent because Discogs refuses deadwax's; review pages may be `blocked` |
 | Bandcamp | implemented | tags, About and Credits texts, credits, fan comments, recommendations as similar releases, label, the label's other releases; resolves `bandcamp.com` album and track pages | scraped pages; a track found on another artist's album contributes only its identity, links and own notes |
-| Last.fm | implemented, needs `sources.lastfm.api_key` | weighted tags (artist-wide ones marked `artist`), wiki texts, similar tracks or artists | `skipped` without the key |
+| Last.fm | implemented, needs `sources.lastfm.api_key` | weighted tags (artist-wide ones marked `artist`), wiki texts, similar tracks and artists | `skipped` without the key |
 | Wikipedia/Wikidata | implemented | genres, producers, composers, lyricists, labels, date, the album a song is on, review scores, lead and music sections of the English and original-language articles | section headings recognised in en, ru, ja, de, fr; other languages give the lead |
-| ListenBrainz | implemented | listen and listener counts, similar recordings and artists, CritiqueBrainz reviews | needs MusicBrainz IDs from the identity pass |
+| ListenBrainz | implemented | listen and listener counts, similar recordings and artists, LB Radio recordings by similar artists, CritiqueBrainz reviews | needs MusicBrainz IDs from the identity pass |
 | SecondHandSongs | implemented | first release date, writers, covers, the original of a cover, adaptations | songs only; about 10–20 requests a minute without `sources.secondhandsongs.api_key` |
 | KEXP | implemented | the latest 25 plays as broadcasts with programs and hosts, host comments | |
 | NTS | implemented, opt-in | episode broadcasts, neighbouring tracks, episode genres marked as context | searches the current JSON track index; at most 10 matching episodes |

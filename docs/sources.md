@@ -38,7 +38,7 @@ The README lists sources planned for later versions and those deadwax will not u
 - **Access:** WS/2 JSON API, keyless, 1 request a second, with the `deadwax/<version> (+contact)` User-Agent that the API requires.
 - **Pass:** identity.
 - **Finds the record by:** MusicBrainz IDs in the query; any URL through `ws/2/url`; an ISRC; or a search. Track searches look at official album, EP and single releases first, then a plain search, then the base title. DJ-mix excerpts and videos are excluded.
-- **Contributes:** artist, title, version, date, ISRCs, labels and catalog numbers, barcode; credits (producer, engineer, instruments, vocals, remixer, writers from the work); tags and genres with vote weights; members and projects; covers, remixes, samples, mixes, appearances on releases and compilations; streaming and shop links; Discogs, Wikidata and Bandcamp IDs.
+- **Contributes:** artist, title, version, date, ISRCs, labels and catalog numbers, barcode; credits (producer, engineer, instruments, vocals, remixer, writers from the work); tags and genres with vote weights; members and projects of the first credited artist, and its other artist relations (is person, collaboration, supporting musicians, subgroup, founder, rename, tribute, producer) as `associated` with the type in the note; covers, remixes, samples, mixes, appearances on releases and compilations; streaming and shop links; Discogs, Wikidata and Bandcamp IDs.
 - **Limits:** the public server answers "503 server busy" under load. Retries use `http.retry_base` and usually recover.
 
 ## iTunes Search
@@ -81,7 +81,7 @@ The README lists sources planned for later versions and those deadwax will not u
 ## Last.fm
 
 - **Access:** API with `DEADWAX_SOURCES__LASTFM__API_KEY`. The source is `skipped` without the key.
-- **Contributes:** `track.getInfo` or `album.getInfo` tags with weights (artist-wide tags are marked `artist`), wiki texts, and similar tracks (for a track) or similar artists (for an album).
+- **Contributes:** `track.getInfo` or `album.getInfo` tags with weights (artist-wide tags are marked `artist`), wiki texts, similar tracks (for a track), and up to 10 similar artists.
 - **Limits:** errors arrive inside 200 responses: code 6 means not found, 29 means rate limited.
 
 ## Wikipedia and Wikidata
@@ -96,7 +96,7 @@ The README lists sources planned for later versions and those deadwax will not u
 - **Group:** `catalogues`; in the default set.
 - **Access:** ListenBrainz API, its labs similarity endpoints, and the CritiqueBrainz API; keyless, honest User-Agent.
 - **Finds the record by:** the MusicBrainz recording, release group, and artist IDs from the identity pass; without them the source is `not_found`. It reports no candidate, since the IDs belong to the matched record.
-- **Contributes:** listen and listener counts as `metrics`; for a track, up to 20 recordings and 10 artists listened to in the same sessions as `similar`; CritiqueBrainz reviews of the recording and release group, as `user` texts, or as `review` texts naming the publication when CritiqueBrainz republishes one (such as BBC Music).
+- **Contributes:** listen and listener counts as `metrics`; for a track, up to 20 recordings and 10 artists listened to in the same sessions as `similar`; LB Radio recordings by similar artists of the first credited artist as `similar_artist_recording` (`sources.listenbrainz.radio_artists` artists, 8 by default, × `radio_per_artist` recordings, 2 by default; easy mode, every popularity; the artist's own recordings dropped, titles and artist credits from the metadata endpoint); CritiqueBrainz reviews of the recording and release group, as `user` texts, or as `review` texts naming the publication when CritiqueBrainz republishes one (such as BBC Music).
 - **Limits:** the labs endpoints are experimental; an empty answer gives no facts.
 
 ## SecondHandSongs

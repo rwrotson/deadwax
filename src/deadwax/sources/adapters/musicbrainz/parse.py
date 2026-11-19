@@ -395,14 +395,46 @@ def label_relations(release: models.Release) -> list[Relation]:
     ]
 
 
-def member_relations(artist: models.Artist) -> list[Relation]:
-    """Return the members of a group, or the groups a person belongs to."""
+MEMBER_TYPE = "member of band"
+
+# Artist relation types kept as leads; mixhound V1 used the same set.
+ASSOCIATED_TYPES = frozenset(
+    {
+        "is person",
+        "collaboration",
+        "supporting musician",
+        "subgroup",
+        "founder",
+        "artist rename",
+        "vocal supporting musician",
+        "instrumental supporting musician",
+        "tribute",
+        "producer",
+    },
+)
+
+
+def artist_relations(artist: models.Artist) -> list[Relation]:
+    """Return members, groups, and other associated artists, in MusicBrainz order.
+
+    `member of band` gives `member` (backward) or `project`; the types in `ASSOCIATED_TYPES`
+    give `associated` with the type, and its attributes, in the note.
+    """
     url = page("artist", artist.id)
     result = []
     for relation in artist.relations:
-        if relation.type != "member of band" or relation.artist is None:
+        if relation.artist is None:
             continue
-        kind = RelationKind.MEMBER if relation.direction == "backward" else RelationKind.PROJECT
+        attributes = ", ".join(relation.attributes)
+        if relation.type == MEMBER_TYPE:
+            backward = relation.direction == "backward"
+            kind = RelationKind.MEMBER if backward else RelationKind.PROJECT
+            note = attributes or None
+        elif relation.type in ASSOCIATED_TYPES:
+            kind = RelationKind.ASSOCIATED
+            note = f"{relation.type}: {attributes}" if attributes else relation.type
+        else:
+            continue
         result.append(
             Relation(
                 kind=kind,
@@ -412,7 +444,7 @@ def member_relations(artist: models.Artist) -> list[Relation]:
                     url=page("artist", relation.artist.id),
                     ids={IdKind.MUSICBRAINZ_ARTIST: relation.artist.id},
                 ),
-                note=", ".join(relation.attributes) or None,
+                note=note,
                 scope=Scope.ARTIST,
                 sources=[Provenance(source=SOURCE, url=url)],
             ),

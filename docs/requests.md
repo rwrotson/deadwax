@@ -14,7 +14,9 @@ request = Request(
     relations=(
         RelationLimit(kind=RelationKind.SIMILAR, target=EntityType.RECORDING, per_source=15),
         RelationLimit(kind=RelationKind.SIMILAR, target=EntityType.ARTIST, per_source=8),
+        RelationLimit(kind=RelationKind.SIMILAR_ARTIST_RECORDING, per_source=16),
         RelationLimit(kind=RelationKind.MEMBER, per_source=6),
+        RelationLimit(kind=RelationKind.ASSOCIATED, per_source=6),
     ),
 )
 ```

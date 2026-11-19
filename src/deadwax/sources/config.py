@@ -318,6 +318,16 @@ class ListenBrainzSettings(SourceSettings):
     """Settings of the ListenBrainz source."""
 
     rate: float = _rate(2.0)
+    radio_artists: int = Field(
+        default=8,
+        ge=1,
+        description="Similar artists asked from LB Radio for a track",
+    )
+    radio_per_artist: int = Field(
+        default=2,
+        ge=1,
+        description="LB Radio recordings asked per similar artist",
+    )
 
 
 class SecondHandSongsSettings(SourceSettings):

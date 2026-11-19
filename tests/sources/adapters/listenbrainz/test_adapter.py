@@ -6,6 +6,7 @@ import pytest
 from deadwax.core import (
     Capability,
     EntityKind,
+    EntityType,
     ExternalId,
     Identity,
     IdKind,
@@ -41,6 +42,19 @@ ROUTES: dict[str, object] = {
         {"recording_mbid": "r3", "recording_name": "Later", "artist_credit_name": ""},
     ],
     "/similar-artists/json": [{"artist_mbid": "a2", "name": "Kin"}],
+    f"/1/lb-radio/artist/{ARTIST}": {
+        ARTIST: [{"recording_mbid": "own", "similar_artist_mbid": ARTIST}],
+        "a2": [
+            {"recording_mbid": "r5", "similar_artist_mbid": "a2", "similar_artist_name": "Kin"},
+            {"recording_mbid": "r6", "similar_artist_mbid": "a2", "similar_artist_name": "Kin"},
+        ],
+        "a3": [{"recording_mbid": "r7", "similar_artist_mbid": "a3", "similar_artist_name": "Far"}],
+    },
+    "/1/metadata/recording/": {
+        "r5": {"recording": {"name": "Radio One"}, "artist": {"name": "Kin & Cast"}},
+        "r6": {"recording": {"name": "Radio Two"}},
+        "r7": {"recording": {}},
+    },
     "/ws/1/review/": {
         "reviews": [
             REVIEW,
@@ -51,14 +65,23 @@ ROUTES: dict[str, object] = {
 }
 
 
-def make(seen: list[httpx.Request] | None = None) -> ListenBrainzAdapter:
+def make(
+    seen: list[httpx.Request] | None = None,
+    routes: dict[str, object] | None = None,
+    **settings: object,
+) -> ListenBrainzAdapter:
+    table = ROUTES | (routes or {})
+
     def handler(request: httpx.Request) -> httpx.Response:
         if seen is not None:
             seen.append(request)
-        return httpx.Response(200, content=json.dumps(ROUTES[request.url.path]).encode())
+        return httpx.Response(200, content=json.dumps(table[request.url.path]).encode())
 
     config = LookupConfig.model_validate(
-        {"sources": {"listenbrainz": {"rate": 1000}}, "http": {"retries": 0, "escalation": []}},
+        {
+            "sources": {"listenbrainz": {"rate": 1000, **settings}},
+            "http": {"retries": 0, "escalation": []},
+        },
     )
     return ListenBrainzAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 
@@ -94,8 +117,15 @@ async def test_track() -> None:
     assert partial.metrics[0].sources[0].url == f"https://listenbrainz.org/track/{RECORDING}/"
     assert json.loads(seen[0].content) == {"recording_mbids": [RECORDING]}
     similar = [(r.kind, r.target.type, r.target.name, r.target.artist) for r in partial.relations]
-    assert [s[2:] for s in similar] == [("Next", "Other"), ("Later", None), ("Kin", None)]
-    assert {s[0] for s in similar} == {RelationKind.SIMILAR}
+    assert [s[2:] for s in similar] == [
+        ("Next", "Other"),
+        ("Later", None),
+        ("Kin", None),
+        ("Radio One", "Kin & Cast"),
+        ("Radio Two", "Kin"),
+    ]
+    assert {s[0] for s in similar[:3]} == {RelationKind.SIMILAR}
+    assert {s[0] for s in similar[3:]} == {RelationKind.SIMILAR_ARTIST_RECORDING}
     assert partial.relations[0].target.ids == {IdKind.MUSICBRAINZ_RECORDING: "r2"}
     review = partial.texts[0]
     assert (review.kind, review.body, review.author, review.date) == (
@@ -155,7 +185,12 @@ def test_published_dates() -> None:
         (
             EntityKind.TRACK,
             Capability.RELATIONS,
-            {"/similar-recordings/json", "/similar-artists/json"},
+            {
+                "/similar-recordings/json",
+                "/similar-artists/json",
+                f"/1/lb-radio/artist/{ARTIST}",
+                "/1/metadata/recording/",
+            },
         ),
         (EntityKind.TRACK, Capability.TEXTS, {"/ws/1/review/"}),
         (EntityKind.ALBUM, Capability.METRICS, {"/1/popularity/release-group"}),
@@ -181,3 +216,78 @@ async def test_asks_only_for_wanted_facets(
     await adapter.aclose()
 
     assert {request.url.path for request in seen} == paths
+
+
+def track_context(*ids: tuple[IdKind, str]) -> LookupContext:
+    found = context(EntityKind.TRACK, (IdKind.MUSICBRAINZ_RECORDING, RECORDING), *ids)
+    return found.model_copy(update={"facets": frozenset({Capability.RELATIONS})})
+
+
+@pytest.mark.asyncio
+async def test_radio_recordings_of_similar_artists() -> None:
+    seen: list[httpx.Request] = []
+    adapter = make(seen, radio_artists=3, radio_per_artist=1)
+    found = track_context((IdKind.MUSICBRAINZ_ARTIST, ARTIST))
+
+    partial = await adapter.lookup(found.query, found)
+    await adapter.aclose()
+
+    radio, names = (r for r in seen if r.url.path.startswith("/1/"))
+    assert dict(radio.url.params) == {
+        "mode": "easy",
+        "max_similar_artists": "3",
+        "max_recordings_per_artist": "1",
+        "pop_begin": "0",
+        "pop_end": "100",
+    }
+    assert dict(names.url.params) == {"recording_mbids": "r5,r6,r7", "inc": "artist"}
+    relation = next(r for r in partial.relations if r.kind is RelationKind.SIMILAR_ARTIST_RECORDING)
+    assert (relation.target.type, relation.scope) == (EntityType.RECORDING, Scope.ARTIST)
+    assert relation.target.url == "https://musicbrainz.org/recording/r5"
+    assert relation.target.ids == {IdKind.MUSICBRAINZ_RECORDING: "r5"}
+    assert relation.sources[0].url == f"https://listenbrainz.org/artist/{ARTIST}/"
+
+
+@pytest.mark.asyncio
+async def test_radio_resolves_at_most_forty_recordings() -> None:
+    seen: list[httpx.Request] = []
+    items = [{"recording_mbid": f"m{n}", "similar_artist_mbid": "a2"} for n in range(45)]
+    routes: dict[str, object] = {f"/1/lb-radio/artist/{ARTIST}": {"a2": items}}
+    adapter = make(seen, routes)
+    found = track_context((IdKind.MUSICBRAINZ_ARTIST, ARTIST))
+
+    await adapter.lookup(found.query, found)
+    await adapter.aclose()
+
+    names = next(r for r in seen if r.url.path == "/1/metadata/recording/")
+    assert names.url.params["recording_mbids"].split(",") == [f"m{n}" for n in range(40)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "radio",
+    [{}, {ARTIST: [{"recording_mbid": "own", "similar_artist_mbid": ARTIST}]}],
+)
+async def test_radio_without_other_artists_resolves_nothing(radio: dict[str, object]) -> None:
+    seen: list[httpx.Request] = []
+    adapter = make(seen, {f"/1/lb-radio/artist/{ARTIST}": radio})
+    found = track_context((IdKind.MUSICBRAINZ_ARTIST, ARTIST))
+
+    partial = await adapter.lookup(found.query, found)
+    await adapter.aclose()
+
+    assert "/1/metadata/recording/" not in {r.url.path for r in seen}
+    assert RelationKind.SIMILAR_ARTIST_RECORDING not in {r.kind for r in partial.relations}
+
+
+@pytest.mark.asyncio
+async def test_radio_needs_an_artist_mbid() -> None:
+    seen: list[httpx.Request] = []
+    adapter = make(seen)
+    found = track_context()
+
+    partial = await adapter.lookup(found.query, found)
+    await adapter.aclose()
+
+    assert {r.url.path for r in seen} == {"/similar-recordings/json"}
+    assert {r.kind for r in partial.relations} == {RelationKind.SIMILAR}

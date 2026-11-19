@@ -2,6 +2,7 @@ import pytest
 
 from deadwax.core import (
     EntityKind,
+    IdKind,
     LinkTarget,
     RecordKey,
     RelationKind,
@@ -309,3 +310,42 @@ def test_url_relations_give_ids_and_links() -> None:
 
 def test_phrase_escapes_quotes() -> None:
     assert p.phrase('Say "Hi" \\ bye') == '"Say \\"Hi\\" \\\\ bye"'
+
+
+def test_artist_relations() -> None:
+    def related(type_: str, name: str, direction: str, *attributes: str) -> dict[str, object]:
+        artist = {"id": f"id-{name}", "name": name}
+        return {
+            "type": type_,
+            "target-type": "artist",
+            "direction": direction,
+            "attributes": attributes,
+            "artist": artist,
+        }
+
+    artist = models.Artist.model_validate(
+        {
+            "id": "a1",
+            "name": "Band",
+            "relations": [
+                related("member of band", "Singer", "backward", "lead vocals"),
+                related("married", "Spouse", "forward"),
+                related("subgroup", "Offshoot", "forward"),
+                {"type": "collaboration", "target-type": "artist"},
+                related("supporting musician", "Session", "backward", "guitar", "bass"),
+                related("member of band", "Supergroup", "forward"),
+            ],
+        },
+    )
+
+    relations = p.artist_relations(artist)
+
+    assert [(r.kind, r.target.name, r.note) for r in relations] == [
+        (RelationKind.MEMBER, "Singer", "lead vocals"),
+        (RelationKind.ASSOCIATED, "Offshoot", "subgroup"),
+        (RelationKind.ASSOCIATED, "Session", "supporting musician: guitar, bass"),
+        (RelationKind.PROJECT, "Supergroup", None),
+    ]
+    assert relations[1].target.ids == {IdKind.MUSICBRAINZ_ARTIST: "id-Offshoot"}
+    assert {r.scope for r in relations} == {Scope.ARTIST}
+    assert relations[0].sources[0].url == "https://musicbrainz.org/artist/a1"

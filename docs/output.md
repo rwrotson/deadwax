@@ -59,6 +59,7 @@ Relation kinds are directional:
 | Kind | Target |
 |------|--------|
 | `member`, `project` | Band members; other projects of the artist or its members |
+| `associated` | Other related artists from MusicBrainz; `note` holds the relation type and its attributes, such as `supporting musician: guitar`, `subgroup`, or `tribute` |
 | `label`, `label_release` | The label; its other releases |
 | `appears_on`, `compilation` | Releases and compilations containing the record |
 | `mix`, `broadcast` | DJ mixes and broadcasts containing it |
@@ -66,12 +67,13 @@ Relation kinds are directional:
 | `cover_of`, `covered_by` | The original it covers; covers of it |
 | `remix_of`, `remixed_by` | The original it remixes; remixes of it |
 | `samples`, `sampled_by` | What it samples; what samples it |
-
-Sample relations can carry `recording_offset` and `target_offset` in seconds, plus an `element` label. An absent value is left empty.
 | `reposted_by` | Accounts that reposted the upload (SoundCloud) |
 | `charted_by` | DJ charts that list the track, with the DJ as the target's artist (Beatport) |
 | `similar` | Similar records or artists according to a source |
+| `similar_artist_recording` | Recordings by artists similar to the record's artist (ListenBrainz LB Radio), with `artist` scope |
 | `other_version` | Another version of the same work, kept apart from the identity |
+
+Sample relations can carry `recording_offset` and `target_offset` in seconds, plus an `element` label. An absent value is left empty.
 
 Genius song lyrics appear as a full `lyrics` text with `work` scope when the page contains them. JSON, Markdown, and terminal output retain the complete text.
 

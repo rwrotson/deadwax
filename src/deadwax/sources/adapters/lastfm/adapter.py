@@ -77,6 +77,15 @@ class LastfmAdapter(HttpAdapter):
         )
         return p.tags(found.toptags.tag, Scope.ARTIST, page, p.ARTIST_TAGS_LIMIT)
 
+    async def _similar_artists(self, artist: str, page: str | None) -> list[Relation]:
+        found = await self._call(
+            models.SimilarArtistsResponse,
+            "artist.getSimilar",
+            artist=artist,
+            limit=SIMILAR_ARTISTS,
+        )
+        return p.similar_artists(found.similar.artist, page)
+
     async def _track(self, key: RecordKey, context: LookupContext) -> Partial:
         names = {"artist": key.artist, "track": key.title, "autocorrect": "1"}
         track = (await self._call(models.TrackInfoResponse, "track.getInfo", **names)).track
@@ -97,6 +106,7 @@ class LastfmAdapter(HttpAdapter):
                 limit=SIMILAR_TRACKS,
             )
             relations = p.similar_tracks(similar.similartracks.track, track.url)
+            relations += await self._similar_artists(track.artist.name, artist_page)
 
         return Partial(
             source=self.name,
@@ -119,13 +129,7 @@ class LastfmAdapter(HttpAdapter):
             tags += await self._artist_tags(album.artist, artist_page)
         relations: list[Relation] = []
         if context.wants(Capability.RELATIONS):
-            similar = await self._call(
-                models.SimilarArtistsResponse,
-                "artist.getSimilar",
-                artist=album.artist,
-                limit=SIMILAR_ARTISTS,
-            )
-            relations = p.similar_artists(similar.similar.artist, artist_page)
+            relations = await self._similar_artists(album.artist, artist_page)
 
         return Partial(
             source=self.name,
