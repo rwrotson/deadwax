@@ -13,13 +13,13 @@ from deadwax import (
     Provenance,
     Relation,
     RelationKind,
-    SourceAccess,
     Sourced,
     SourceInfo,
     SourceState,
     Tag,
-    to_markdown,
 )
+from deadwax.cli.markdown import to_markdown
+from deadwax.cli.text import access_label, number, rating, relation_details, version_text
 from deadwax.logs import RunRecord
 
 # Longest text body shown in the terminal; JSON and Markdown keep the whole text.
@@ -76,10 +76,7 @@ def _identity_rows(dossier: Dossier) -> list[tuple[str, str, Text]]:
     named = (("artist", identity.artist), ("title", identity.title))
     rows += [(name, *_sourced(value)) for name, value in named if value is not None]
 
-    version = identity.version.kind.value
-    if identity.version.detail:
-        version = f"{version} ({identity.version.detail})"
-    rows.append(("version", version, Text()))
+    rows.append(("version", version_text(identity.version), Text()))
     if identity.date is not None:
         rows.append(("date", *_sourced(identity.date)))
     if identity.bpm is not None:
@@ -148,10 +145,8 @@ def _texts(dossier: Dossier) -> list[Text | Table]:
     for text in dossier.texts:
         header = Text(text.kind.value, style="bold")
         details = [text.title, text.publication, text.author, text.date]
-        if text.rating is not None and (text.rating.text or text.rating.value is not None):
-            scale = f"/{text.rating.scale:g}" if text.rating.scale else ""
-            value = f"{text.rating.value:g}" if text.rating.value is not None else ""
-            details.append(f"rating {text.rating.text or value}{scale}")
+        if score := rating(text.rating):
+            details.append(f"rating {score}")
         header.append(" · " + " · ".join(d for d in details if d) if any(details) else "")
         header.append(" — ")
         header.append_text(_sources(text.sources))
@@ -170,11 +165,7 @@ def _relation_line(relation: Relation) -> Text:
     target = relation.target
     line = Text("  ")
     line.append(target.name, style=f"link {target.url}" if target.url else "")
-    details = [d for d in (target.artist, target.date, relation.note, relation.element) if d]
-    if relation.recording_offset is not None:
-        details.append(f"recording {relation.recording_offset}s")
-    if relation.target_offset is not None:
-        details.append(f"target {relation.target_offset}s")
+    details = [d for d in (target.artist, target.date) if d] + relation_details(relation)
     if details:
         line.append(f" ({', '.join(details)})")
     line.append(" — ")
@@ -192,17 +183,13 @@ def _relations(dossier: Dossier) -> list[Text | Table]:
     return parts
 
 
-def _number(value: float) -> str:
-    return f"{int(value):,}" if value.is_integer() else f"{value:g}"
-
-
 def _metrics(dossier: Dossier) -> list[Text | Table]:
     table = _table("metric", "value", "scope", "sources")
     for metric in dossier.metrics:
-        scale = f"/{_number(metric.scale)}" if metric.scale is not None else ""
+        scale = f"/{number(metric.scale, grouped=True)}" if metric.scale is not None else ""
         table.add_row(
             metric.kind.value,
-            f"{_number(metric.value)}{scale}",
+            f"{number(metric.value, grouped=True)}{scale}",
             metric.scope.value.replace("_", " "),
             _sources(metric.sources),
         )
@@ -239,7 +226,9 @@ def _errors(dossier: Dossier) -> list[Text | Table]:
             error.source,
             Text(error.kind.value, style="red"),
             error.reason,
-            Text(error.access.label) if error.kind is ErrorKind.BLOCKED and error.access else "",
+            Text(access_label(error.access))
+            if error.kind is ErrorKind.BLOCKED and error.access
+            else "",
         )
     return [_heading("Errors"), table]
 
@@ -306,15 +295,6 @@ def _capabilities(info: SourceInfo) -> str:
     return ", ".join(capability.value for capability in info.capabilities)
 
 
-def _access(info: SourceInfo) -> str:
-    return SourceAccess(
-        api=info.api,
-        html_transports=info.html_transports,
-        browser_headless=info.browser_headless,
-        headed_fallback=info.headed_fallback,
-    ).label
-
-
 def print_sources(
     infos: Sequence[SourceInfo],
     output: OutputFormat,
@@ -338,7 +318,7 @@ def print_sources(
                 info.group.value,
                 _default(info),
                 info.pass_.value,
-                _access(info),
+                access_label(info.access),
                 _capabilities(info),
                 _status(info).plain,
             )
@@ -353,7 +333,7 @@ def print_sources(
             info.group.value,
             _default(info),
             info.pass_.value,
-            Text(_access(info)),
+            Text(access_label(info.access)),
             _capabilities(info),
             _status(info),
         )

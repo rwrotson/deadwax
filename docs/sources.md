@@ -4,7 +4,7 @@
 
 Its Access column shows the configured retrieval methods: API requests use httpx; HTML pages use the listed transports in order. `impersonate` uses curl_cffi, `patchright` uses Patchright, and `nodriver` uses Nodriver. Browser transports show their configured `headed` or `headless` mode; `headless → headed` means a challenged headless page is retried in a window (`http.headed_fallback`). If the global allowlist leaves an HTML source with no transport, `sources` shows `HTML (no permitted transports)` and a disabled status; lookups omit that source, including any API work it could do. The list does not check whether optional packages are installed or whether a site will accept a request. Flags on a separate lookup can override its browser mode.
 
-Lookup errors marked `blocked` carry the source's access configuration for that run. The terminal and Markdown error tables show it in an Access column; JSON has a structured `access` field with `api`, `html_transports`, `browser_headless`, and `headed_fallback`.
+Lookup errors marked `blocked` carry the source's access configuration for that run. The terminal and Markdown error tables show it in an Access column; JSON has a structured `access` field with `api`, `html_transports`, `browser_headless`, and `headed_fallback`; `deadwax sources --format json` nests the same field in each source.
 
 ## Groups and the default set
 

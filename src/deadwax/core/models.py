@@ -337,21 +337,6 @@ class SourceAccess(_Model):
     # Whether a challenged headless browser retries with a window.
     headed_fallback: bool = False
 
-    @property
-    def label(self) -> str:
-        """Describe the configured routes in their attempt order."""
-        parts = ["API (httpx)"] if self.api else []
-        if self.browser_headless is not None:
-            mode = "headless" if self.browser_headless else "headed"
-            if self.browser_headless and self.headed_fallback:
-                mode = "headless → headed"
-            steps = [
-                f"{step} [{mode}]" if step in {"patchright", "nodriver"} else step
-                for step in self.html_transports
-            ]
-            parts.append(f"HTML ({' → '.join(steps) if steps else 'no permitted transports'})")
-        return "; ".join(parts)
-
 
 class AdapterError(_Model):
     """Adapter that did not answer, or answered only in part, and why."""
@@ -391,33 +376,31 @@ class RecordCandidate(_Model):
     url: str | None = None
 
 
-class Partial(_Model):
+class Facts(_Model):
+    """Facts gathered about a record, each with its sources."""
+
+    tags: list[Tag] = []
+    credits: list[Credit] = []
+    texts: list[Text] = []
+    relations: list[Relation] = []
+    metrics: list[Metric] = []
+    links: list[Link] = []
+    review_links: list[ReviewLink] = []
+
+
+class Partial(Facts):
     """Everything one adapter found; facts are kept only if the candidate matches the query."""
 
     source: str
     candidate: RecordCandidate | None = None
-    tags: list[Tag] = []
-    credits: list[Credit] = []
-    texts: list[Text] = []
-    relations: list[Relation] = []
-    metrics: list[Metric] = []
-    links: list[Link] = []
-    review_links: list[ReviewLink] = []
     errors: list[AdapterError] = []
 
 
-class Dossier(_Model):
+class Dossier(Facts):
     """Everything known about one record, with the source of every fact."""
 
     query: Query
     identity: Identity
-    tags: list[Tag] = []
-    credits: list[Credit] = []
-    texts: list[Text] = []
-    relations: list[Relation] = []
-    metrics: list[Metric] = []
-    links: list[Link] = []
-    review_links: list[ReviewLink] = []
     errors: list[AdapterError] = []
     generated_at: AwareDatetime
 

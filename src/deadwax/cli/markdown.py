@@ -1,6 +1,6 @@
 from collections.abc import Callable, Iterable
 
-from deadwax.core.models import (
+from deadwax import (
     AdapterError,
     Credit,
     Dossier,
@@ -15,6 +15,7 @@ from deadwax.core.models import (
     Text,
     VersionKind,
 )
+from deadwax.cli.text import access_label, number, rating, relation_details, version_text
 
 
 def _sources(sources: Iterable[Provenance]) -> str:
@@ -39,8 +40,7 @@ def _identity(identity: Identity) -> list[str]:
         lines.append(f"- **Kind:** {identity.kind}")
     lines += _sourced("Artist", identity.artist) + _sourced("Title", identity.title)
     if identity.version.kind is not VersionKind.ORIGINAL or identity.version.detail:
-        detail = f" ({identity.version.detail})" if identity.version.detail else ""
-        lines.append(f"- **Version:** {identity.version.kind}{detail}")
+        lines.append(f"- **Version:** {version_text(identity.version)}")
     lines += _sourced("Date", identity.date)
     if identity.bpm is not None:
         lines.append(f"- **BPM:** {identity.bpm.value:g} ({_sources(identity.bpm.sources)})")
@@ -91,10 +91,10 @@ def _text(text: Text) -> list[str]:
     if not text.body.strip():
         return _score(text)
     byline = ", ".join(part for part in (text.publication, text.author, text.date) if part)
-    rating = _rating(text)
-    rating = f" — {rating}" if rating else ""
+    score = rating(text.rating)
+    score = f" — {score}" if score else ""
     heading = f"### {text.title or text.kind.capitalize()}"
-    meta = f"*{text.kind}, {text.scope}{', ' + byline if byline else ''}{rating}*"
+    meta = f"*{text.kind}, {text.scope}{', ' + byline if byline else ''}{score}*"
     quoted = [f"> {line}" if line else ">" for line in text.body.splitlines()]
     return [heading, "", meta, "", *quoted, "", f"Source: {_sources(text.sources)}", ""]
 
@@ -102,43 +102,24 @@ def _text(text: Text) -> list[str]:
 def _score(text: Text) -> list[str]:
     """A score without a review body, as one list line."""
     name = text.publication or text.author or text.kind.capitalize()
-    rating = _rating(text)
+    score = rating(text.rating)
     details = ", ".join(d for d in (text.title, str(text.scope), text.language) if d)
-    line = f"- {name}{': ' + rating if rating else ''} ({details}) — {_sources(text.sources)}"
+    line = f"- {name}{': ' + score if score else ''} ({details}) — {_sources(text.sources)}"
     return [line, ""]
-
-
-def _rating(text: Text) -> str:
-    if text.rating is None:
-        return ""
-    if text.rating.text:
-        return text.rating.text
-    if text.rating.value is None:
-        return ""
-    scale = f"/{text.rating.scale:g}" if text.rating.scale is not None else ""
-    return f"{text.rating.value:g}{scale}"
 
 
 def _relation(relation: Relation) -> list[str]:
     target = relation.target
     name = f"{target.artist} — {target.name}" if target.artist else target.name
     name = f"[{name}]({target.url})" if target.url else name
-    details = [relation.note, relation.element]
-    if relation.recording_offset is not None:
-        details.append(f"recording {relation.recording_offset}s")
-    if relation.target_offset is not None:
-        details.append(f"target {relation.target_offset}s")
-    note = f" ({', '.join(item for item in details if item)})" if any(details) else ""
+    details = relation_details(relation)
+    note = f" ({', '.join(details)})" if details else ""
     return [f"- {relation.kind}: {name}{note} — {_sources(relation.sources)}"]
 
 
-def _number(value: float) -> str:
-    return str(int(value)) if value.is_integer() else f"{value:g}"
-
-
 def _metric(metric: Metric) -> list[str]:
-    value = _number(metric.value)
-    scale = f"/{_number(metric.scale)}" if metric.scale is not None else ""
+    value = number(metric.value)
+    scale = f"/{number(metric.scale)}" if metric.scale is not None else ""
     return [f"- {metric.kind}: {value}{scale} ({metric.scope}) — {_sources(metric.sources)}"]
 
 
@@ -162,7 +143,7 @@ def _errors(errors: list[AdapterError]) -> list[str]:
     ]
     for error in errors:
         reason = error.reason.replace("|", "\\|")
-        access = error.access.label if error.access is not None else ""
+        access = access_label(error.access) if error.access is not None else ""
         lines.append(f"| {error.source} | {error.kind} | {reason} | {access} |")
     return lines
 

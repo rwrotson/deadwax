@@ -33,7 +33,7 @@ def describe_sources(config: LookupConfig | None = None) -> list[SourceInfo]:
             capabilities=sorted(adapter.capabilities),
             requires=list(adapter.requires),
             status=adapter.status(),
-            **adapter.access().model_dump(),
+            access=adapter.access(),
         )
         for adapter in adapters
     ]

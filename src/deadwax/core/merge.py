@@ -8,7 +8,6 @@ from deadwax.core.matching import RecordKey, Verdict, compare
 from deadwax.core.models import (
     AdapterError,
     Attributed,
-    Credit,
     Discrepancy,
     Dossier,
     Entity,
@@ -16,9 +15,9 @@ from deadwax.core.models import (
     ErrorKind,
     ExternalId,
     Fact,
+    Facts,
     Identity,
     LabelRef,
-    Link,
     LinkTarget,
     Metric,
     Partial,
@@ -26,7 +25,6 @@ from deadwax.core.models import (
     RecordCandidate,
     Relation,
     RelationKind,
-    ReviewLink,
     Scope,
     Sourced,
     Tag,
@@ -459,17 +457,6 @@ def _scope_rank(kind: EntityKind) -> Callable[[Fact], int]:
     return lambda fact: order.index(fact.scope)
 
 
-@dataclass(frozen=True, slots=True)
-class _Facts:
-    tags: list[Tag]
-    credits: list[Credit]
-    texts: list[Text]
-    relations: list[Relation]
-    metrics: list[Metric]
-    links: list[Link]
-    review_links: list[ReviewLink]
-
-
 # Shop and label texts often reprint one press release.
 _COPY_KINDS = frozenset({TextKind.SHOP, TextKind.LABEL})
 
@@ -582,7 +569,7 @@ def _merge_review_scores(texts: Iterable[Text]) -> list[Text]:
     return merged
 
 
-def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Partial]) -> _Facts:
+def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Partial]) -> Facts:
     scope_rank = _scope_rank(kind)
 
     tags = _dedupe(
@@ -616,7 +603,7 @@ def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Parti
         lambda link: _url_key(link.url),
     )
     link_order = _LINK_ORDER[kind]
-    return _Facts(
+    return Facts(
         tags=sorted(tags, key=lambda t: (scope_rank(t), -len(t.sources), -(t.weight or 0.0))),
         credits=sorted(credit_facts, key=scope_rank),
         texts=sorted(texts, key=lambda t: (scope_rank(t), _TEXT_ORDER.index(t.kind))),
@@ -648,13 +635,7 @@ def merge(
     return Dossier(
         query=query,
         identity=identity,
-        tags=facts.tags,
-        credits=facts.credits,
-        texts=facts.texts,
-        relations=facts.relations,
-        metrics=facts.metrics,
-        links=facts.links,
-        review_links=facts.review_links,
+        **dict(facts),
         errors=[*errors, *judgement.errors],
         generated_at=generated_at,
     )

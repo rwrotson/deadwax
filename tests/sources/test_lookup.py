@@ -453,7 +453,7 @@ def test_describe_sources_reports_configured_access() -> None:
             "http": {"browser_headless": True},
         },
     )
-    sources = {info.source: info for info in describe_sources(config)}
+    sources = {info.source: info.access for info in describe_sources(config)}
 
     assert sources["musicbrainz"].api
     assert sources["musicbrainz"].html_transports == []
@@ -479,7 +479,7 @@ def test_describe_sources_disables_one_without_permitted_transports() -> None:
 
     sources = {info.source: info for info in describe_sources(config)}
 
-    assert sources["norman"].html_transports == []
+    assert sources["norman"].access.html_transports == []
     assert sources["norman"].status.state is SourceState.DISABLED
     assert sources["norman"].status.detail == "no permitted HTML transports"
     assert sources["musicbrainz"].status.ready

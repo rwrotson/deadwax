@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 
+from deadwax.cli.markdown import to_markdown
 from deadwax.core import (
     AdapterError,
     CandidateLabel,
@@ -26,7 +27,6 @@ from deadwax.core import (
     TextKind,
     merge,
     text_query,
-    to_markdown,
 )
 
 NOW = datetime(2026, 11, 12, tzinfo=UTC)

@@ -356,7 +356,7 @@ def test_sources_command_displays_unavailable_html_transport(
     assert "HTML (no permitted transports)" in table.stdout
     assert "disabled: no permitted HTML transports" in table.stdout
     sources = {row["source"]: row for row in json.loads(as_json.stdout)}
-    assert sources["norman"]["html_transports"] == []
+    assert sources["norman"]["access"]["html_transports"] == []
     assert sources["norman"]["status"] == {
         "source": "norman",
         "state": "disabled",

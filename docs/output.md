@@ -1,6 +1,6 @@
 # Output
 
-A lookup returns a `Dossier`. `deadwax --format json` prints it as JSON (`Dossier.model_dump_json()`), `--format markdown` through `to_markdown()`, and `--format pretty` as rich sections in the terminal. The JSON Schema is on the [Schema](schema.md) page.
+A lookup returns a `Dossier`. `deadwax --format json` prints it as JSON (`Dossier.model_dump_json()`), `--format markdown` as Markdown, and `--format pretty` as rich sections in the terminal. The JSON Schema is on the [Schema](schema.md) page.
 
 ## Provenance
 

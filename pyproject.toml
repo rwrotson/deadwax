@@ -288,8 +288,8 @@ type = "layers"
 containers = ["deadwax.core"]
 layers = [
     "orchestrator",
-    "adapter | merge | markdown",
-    "matching", "versions", "normalize", "models", "query", "errors | events"]
+    "adapter | merge",
+    "matching", "versions", "normalize", "models", "query", "errors | events | deadline"]
 
 [[tool.importlinter.contracts]]
 name = "R4: sources modules"

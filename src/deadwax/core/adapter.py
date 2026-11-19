@@ -1,9 +1,9 @@
 from enum import StrEnum
 from typing import Protocol
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
-from deadwax.core.models import Identity, Link, Partial, ReviewLink
+from deadwax.core.models import Identity, Link, Partial, ReviewLink, SourceAccess
 from deadwax.core.query import IdKind, Query
 
 
@@ -85,12 +85,7 @@ class SourceInfo(_Model):
     capabilities: list[Capability]
     requires: list[Requirement]
     status: SourceStatus
-    api: bool = False
-    html_transports: list[str] = Field(default_factory=list)
-    browser_headless: bool | None = None
-
-    # Whether a challenged headless browser retries with a window.
-    headed_fallback: bool = False
+    access: SourceAccess
 
     # Whether a lookup without an explicit source list runs the adapter.
     default: bool

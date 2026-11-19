@@ -15,6 +15,7 @@ from .core import (
     EntityType,
     ErrorKind,
     ExternalId,
+    Facts,
     Identity,
     IdKind,
     InvalidQueryError,
@@ -46,7 +47,6 @@ from .core import (
     VersionInfo,
     VersionKind,
     parse_title,
-    to_markdown,
 )
 
 if TYPE_CHECKING:
@@ -106,6 +106,7 @@ __all__ = [
     "ErrorKind",
     "Escalation",
     "ExternalId",
+    "Facts",
     "HttpSettings",
     "IdKind",
     "Identity",
@@ -144,5 +145,4 @@ __all__ = [
     "lookup",
     "parse_query",
     "parse_title",
-    "to_markdown",
 ]

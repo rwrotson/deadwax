@@ -11,6 +11,7 @@ from .adapter import (
     SourceState,
     SourceStatus,
 )
+from .deadline import adapter_time_left, pause_adapter_timeout
 from .errors import (
     BlockedError,
     ConfigurationError,
@@ -21,7 +22,6 @@ from .errors import (
     SourceError,
 )
 from .events import TRACE_ATTRIBUTE, TraceFilter, trace, trace_fields, trace_scope
-from .markdown import to_markdown
 from .matching import Match, RecordKey, Verdict, artist_similarity, compare, title_similarity
 from .merge import QUERY_SOURCE, build_identity, merge
 from .models import (
@@ -36,6 +36,7 @@ from .models import (
     ErrorKind,
     ExternalId,
     Fact,
+    Facts,
     Identity,
     LabelRef,
     Link,
@@ -69,13 +70,7 @@ from .normalize import (
     normalize_text,
     split_featuring,
 )
-from .orchestrator import (
-    LookupOptions,
-    adapter_time_left,
-    expand_names,
-    pause_adapter_timeout,
-    run,
-)
+from .orchestrator import LookupOptions, expand_names, run
 from .query import EntityKind, IdKind, Query, UrlRule, recognize_url, text_query
 from .versions import ParsedTitle, classify_marker, parse_title
 
@@ -99,6 +94,7 @@ __all__ = [
     "ErrorKind",
     "ExternalId",
     "Fact",
+    "Facts",
     "IdKind",
     "Identity",
     "InvalidQueryError",
@@ -162,7 +158,6 @@ __all__ = [
     "split_featuring",
     "text_query",
     "title_similarity",
-    "to_markdown",
     "trace",
     "trace_fields",
     "trace_scope",

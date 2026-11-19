@@ -2,13 +2,13 @@ import asyncio
 import contextlib
 import logging
 import time
-from collections.abc import AsyncIterator, Callable, Collection, Sequence
-from contextvars import ContextVar
+from collections.abc import Callable, Collection, Sequence
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from deadwax.core.adapter import Adapter, LookupContext, Pass, SourceGroup, SourceState
+from deadwax.core.deadline import adapter_deadline
 from deadwax.core.errors import (
     BlockedError,
     ConfigurationError,
@@ -22,11 +22,6 @@ from deadwax.core.models import AdapterError, Dossier, ErrorKind, Partial
 from deadwax.core.query import Query
 
 logger = logging.getLogger(__name__)
-
-_adapter_deadline: ContextVar[asyncio.Timeout | None] = ContextVar(
-    "deadwax_adapter_deadline",
-    default=None,
-)
 
 _ERROR_KINDS: tuple[tuple[type[SourceError], ErrorKind], ...] = (
     (BlockedError, ErrorKind.BLOCKED),
@@ -46,29 +41,6 @@ def _failure(adapter: Adapter, kind: ErrorKind, reason: str, url: str | None = N
 
 def _milliseconds(start: float) -> int:
     return round((time.monotonic() - start) * 1000)
-
-
-def adapter_time_left() -> float | None:
-    """Return the seconds left before the current adapter times out, or None without a limit."""
-    timeout = _adapter_deadline.get()
-    if timeout is None or (deadline := timeout.when()) is None:
-        return None
-    return max(deadline - asyncio.get_running_loop().time(), 0.0)
-
-
-@contextlib.asynccontextmanager
-async def pause_adapter_timeout() -> AsyncIterator[None]:
-    """Exclude a shared-resource queue wait from the current adapter timeout."""
-    timeout = _adapter_deadline.get()
-    if timeout is None or (deadline := timeout.when()) is None:
-        yield
-        return
-    started = asyncio.get_running_loop().time()
-    timeout.reschedule(None)
-    try:
-        yield
-    finally:
-        timeout.reschedule(deadline + asyncio.get_running_loop().time() - started)
 
 
 def _outcome(partial: Partial) -> dict[str, object]:
@@ -119,12 +91,8 @@ async def _call(
 
 async def _timed(adapter: Adapter, query: Query, context: LookupContext, seconds: float) -> Partial:
     try:
-        async with asyncio.timeout(seconds) as timeout:
-            token = _adapter_deadline.set(timeout)
-            try:
-                return await adapter.lookup(query, context)
-            finally:
-                _adapter_deadline.reset(token)
+        async with adapter_deadline(seconds):
+            return await adapter.lookup(query, context)
     except TimeoutError:
         return _failure(adapter, ErrorKind.TIMEOUT, f"no answer within {seconds:g} s")
     except SourceError as error:

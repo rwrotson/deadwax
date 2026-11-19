@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1–R-4 done, R-5 is next.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1–R-5 done, R-6 is next.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -120,7 +120,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | R-2 | Done | Shared helpers: `prose()`, JSON through models, adapter access description. |
 | R-3 | Done | Service catalogue in `sources/services.py`; `service` and default `resolves()` on every adapter; URL rules leave the core. |
 | R-4 | Done | Source defaults in settings, `LookupConfig` with a `sources` section shared by the CLI, resolved settings for `HttpClient`, registry. |
-| R-5 | Not started | Core: `Facts` base, `deadline` module, access label out of the core, nested `SourceInfo.access`, shared formatters. |
+| R-5 | Done | Core: `Facts` base, `deadline` module, access label out of the core, nested `SourceInfo.access`, shared formatters. |
 | R-6 | Not started | Trace event names, repository cleanup, journal split, architecture docs. |
 | 20 | Not started | Qualification. |
 
@@ -279,6 +279,27 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 ## Progress evidence and decision log
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
+
+### 2026-11-19 — R-5 evidence (core)
+
+Changed:
+- `core/models.py`: new public `Facts` (tags, credits, texts, relations, metrics, links, review links); `Partial` and `Dossier` subclass it and keep their own `errors`. `merge._Facts` is gone; `_facts()` returns `Facts`.
+- `core/deadline.py` holds the adapter time budget: `adapter_deadline(seconds)` (used by `orchestrator._timed`), `adapter_time_left()`, `pause_adapter_timeout()`. import-linter R5: `errors | events | deadline` at the bottom; `markdown` left the core.
+- `SourceAccess` has no `label`; `SourceInfo` nests `access: SourceAccess` instead of `api`, `html_transports`, `browser_headless`, `headed_fallback`.
+- `to_markdown` moved to `cli/markdown.py` and left `deadwax.__all__` and `deadwax.core`. New `cli/text.py` holds plain-text formatters used by Markdown and rich output: `access_label`, `number`, `rating`, `version_text`, `relation_details`.
+- Tests: `tests/core/test_deadline.py`, `tests/cli/test_text.py`; `test_markdown.py` moved to `tests/cli/`; render, app, and lookup tests read the nested `access`. Docs: `docs/architecture.md` R5, `docs/reference/index.md`, `docs/output.md`, `docs/sources.md`.
+
+Decisions:
+- (user) Markdown rendering and the access label move to the CLI; `deadwax.to_markdown` is removed from the public API.
+- (agent) `errors` stays outside `Facts`: errors are not facts about the record.
+- (agent) Dossier and Partial JSON now list the fact fields before `query`/`identity` (`source`/`candidate`), since Pydantic orders base fields first. Values are unchanged.
+- (agent) `deadwax sources --format json` nests access under `access` (breaking for its readers).
+
+Observed: the terminal showed a scale after a printed rating (`4/5/5` for text `4/5` with scale 5); the shared `rating()` uses the Markdown rule, so it now shows `4/5`. Markdown output is unchanged (its exact-text tests pass).
+
+Checks: `uv run poe check` passed (fmt-check, lint, lint-imports 16 contracts kept, mypy, 1055 tests, coverage 96.88%); `uv run --group docs properdocs build --strict` passed; `deadwax sources --format json` shows the nested `access`, `--format markdown` the Access column. No live runs (refactor only).
+
+**Suggested message:** `refactor(core)!: add a Facts base and a deadline module, and render Markdown and access labels in the CLI`.
 
 ### 2026-11-19 — R-4 evidence (configuration)
 

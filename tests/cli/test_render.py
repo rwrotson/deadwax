@@ -139,6 +139,7 @@ INFOS = [
         capabilities=[Capability.IDENTITY, Capability.LINKS],
         requires=[],
         status=SourceStatus(source="musicbrainz", state=SourceState.READY),
+        access=SourceAccess(),
     ),
     SourceInfo(
         source="lastfm",
@@ -148,6 +149,7 @@ INFOS = [
         capabilities=[Capability.TAGS],
         requires=[Requirement(setting="sources.lastfm.api_key", purpose="every lookup")],
         status=SourceStatus(source="lastfm", state=SourceState.MISSING_CREDENTIAL, detail="x"),
+        access=SourceAccess(api=True),
     ),
     SourceInfo(
         source="bandcamp",
@@ -161,9 +163,11 @@ INFOS = [
             state=SourceState.MISSING_EXTRA,
             detail="deadwax[browser]",
         ),
-        api=True,
-        html_transports=["httpx", "patchright", "nodriver"],
-        browser_headless=False,
+        access=SourceAccess(
+            api=True,
+            html_transports=["httpx", "patchright", "nodriver"],
+            browser_headless=False,
+        ),
     ),
     SourceInfo(
         source="itunes",
@@ -173,6 +177,7 @@ INFOS = [
         capabilities=[],
         requires=[],
         status=SourceStatus(source="itunes", state=SourceState.DISABLED),
+        access=SourceAccess(),
     ),
 ]
 
@@ -195,8 +200,9 @@ def test_sources(output: OutputFormat) -> None:
             ("core", True),
             ("core", False),
         }
-        assert json.loads(text)[2]["html_transports"] == ["httpx", "patchright", "nodriver"]
-        assert json.loads(text)[2]["browser_headless"] is False
+        access = json.loads(text)[2]["access"]
+        assert access["html_transports"] == ["httpx", "patchright", "nodriver"]
+        assert access["browser_headless"] is False
     else:
         assert "missing DEADWAX_SOURCES__LASTFM__API_KEY" in text
         assert "missing extra: deadwax[browser]" in text

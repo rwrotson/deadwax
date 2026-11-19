@@ -78,16 +78,16 @@ From top to bottom:
 
 ```
 orchestrator
-adapter | merge | markdown
+adapter | merge
 matching
 versions
 normalize
 models
 query
-errors | events
+errors | events | deadline
 ```
 
-`events` holds `trace()` and `trace_scope()`, which every other core module may use.
+`events` holds `trace()` and `trace_scope()`, which every other core module may use. `deadline` holds the adapter time budget that the orchestrator sets and adapters read or pause.
 
 A change to this order is recorded in the decision log of `DEADWAX_PLAN.md`.
 

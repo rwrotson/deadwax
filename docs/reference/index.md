@@ -12,8 +12,8 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.core.versions` | Detect remix, live, demo, remaster, and other versions in titles |
 | `deadwax.core.matching` | Compare a candidate with the queried record and its version |
 | `deadwax.core.merge` | Combine adapter results into a dossier with discrepancies |
-| `deadwax.core.markdown` | Render a dossier as Markdown |
 | `deadwax.core.adapter` | Define the adapter protocol, source status, and lookup context |
+| `deadwax.core.deadline` | Give each adapter call a time budget it can read and pause |
 | `deadwax.core.orchestrator` | Run adapters pass by pass and merge their results |
 | `deadwax.sources.config` | Define the lookup configuration: HTTP, cache, and each source's settings with its defaults |
 | `deadwax.sources.lookup` | Describe the sources and look a query up |
@@ -109,5 +109,8 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.logs.setup` | Configure console and file logging for applications |
 | `deadwax.logs.runs` | Journal each lookup run to its own event file and an index of runs |
 | `deadwax.cli.settings` | Load command settings from the environment |
+| `deadwax.cli.text` | Format ratings, versions, relation details, and source access as plain text |
+| `deadwax.cli.markdown` | Render a dossier as Markdown |
+| `deadwax.cli.render` | Print dossiers and sources as rich text, JSON, or Markdown |
 | `deadwax.cli.app` | Define the `deadwax` command |
 | `deadwax.main` | Run the `deadwax` console script |
