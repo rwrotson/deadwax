@@ -28,10 +28,10 @@ Each source runs under `adapter_timeout` (`--timeout`). Waiting for another sour
 | Tier | Sources | Role |
 |------|---------|------|
 | 1, identity and links | MusicBrainz, iTunes Search, Deezer, Odesli | Which exact recording or release this is; listening links |
-| 2, enrichment | Discogs, Bandcamp, Last.fm, Wikipedia/Wikidata, ListenBrainz, SecondHandSongs, KEXP, Spotify, SoundCloud, Beatport, Hard Wax, Soundohm, Juno | Tags, credits, texts, relations, metrics |
-| 3, links | Odesli, YouTube | Listening links |
+| 2, enrichment | Discogs, Bandcamp, Last.fm, Wikipedia/Wikidata, ListenBrainz, SecondHandSongs, Genius, Album of the Year, Rate Your Music, KEXP, NTS, WFMU, 1001Tracklists, Spotify, SoundCloud, Beatport, Hard Wax, Soundohm, Juno, Forced Exposure, Bleep, Phonica, Boomkat, Norman Records, AllMusic, WhoSampled | Tags, credits, texts, relations, metrics |
+| 3, links | Odesli, YouTube, press reviews, Resident Advisor | Listening links; reviews found through links of earlier passes |
 
-The README lists sources planned for later versions and those deadwax will not use.
+The README lists deferred sources and those deadwax will not use.
 
 ## MusicBrainz
 
@@ -205,6 +205,7 @@ These shops are opt-in. Phonica uses Patchright headless by default and sends it
 
 ## Genius
 
+- **Group:** `catalogues`; in the default set.
 - **Access:** Genius API with `DEADWAX_SOURCES__GENIUS__TOKEN`; the song page is fetched separately for lyrics. Without a token the source is `skipped`.
 - **Finds the record by:** track search through the matching gate. Album queries contribute no facts.
 - **Contributes:** description and annotations as texts, writers and producers as credits, samples, covers, remixes and interpolations as directional relations, a song link, and full lyrics when present in the page HTML. A blocked page leaves API facts available and records an error.
@@ -220,7 +221,7 @@ These shops are opt-in. Phonica uses Patchright headless by default and sends it
 - **Pass:** enrichment; opt-in; group `catalogues`.
 - **Contributes:** critic scores by publication, user score as a metric, genres, and links to original reviews for the later press pass.
 - **Tracks:** a track query searches releases and accepts one, such as the track's single, only when its tracklist lists the track; the track is related to that release, and the release's scores keep the release-group scope.
-- **Limits:** direct requests currently meet Cloudflare 403 from the development network. The extraction selectors require verification against a saved page.
+- **Limits:** Cloudflare refuses direct requests. The parser was checked against saved real pages, and live lookups succeeded through a headed Patchright persistent profile after a manual challenge solve.
 
 ## Press reviews
 

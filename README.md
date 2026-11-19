@@ -95,20 +95,15 @@ Every source is described in detail in [the sources guide](https://rwrotson.gith
 | Rate Your Music | experimental, opt-in | primary and secondary genres, descriptors, user rating and vote count, chart positions, up to ten visible full user reviews | requires express permission for automated access and the `browser` extra; live page parsing is unverified |
 | WhoSampled | implemented, opt-in | samples, covers and remixes; sample element and positions where shown | direct recording pages through the headed `browser` extra; the site's search path is excluded by robots.txt |
 | 1001Tracklists | implemented, opt-in | DJ sets containing a track, supporting DJs, adjacent tracks | public track search; headed `browser` extra, at most five verified sets; use `--timeout 120` with the default request rate |
-| Album of the Year | experimental, opt-in | critic scores, user score, genres, links to critic reviews | Live pages currently return Cloudflare 403 from the development network; extraction awaits saved-page verification |
+| Album of the Year | implemented, opt-in | critic scores, user score, genres, links to critic reviews; for a track, the single or release whose tracklist lists it | Cloudflare: live lookups succeeded through a headed Patchright persistent profile; direct requests are `blocked` |
 | Press reviews | implemented, opt-in | full accessible review text, author, and score when present from linked Pitchfork, The Quietus, and The Wire pages | needs review links from earlier sources; all three sites were checked on live pages |
 | Resident Advisor | implemented, opt-in | full review text and associated artist and label biographies | finds reviews by GraphQL search or earlier review links; RA discontinued DJ charts |
 
 Names written in a non-Latin script are compared as written: a store that lists "Кино" as "Kino" is reported as `no_match`.
 
-### Planned
+### Deferred
 
-| Group | Sources | Caveats |
-|-------|---------|---------|
-| Shops | Boomkat, Norman | access blocked by Cloudflare |
-| Catalogues and communities | Rate Your Music | Rate Your Music only through a browser |
-
-Deferred: Phonica (Sucuri), Boomkat and Norman Records (Cloudflare), until access is solved.
+Rate Your Music (Stage 18): the adapter exists but its parser has been checked only on synthetic pages, because RYM search and record pages could not be fetched. Boomkat and Norman Records work only with a visible browser window.
 
 Never used: Juno Download (shut down), Every Noise at Once, direct Metacritic scraping (Metacritic scores come from Wikipedia), Spotify audio features.
 

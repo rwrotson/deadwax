@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md). Closed v2 stages (8–17, 19, R-1–R-5), their evidence, and the v2 decision log are archived in [`plans/v2.md`](plans/v2.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1–R-6 done. Stages M-1–M-3 (2026-11-20, requests and data for the mixhound consumer) run before Stage 20; M-1–M-3 done. Stage 20 is next.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1–R-6 done. Stages M-1–M-3 (2026-11-20, requests and data for the mixhound consumer) run before Stage 20; M-1–M-3 done. Stage 20 done on 2026-11-20; v0.1.0 is the first tagged release (GitHub only, no PyPI).
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -127,7 +127,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Sections of closed
 | M-1 | Done | Requests by facets, the long-lived `Deadwax` client. |
 | M-2 | Done | Leads: LB Radio, Last.fm similar artists for tracks, MusicBrainz associated artists. |
 | M-3 | Done | Bandcamp stream previews, ISRC in queries. |
-| 20 | Not started | Qualification. |
+| 20 | Done (RYM blocked, Forced Exposure HTTP 403, Norman disabled by the local allowlist) | Qualification; release v0.1.0. |
 
 Common acceptance for source stages 9–19, in addition to each stage's own:
 
@@ -183,9 +183,9 @@ Agreed with the user on 2026-11-20. mixhound, an application that finds recordin
 
 ### Stage 20: qualification
 
-- [ ] README source tiers and docs pages for every v2 source.
-- [ ] Full checks, package build and wheel smoke, audit; `poe test-live` with the v2 sources.
-- [ ] Manual runs on the check records with the default set and with every source; the time of a full lookup recorded.
+- [x] README source tiers and docs pages for every v2 source.
+- [x] Full checks, package build and wheel smoke, audit; `poe test-live` with the v2 sources.
+- [x] Manual runs on the check records with the default set and with every source; the time of a full lookup recorded.
 
 **Acceptance:** all checks pass or blocked ones have precise reasons. **Suggested message:** `docs: document sources and qualify deadwax v2`.
 
@@ -214,6 +214,24 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 ## Progress evidence and decision log
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
+
+### 2026-11-20 — Stage 20 evidence (qualification) and release v0.1.0
+
+Changed:
+- README: the "Planned" table, which still listed implemented Boomkat and Norman Records and the restored Phonica as deferred, is replaced by a "Deferred" note (Rate Your Music, Stage 18; Boomkat and Norman need a visible window). The Album of the Year row says what was live-verified (headed Patchright persistent profile, 2026-11-15 and 2026-11-19) instead of "awaits saved-page verification".
+- `docs/sources.md`: the tiers table lists every source by pass (tier 3 adds YouTube, press reviews, and RA); Genius gains its group line; the Album of the Year limits match the README.
+
+Checks: `uv sync --all-groups --locked`; `uv run poe check` passed (fmt-check, lint, lint-imports, mypy, 1143 tests, coverage 96.99%); `uv run --group docs properdocs build --strict` passed; `uv build` (sdist and wheel 0.1.0); wheel smoke: a base install imports `deadwax` and `Deadwax` and parses a query, `deadwax` without the extra reports the missing `cli` extra, the `cli` extra shows `deadwax --help`; `uv run poe audit`: no known vulnerabilities. `uv run poe test-live`: 23 passed in 732 s (default set plus SoundCloud over 22 records and the Genius song); errors were `not_found` except `listenbrainz:timeout` in three records (Albert Hammond, Premature Ejaculation, Jeff Bridges) and `kexp:timeout` in one (Christina Vantzou).
+
+Manual runs, `--no-cache -f json`, each dossier validated with `Dossier.model_validate_json`; wall time includes `uv run` start-up:
+- Default set: *Paranoid Android* 32.1 s, no errors (79 tags, 86 credits, 48 texts, 252 relations, 29 links). *ESTADO DE BIENESTAR* text 5.6 s and Bandcamp URL 9.6 s, Bandcamp only (12 tags, 2 texts), other sources `not_found`. *Huerco S.* 28.5 s, no errors. *Кино — Группа крови* 32.3 s; Spotify, iTunes, Odesli `no_match` (Latin "Kino", standing decision). *Missing (Todd Terry remix)* 33.3 s; the original stays a `remix_of` relation (MusicBrainz work, Genius recording), not merged.
+- Every source (`--sources all --timeout 120`): *Paranoid Android* 96 s, 22 sources contributed; Boomkat, WhoSampled, and Beatport showed the headed solve prompt (not solved by hand; Beatport and WhoSampled still contributed). Errors: Forced Exposure `failed` HTTP 403 (no recognised challenge, as before), RYM `blocked` Cloudflare 403 after `browser[headed]`, AllMusic `no_match` (search gave *OK Computer*, rejected by the gate), other shops, press, RA `not_found`. *Huerco S.* 120 s, 18 sources contributed (AllMusic, Album of the Year, Boomkat, Hard Wax, press reviews, RA among them); Forced Exposure `failed`, RYM `blocked`, the rest `not_found`. Norman Records is `disabled` in this environment: the local `.env` HTML allowlist leaves it no permitted transport.
+
+Release: decisions (user): first tag `v0.1.0` (version unchanged), GitHub only with `PUBLISH_TO_PYPI` unset, and this once the agent commits, tags, and pushes. CHANGELOG generated with `cz changelog --unreleased-version v0.1.0`.
+
+Remaining: Stage 18 (RYM) deferred; Forced Exposure 403; automation masking stays unscheduled.
+
+**Suggested message:** `docs: document sources and qualify deadwax v2`.
 
 ### 2026-11-20 — M-3 evidence (previews and ISRC)
 
