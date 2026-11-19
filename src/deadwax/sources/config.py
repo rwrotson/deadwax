@@ -118,6 +118,21 @@ class HttpSettings(_Model):
         ge=0,
         description="Seconds to wait for a challenge or required page state in a browser",
     )
+    headed_fallback: bool = Field(
+        default=True,
+        description=(
+            "Retry a challenged headless Patchright or Nodriver page in a visible browser "
+            "and keep the source headed for the rest of the lookup"
+        ),
+    )
+    headed_challenge_wait: float = Field(
+        default=60.0,
+        ge=0,
+        description=(
+            "Seconds a headed fallback waits for a challenge to clear, for example by hand; "
+            "not counted in the adapter timeout"
+        ),
+    )
     nodriver_browser_path: Path | None = Field(
         default=None,
         description="Chrome executable for Nodriver; unset uses its system discovery",

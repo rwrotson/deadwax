@@ -77,8 +77,13 @@ class BrowserFetcher:
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
+        self._opening = asyncio.Lock()
 
     async def _open(self) -> BrowserContext:
+        async with self._opening:
+            return await self._launch()
+
+    async def _launch(self) -> BrowserContext:
         from patchright.async_api import Error, async_playwright  # noqa: PLC0415 -- optional (R7)
 
         if self._context is None:
@@ -209,7 +214,8 @@ class BrowserFetcher:
     ) -> bytes:
         from patchright.async_api import Error  # noqa: PLC0415 -- optional extra (R7)
 
-        deadline = asyncio.get_running_loop().time() + self._challenge_wait
+        wait = self._challenge_wait if request.challenge_wait is None else request.challenge_wait
+        deadline = asyncio.get_running_loop().time() + wait
         while True:
             try:
                 content = (await page.content()).encode()

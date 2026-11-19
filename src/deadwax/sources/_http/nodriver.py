@@ -158,8 +158,13 @@ class NodriverFetcher:
         self._challenge_wait = challenge_wait
         self._profile_dir = profile_dir
         self._browser: _Browser | None = None
+        self._opening = asyncio.Lock()
 
     async def _open(self) -> _Browser:
+        async with self._opening:
+            return await self._launch()
+
+    async def _launch(self) -> _Browser:
         module = _module()
 
         if self._browser is None:
@@ -211,7 +216,8 @@ class NodriverFetcher:
         request: Request,
         responses: list[_NavigationResponse],
     ) -> Response:
-        deadline = asyncio.get_running_loop().time() + self._challenge_wait
+        wait = self._challenge_wait if request.challenge_wait is None else request.challenge_wait
+        deadline = asyncio.get_running_loop().time() + wait
         while True:
             content = (await asyncio.wait_for(tab.get_content(), timeout=self._timeout)).encode()
             if _chrome_error_page(content):

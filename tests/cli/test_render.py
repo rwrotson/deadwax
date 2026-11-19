@@ -103,6 +103,7 @@ def test_blocked_error_shows_configured_access(dossier: Dossier, output: OutputF
             api=True,
             html_transports=["httpx", "patchright"],
             browser_headless=True,
+            headed_fallback=True,
         ),
     )
     missing = AdapterError(source="kexp", kind=ErrorKind.NOT_FOUND, reason="no plays")
@@ -116,12 +117,14 @@ def test_blocked_error_shows_configured_access(dossier: Dossier, output: OutputF
             "api": False,
             "html_transports": ["httpx", "patchright"],
             "browser_headless": False,
+            "headed_fallback": False,
         }
         assert errors[1]["access"]["api"] is True
+        assert errors[1]["access"]["headed_fallback"] is True
         assert errors[2]["access"] is None
     else:
         assert "HTML (httpx → patchright [headed])" in output_text
-        assert "API (httpx); HTML (httpx → patchright [headless])" in output_text
+        assert "API (httpx); HTML (httpx → patchright [headless → headed])" in output_text
         assert "no plays" in output_text
         if output is OutputFormat.MARKDOWN:
             assert "| Source | Problem | Reason | Access |" in output_text

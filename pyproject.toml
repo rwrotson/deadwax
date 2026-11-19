@@ -423,6 +423,7 @@ type = "layers"
 containers = ["deadwax.sources._http"]
 layers = [
     "client",
+    "sessions",
     "impersonate | browser | nodriver | plain | cache",
     "challenge | profiles | ratelimit | retry | messages",
 ]

@@ -89,6 +89,9 @@ class SourceInfo(_Model):
     html_transports: list[str] = Field(default_factory=list)
     browser_headless: bool | None = None
 
+    # Whether a challenged headless browser retries with a window.
+    headed_fallback: bool = False
+
     # Whether a lookup without an explicit source list runs the adapter.
     default: bool
 

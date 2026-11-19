@@ -311,6 +311,7 @@ def _access(info: SourceInfo) -> str:
         api=info.api,
         html_transports=info.html_transports,
         browser_headless=info.browser_headless,
+        headed_fallback=info.headed_fallback,
     ).label
 
 

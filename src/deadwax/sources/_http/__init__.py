@@ -5,7 +5,6 @@ from .cache import ResponseCache, cache_key, open_cache
 from .challenge import detect_challenge
 from .client import (
     ClientSpec,
-    FetcherFactory,
     HttpClient,
     HttpResources,
     escalation_steps,
@@ -27,14 +26,17 @@ from .profiles import (
 )
 from .ratelimit import HostLimiters, RateLimiter
 from .retry import RETRY_STATUSES, RetryPolicy, parse_retry_after
+from .sessions import BROWSER_STEPS, BrowserSessions, FetcherFactory
 
 __all__ = [
     "BROWSERS",
+    "BROWSER_STEPS",
     "CHROME",
     "FIREFOX",
     "RETRY_STATUSES",
     "BrowserFetcher",
     "BrowserIdentity",
+    "BrowserSessions",
     "ClientSpec",
     "Fetcher",
     "FetcherFactory",

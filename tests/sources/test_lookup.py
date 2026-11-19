@@ -27,6 +27,7 @@ from deadwax import (
     lookup,
     parse_query,
 )
+from deadwax.sources._http import BrowserSessions
 
 Replay = Callable[..., httpx.MockTransport]
 
@@ -458,6 +459,8 @@ def test_describe_sources_reports_configured_access() -> None:
         "nodriver",
     ]
     assert sources["deezer"].browser_headless is True
+    assert sources["deezer"].headed_fallback
+    assert not sources["musicbrainz"].headed_fallback
     assert sources["bandcamp"].api
     assert sources["bandcamp"].html_transports == ["patchright", "httpx"]
     assert sources["bandcamp"].browser_headless is False
@@ -500,6 +503,21 @@ async def test_blocked_error_carries_configured_access() -> None:
     assert error.access is not None
     assert error.access.html_transports == ["httpx"]
     assert error.access.browser_headless is False
+
+
+@pytest.mark.asyncio
+async def test_lookup_closes_shared_browsers(monkeypatch: pytest.MonkeyPatch) -> None:
+    closed: list[BrowserSessions] = []
+
+    async def aclose(sessions: BrowserSessions) -> None:
+        closed.append(sessions)
+
+    monkeypatch.setattr(BrowserSessions, "aclose", aclose)
+    transport = httpx.MockTransport(lambda request: httpx.Response(404, request=request))
+
+    await lookup(PARANOID_ANDROID, include=["deezer"], transport=transport)
+
+    assert len(closed) == 1
 
 
 @pytest.mark.asyncio

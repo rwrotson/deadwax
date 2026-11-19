@@ -334,12 +334,17 @@ class SourceAccess(_Model):
     html_transports: list[str] = Field(default_factory=list)
     browser_headless: bool | None = None
 
+    # Whether a challenged headless browser retries with a window.
+    headed_fallback: bool = False
+
     @property
     def label(self) -> str:
         """Describe the configured routes in their attempt order."""
         parts = ["API (httpx)"] if self.api else []
         if self.browser_headless is not None:
             mode = "headless" if self.browser_headless else "headed"
+            if self.browser_headless and self.headed_fallback:
+                mode = "headless → headed"
             steps = [
                 f"{step} [{mode}]" if step in {"patchright", "nodriver"} else step
                 for step in self.html_transports

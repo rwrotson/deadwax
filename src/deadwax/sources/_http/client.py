@@ -1,4 +1,5 @@
 import asyncio
+import dataclasses
 import hashlib
 import importlib.util
 import logging
@@ -32,11 +33,10 @@ from deadwax.sources._http.plain import HttpxFetcher
 from deadwax.sources._http.profiles import CHROME, Profile, api_headers, browser_headers
 from deadwax.sources._http.ratelimit import HostLimiters, Sleep
 from deadwax.sources._http.retry import RETRY_STATUSES, RetryPolicy
+from deadwax.sources._http.sessions import BROWSER_STEPS, BrowserSessions, FetcherFactory
 from deadwax.sources.config import DIRECT, Escalation, HttpSettings, SourcesConfig
 
 logger = logging.getLogger(__name__)
-
-type FetcherFactory = Callable[[HttpSettings, str | None], Fetcher]
 
 _NOT_FOUND = 404
 
@@ -148,7 +148,7 @@ class HttpResources:
     sleep: Sleep = asyncio.sleep
     now: Callable[[], datetime] = _utcnow
     rng: random.Random = field(default_factory=random.Random)
-    profile_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    sessions: BrowserSessions = field(default_factory=BrowserSessions)
 
 
 @dataclass(slots=True)
@@ -175,6 +175,7 @@ class HttpClient:
     """Rate-limited, retrying, caching HTTP client of one adapter.
 
     Browser-profile clients try their configured transports when a page shows a challenge.
+    A headless browser that meets a challenge retries headed, and the source stays headed.
     """
 
     def __init__(self, spec: ClientSpec, config: SourcesConfig, resources: HttpResources) -> None:
@@ -213,13 +214,16 @@ class HttpClient:
         )
         profile_policy = (
             f"{self._settings.patchright_channel}|{self._settings.browser_headless}|"
-            f"{self._settings.patchright_profile_dir}|{self._settings.nodriver_profile_dir}"
+            f"{self._settings.patchright_profile_dir}|{self._settings.nodriver_profile_dir}|"
+            f"{self._settings.headed_fallback}|{self._settings.headed_challenge_wait}"
         )
         self._policy_signature = (
             f"{','.join(self._steps)}:{hashlib.sha256(profile_policy.encode()).hexdigest()}"
         )
         self._escalated: dict[Escalation, Fetcher] = {}
         self._level = 0
+        self._headed = not self._settings.browser_headless
+        self._fell_back = False
         self._unavailable = (
             [
                 f"{step} unavailable: install {_EXTRA_PACKAGES[step]}"
@@ -372,13 +376,23 @@ class HttpClient:
             raise RateLimitedError("too many requests", url=response.url)
         raise SourceError(f"HTTP {response.status}", url=response.url)
 
-    def _fetcher(self, level: int) -> Fetcher:
-        step = self._steps[level]
+    def _fetcher(self, step: Escalation) -> Fetcher:
         if step is Escalation.HTTPX:
             return self._plain
         if step not in self._escalated:
             self._escalated[step] = self._resources.escalations[step](self._settings, self._proxy)
         return self._escalated[step]
+
+    def _label(self, step: Escalation) -> str:
+        if step is Escalation.HTTPX:
+            return self._plain.name
+        if step in BROWSER_STEPS and self._fell_back:
+            return f"{step}[headed]"
+        return str(step)
+
+    def _falls_back(self, step: Escalation) -> bool:
+        """Whether a challenge in this headless browser step is retried headed."""
+        return step in BROWSER_STEPS and not self._headed and self._settings.headed_fallback
 
     async def _fetch(self, request: Request, exchange: _Exchange) -> Response:
         safe_url = redact(request.full_url, self.spec.secret_params)
@@ -387,15 +401,15 @@ class HttpClient:
         challenged = False
         level = self._level
         while level < len(self._steps):
+            step = self._steps[level]
+            label = self._label(step)
             try:
-                fetcher = self._fetcher(level)
-                response = await self._attempt(fetcher, request, safe_url, exchange)
+                response = await self._attempt(step, request, safe_url, exchange)
             except TransportError as error:
                 error.url = error.url or safe_url
                 if level == len(self._steps) - 1:
                     raise
-                step = self._steps[level]
-                self._unavailable.append(f"{step} failed: {error}")
+                self._unavailable.append(f"{label} failed: {error}")
                 trace(logger, "http.step_failed", step=step, reason=str(error))
                 level += 1
                 continue
@@ -405,32 +419,33 @@ class HttpClient:
             except ConfigurationError as error:
                 await self._drop_step(level, error)
                 continue
-            tried.append(fetcher.name)
-            challenge = detect_challenge(response.status, response.headers, response.content)
-            marker_missing = (
-                self.spec.required_marker is not None
-                and self.spec.required_marker not in response.content
-            )
-            if challenge is None and not marker_missing:
+            tried.append(label)
+            if (problem := self._problem(response, safe_url, label)) is None:
                 self._level = level
                 return response
-            if challenge is not None:
-                challenged = True
-                reason = challenge
-                trace(
-                    logger,
-                    "http.challenge",
-                    url=safe_url,
-                    challenge=challenge,
-                    fetcher=fetcher.name,
-                )
-            else:
-                reason = "required page state missing"
-                trace(logger, "http.page_incomplete", url=safe_url, fetcher=fetcher.name)
+            reason, challenge = problem
+            challenged = challenged or challenge
+            if challenge and self._falls_back(step):
+                self._headed = self._fell_back = True
+                trace(logger, "http.headed_fallback", url=safe_url, fetcher=label)
+                continue
             level += 1
         unavailable = f"; {'; '.join(self._unavailable)}" if self._unavailable else ""
         failure_type = BlockedError if challenged else SourceError
         raise failure_type(f"{reason} (tried {', '.join(tried)}{unavailable})", url=safe_url)
+
+    def _problem(self, response: Response, safe_url: str, label: str) -> tuple[str, bool] | None:
+        """Return why a page is unusable and whether it is a challenge, or None when usable."""
+        if challenge := detect_challenge(response.status, response.headers, response.content):
+            trace(logger, "http.challenge", url=safe_url, challenge=challenge, fetcher=label)
+            return challenge, True
+        if (
+            self.spec.required_marker is not None
+            and self.spec.required_marker not in response.content
+        ):
+            trace(logger, "http.page_incomplete", url=safe_url, fetcher=label)
+            return "required page state missing", False
+        return None
 
     async def _drop_step(self, level: int, error: ConfigurationError) -> None:
         """Skip one unavailable transport and continue with the next."""
@@ -447,25 +462,33 @@ class HttpClient:
             return False
         return detect_challenge(response.status, response.headers, response.content) is None
 
-    async def _fetch_once(self, fetcher: Fetcher, request: Request) -> Response:
-        persistent = (
-            fetcher.name == "browser" and self._settings.patchright_profile_dir is not None
-        ) or (fetcher.name == "nodriver" and self._settings.nodriver_profile_dir is not None)
-        if not persistent:
-            return await fetcher.fetch(request)
-        async with pause_adapter_timeout():
-            await self._resources.profile_lock.acquire()
-        try:
-            return await fetcher.fetch(request)
-        finally:
-            try:
-                await fetcher.aclose()
-            finally:
-                self._resources.profile_lock.release()
+    async def _fetch_once(self, step: Escalation, request: Request) -> Response:
+        if step not in BROWSER_STEPS:
+            return await self._fetcher(step).fetch(request)
+        sessions = self._resources.sessions
+        factory = self._resources.escalations[step]
+        async with sessions.use(
+            step,
+            factory,
+            self._settings,
+            self._proxy,
+            headed=self._headed,
+        ) as fetcher:
+            if not self._fell_back:
+                return await fetcher.fetch(request)
+
+            # A visitor may solve the challenge by hand; that wait is not adapter time.
+            async with pause_adapter_timeout():
+                return await fetcher.fetch(
+                    dataclasses.replace(
+                        request,
+                        challenge_wait=self._settings.headed_challenge_wait,
+                    ),
+                )
 
     async def _attempt(
         self,
-        fetcher: Fetcher,
+        step: Escalation,
         request: Request,
         safe_url: str,
         exchange: _Exchange,
@@ -479,9 +502,9 @@ class HttpClient:
         while True:
             await limiter.acquire()
             exchange.attempts += 1
-            exchange.fetchers.append(fetcher.name)
+            exchange.fetchers.append(self._label(step))
             try:
-                response = await self._fetch_once(fetcher, request)
+                response = await self._fetch_once(step, request)
             except TransportError as error:
                 if attempt >= self._policy.retries:
                     raise

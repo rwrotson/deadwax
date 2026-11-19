@@ -106,6 +106,7 @@ def _access(adapter: HttpAdapter, config: SourcesConfig) -> SourceAccess:
             else []
         ),
         browser_headless=config.browser_headless(adapter.name) if html else None,
+        headed_fallback=html and config.http.headed_fallback,
     )
 
 
@@ -148,7 +149,8 @@ async def lookup(
     """
     config = config or SourcesConfig()
     cache = open_cache(config.cache)
-    adapters = build_adapters(config, HttpResources(cache=cache, transport=transport))
+    resources = HttpResources(cache=cache, transport=transport)
+    adapters = build_adapters(config, resources)
     options = LookupOptions(
         adapter_timeout=config.adapter_timeout,
         include=frozenset(include if include is not None else config.default_sources),
@@ -169,5 +171,6 @@ async def lookup(
     finally:
         for adapter in adapters:
             await adapter.aclose()
+        await resources.sessions.aclose()
         if cache is not None:
             cache.close()

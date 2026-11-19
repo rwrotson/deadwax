@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -101,6 +102,7 @@ def scenario(monkeypatch: pytest.MonkeyPatch) -> Scenario:
     state = Scenario()
 
     async def start(**kwargs: object) -> FakeBrowser:
+        await asyncio.sleep(0)
         state.launched.append(kwargs)
         state.browser = FakeBrowser(state.tab)
         return state.browser
@@ -244,3 +246,30 @@ async def test_authenticated_proxy_is_rejected(scenario: Scenario) -> None:
         await fetcher.fetch(Request("GET", "https://example.test/page"))
 
     assert scenario.launched == []
+
+
+@pytest.mark.asyncio
+async def test_concurrent_first_fetches_launch_one_browser(scenario: Scenario) -> None:
+    fetcher = NodriverFetcher(timeout=5, max_bytes=100)
+    request = Request("GET", "https://example.test/page")
+
+    await asyncio.gather(fetcher.fetch(request), fetcher.fetch(request))
+
+    assert len(scenario.launched) == 1
+
+
+@pytest.mark.asyncio
+async def test_request_challenge_wait_overrides_the_browser_setting(scenario: Scenario) -> None:
+    scenario.tab.content_sequence = ["<html>loading</html>", "<html>READY</html>"]
+    fetcher = NodriverFetcher(timeout=5, max_bytes=100, challenge_wait=0)
+
+    response = await fetcher.fetch(
+        Request(
+            "GET",
+            "https://example.test/page",
+            required_marker=b"READY",
+            challenge_wait=1,
+        ),
+    )
+
+    assert response.text == "<html>READY</html>"

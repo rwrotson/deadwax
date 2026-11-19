@@ -106,6 +106,9 @@ class Setup:
     proxy: str | None = None
     created: list[Escalation] = field(default_factory=list)
     proxies: list[str | None] = field(default_factory=list)
+    headless: list[bool] = field(default_factory=list)
+    headed_fallback: bool = False
+    resources: HttpResources | None = None
 
     def client(
         self,
@@ -118,6 +121,7 @@ class Setup:
             def create(settings: HttpSettings, proxy: str | None) -> Fetcher:
                 self.created.append(step)
                 self.proxies.append(proxy)
+                self.headless.append(settings.browser_headless)
                 fetcher = self.fetchers[step]
                 if isinstance(fetcher, ConfigurationError):
                     raise fetcher
@@ -125,7 +129,7 @@ class Setup:
 
             return create
 
-        resources = HttpResources(
+        resources = self.resources = self.resources or HttpResources(
             limiters=HostLimiters(clock=self.time.clock, sleep=self.time.sleep),
             cache=self.cache,
             transport=httpx.MockTransport(self.server),
@@ -144,6 +148,8 @@ class Setup:
                 if escalation is None
                 else (escalation,),
                 contact="https://c",
+                headed_fallback=self.headed_fallback,
+                headed_challenge_wait=42,
             ),
             cache=CacheSettings(blocked_ttl=self.blocked_ttl),
             lastfm=LastfmSettings(proxy=SecretStr(self.proxy) if self.proxy else None),
@@ -170,33 +176,65 @@ async def test_api_requests_are_honest_and_cached(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_persistent_profile_is_used_by_one_browser_at_a_time(tmp_path: Path) -> None:
-    resources = HttpResources()
-    config = SourcesConfig(http=HttpSettings(patchright_profile_dir=tmp_path / "profile"))
-    clients = [HttpClient(ClientSpec("beatport"), config, resources) for _ in range(2)]
-    active = 0
-    peak = 0
+async def test_clients_of_one_lookup_share_a_browser() -> None:
+    setup = Setup(Server([httpx.Response(403, content=CHALLENGE)]))
+    browser = FakeFetcher("browser", [page()])
+    setup.fetchers = {Escalation.BROWSER: browser}
+    clients = [setup.client(Profile.BROWSER, escalation=Escalation.BROWSER) for _ in range(2)]
 
-    class Browser:
-        name = "browser"
+    await asyncio.gather(*(client.get(URL) for client in clients))
+    for client in clients:
+        await client.aclose()
 
-        async def fetch(self, request: Request) -> Response:
-            nonlocal active, peak
-            active += 1
-            peak = max(peak, active)
-            await asyncio.sleep(0.01)
-            return page()
+    assert setup.created == [Escalation.BROWSER]
+    assert not browser.closed
+    assert setup.resources is not None
+    await setup.resources.sessions.aclose()
+    assert browser.closed
 
-        async def aclose(self) -> None:
-            nonlocal active
-            active -= 1
 
-    await asyncio.gather(
-        *(client._fetch_once(Browser(), Request("GET", URL)) for client in clients),
-    )
+@pytest.mark.asyncio
+async def test_a_challenged_headless_browser_retries_headed_and_stays_headed() -> None:
+    setup = Setup(Server([httpx.Response(403, content=CHALLENGE)]), headed_fallback=True)
+    browser = FakeFetcher("browser", [page(200, CHALLENGE), page(), page()])
+    setup.fetchers = {Escalation.BROWSER: browser}
 
-    assert peak == 1
-    assert active == 0
+    async with setup.client(Profile.BROWSER, escalation=Escalation.BROWSER) as client:
+        first = await client.get(URL)
+        second = await client.get(URL)
+
+    assert first.text == second.text == "<html>ok</html>"
+    assert setup.headless == [True, False]
+    assert [request.challenge_wait for request in browser.requests] == [None, 42, 42]
+
+
+@pytest.mark.asyncio
+async def test_a_headed_fallback_that_meets_a_challenge_is_blocked() -> None:
+    setup = Setup(Server([httpx.Response(403, content=CHALLENGE)]), headed_fallback=True)
+    setup.fetchers = {Escalation.BROWSER: FakeFetcher("browser", [page(200, CHALLENGE)])}
+
+    async with setup.client(Profile.BROWSER, escalation=Escalation.BROWSER) as client:
+        with pytest.raises(BlockedError, match=r"tried httpx, browser, browser\[headed\]\)$"):
+            await client.get(URL)
+
+
+@pytest.mark.asyncio
+async def test_a_missing_page_state_does_not_open_a_headed_browser() -> None:
+    setup = Setup(Server([httpx.Response(200, content=b"<html>wait</html>")]), headed_fallback=True)
+    setup.fetchers = {Escalation.BROWSER: FakeFetcher("browser", [page(200, b"<html>no</html>")])}
+
+    async with setup.client(
+        Profile.BROWSER,
+        escalation=Escalation.BROWSER,
+        required_marker=b"ready",
+    ) as client:
+        with pytest.raises(
+            SourceError,
+            match=r"required page state missing \(tried httpx, browser\)",
+        ):
+            await client.get(URL)
+
+    assert setup.headless == [True]
 
 
 @pytest.mark.asyncio

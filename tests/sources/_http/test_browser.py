@@ -137,6 +137,7 @@ class FakeChromium:
     scenario: Scenario
 
     async def launch(self, **options: object) -> FakeBrowser:
+        await asyncio.sleep(0)
         self.scenario.launches.append(options)
         if self.scenario.launch_fails:
             raise FakeError("Executable doesn't exist")
@@ -363,3 +364,25 @@ async def test_browser_returns_incomplete_page_when_wait_expires(scenario: Scena
 )
 def test_launch_proxy(proxy: str | None, expected: dict[str, object]) -> None:
     assert launch_proxy(proxy) == expected
+
+
+@pytest.mark.asyncio
+async def test_concurrent_first_fetches_launch_one_browser(scenario: Scenario) -> None:
+    fetcher = BrowserFetcher(timeout=5, max_bytes=100)
+
+    await asyncio.gather(fetcher.fetch(PAGE), fetcher.fetch(PAGE))
+
+    assert len(scenario.launches) == 1
+    assert len(scenario.pages) == 2
+
+
+@pytest.mark.asyncio
+async def test_request_challenge_wait_overrides_the_browser_setting(scenario: Scenario) -> None:
+    scenario.html_sequence = ["<html>loading</html>", "<html>READY</html>"]
+    fetcher = BrowserFetcher(timeout=5, max_bytes=100, challenge_wait=0)
+
+    response = await fetcher.fetch(
+        Request("GET", PAGE.url, required_marker=b"READY", challenge_wait=1),
+    )
+
+    assert response.text == "<html>READY</html>"

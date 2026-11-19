@@ -263,6 +263,18 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
 
+### 2026-11-19 — Shared browser sessions and headed fallback (Stage 20 partial)
+
+Requested after an uncached `--sources all` run in which headed sources opened a window per request and several headless sources ended as Cloudflare blocks.
+
+Decisions (user): sessions and the fallback apply to Patchright and Nodriver; a lookup upgrades headless → headed once and never downgrades; the headed fallback waits `http.headed_challenge_wait` (default 60 s, excluded from the adapter timeout) for a manual solve; the fallback also runs without a persistent profile; `http.headed_fallback` (default true) disables it.
+
+Changed: new `sources/_http/sessions.py` (`BrowserSessions`) lends one browser per transport, launch settings, and proxy to all clients of a lookup. It replaces `HttpResources.profile_lock` and the close-after-each-request behaviour of persistent profiles. Browser fetchers launch once under concurrent first use and accept a per-request `challenge_wait`. `HttpClient` retries a challenged headless browser step headed and keeps the source headed. `tried` lists, for example, `browser[headed]`. The blocked-cache policy signature includes the two new settings. `SourceAccess`/`SourceInfo` gain `headed_fallback`, and the access label shows `[headless → headed]`. `lookup()` closes the sessions.
+
+Observation: headless Patchright (bundled Chromium 156, persistent context included) reports `HeadlessChrome/156…` in `navigator.userAgent` and CDP `Browser.getVersion`. Cloudflare binds `cf_clearance` to the User-Agent, so cookies solved in the headed fallback may not pass later headless runs; such sources would fall back again in each run (one shared window). Overriding the headless User-Agent is automation masking (see "Later, unscheduled") and was not implemented; configuring those sources headed is the alternative.
+
+Verification: `uv run poe check` passed (953 offline tests, 96.70% coverage); `uv run --group docs properdocs build --strict` passed. No live lookup was run after the change.
+
 ### 2026-11-16 — Blocked source access in lookup output (Stage 20 partial)
 
 Blocked errors now carry the source's access configuration from the same lookup, including API use, ordered HTML transports, and headed or headless browser mode. The terminal and Markdown error tables show an Access column; JSON serializes the structured `access` object. Other error kinds have an empty column. The access label is shared with `deadwax sources`, and the source details reflect one-run CLI overrides. README and source/output documentation describe the field.
