@@ -19,7 +19,7 @@ from deadwax.core import (
     RelationKind,
     SourceState,
 )
-from deadwax.sources import SourcesConfig, parse_query
+from deadwax.sources import LookupConfig, parse_query
 from deadwax.sources._http import Fetcher, HttpResources
 from deadwax.sources.adapters.discogs import DiscogsAdapter
 from deadwax.sources.adapters.discogs.adapter import ANONYMOUS_RATE, DEFAULT_USER_AGENT
@@ -73,9 +73,9 @@ def make(
         content = body if isinstance(body, bytes) else json.dumps(body).encode()
         return httpx.Response(status, content=content)
 
-    config = SourcesConfig.model_validate(
+    config = LookupConfig.model_validate(
         {
-            "discogs": {"rate": 1000, "token": token},
+            "sources": {"discogs": {"rate": 1000, "token": token}},
             "http": {"retries": 0, "escalation": [], **http},
         },
     )
@@ -155,10 +155,13 @@ async def test_without_ids_or_token_the_search_is_skipped() -> None:
 
     assert partial.candidate is None
     assert [(e.kind, e.reason) for e in partial.errors] == [
-        (ErrorKind.SKIPPED, "search needs discogs.token, and earlier sources found no Discogs ID"),
+        (
+            ErrorKind.SKIPPED,
+            "search needs sources.discogs.token, and earlier sources found no Discogs ID",
+        ),
     ]
     assert adapter.status().state is SourceState.READY
-    assert adapter.status().detail == "no discogs.token: no search"
+    assert adapter.status().detail == "no sources.discogs.token: no search"
 
 
 @pytest.mark.asyncio
@@ -296,14 +299,17 @@ async def test_missing_escalation_browser_costs_only_the_reviews() -> None:
     [({}, ANONYMOUS_RATE), ({"token": "t"}, 1.0), ({"rate": 2.0}, 2.0)],
 )
 def test_rate_without_a_token(discogs: dict[str, object], rate: float) -> None:
-    adapter = DiscogsAdapter(SourcesConfig.model_validate({"discogs": discogs}), HttpResources())
+    adapter = DiscogsAdapter(
+        LookupConfig.model_validate({"sources": {"discogs": discogs}}),
+        HttpResources(),
+    )
 
-    assert adapter.client._config.rate("discogs") == rate
+    assert adapter.client.settings.rate == rate
 
 
 def test_user_agent_setting_applies_to_both_clients() -> None:
-    config = SourcesConfig.model_validate(
-        {"discogs": {"user_agent": "Mine/1.0", "token": SecretStr("t")}},
+    config = LookupConfig.model_validate(
+        {"sources": {"discogs": {"user_agent": "Mine/1.0", "token": SecretStr("t")}}},
     )
     adapter = DiscogsAdapter(config, HttpResources())
 

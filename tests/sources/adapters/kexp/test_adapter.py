@@ -16,7 +16,7 @@ from deadwax.core import (
     Scope,
     TextKind,
 )
-from deadwax.sources import SourcesConfig, parse_query
+from deadwax.sources import LookupConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.kexp import KexpAdapter
 from deadwax.sources.adapters.kexp.parse import playlist_url
@@ -48,8 +48,8 @@ def make(
         results = PLAYS if plays is None else plays
         return httpx.Response(200, content=json.dumps({"results": results}).encode())
 
-    config = SourcesConfig.model_validate(
-        {"kexp": {"rate": 1000}, "http": {"retries": 0, "escalation": []}},
+    config = LookupConfig.model_validate(
+        {"sources": {"kexp": {"rate": 1000}}, "http": {"retries": 0, "escalation": []}},
     )
     return KexpAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 

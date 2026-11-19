@@ -22,7 +22,8 @@ from deadwax.sources import (
     Escalation,
     HttpSettings,
     LastfmSettings,
-    SourcesConfig,
+    LookupConfig,
+    PerSourceSettings,
 )
 from deadwax.sources._http import (
     ClientSpec,
@@ -146,7 +147,7 @@ class Setup:
             now=lambda: NOW,
             rng=random.Random(0),  # noqa: S311 -- seeded test jitter
         )
-        config = SourcesConfig(
+        config = LookupConfig(
             http=HttpSettings(
                 retries=self.retries,
                 escalation=(Escalation.IMPERSONATE, Escalation.BROWSER, Escalation.NODRIVER)
@@ -158,10 +159,12 @@ class Setup:
                 patchright_profile_dir=self.profile_dir,
             ),
             cache=CacheSettings(blocked_ttl=self.blocked_ttl),
-            lastfm=LastfmSettings(proxy=SecretStr(self.proxy) if self.proxy else None),
+            sources=PerSourceSettings(
+                lastfm=LastfmSettings(proxy=SecretStr(self.proxy) if self.proxy else None),
+            ),
         )
         spec = ClientSpec("lastfm", profile, {"x-source": "test"}, secret_params, required_marker)
-        return HttpClient(spec, config, resources)
+        return HttpClient(spec, config.client_settings("lastfm"), resources)
 
 
 @pytest.mark.asyncio

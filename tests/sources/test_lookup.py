@@ -12,6 +12,7 @@ from deadwax import (
     HttpSettings,
     IdKind,
     LinkTarget,
+    LookupConfig,
     MetricKind,
     Pass,
     Query,
@@ -19,16 +20,14 @@ from deadwax import (
     RelationKind,
     Scope,
     SourceGroup,
-    SourcesConfig,
     SourceState,
-    SpotifySettings,
     TextKind,
     VersionKind,
     describe_sources,
     lookup,
     parse_query,
 )
-from deadwax.sources import build_adapters
+from deadwax.sources import SpotifySettings, build_adapters
 from deadwax.sources._http import BrowserSessions, HttpResources
 from deadwax.sources.services import SERVICES
 
@@ -38,7 +37,7 @@ PARANOID_ANDROID = parse_query("Radiohead - Paranoid Android", EntityKind.TRACK)
 ORIGINAL_RECORDING = "9f9cf187-d6f9-437f-9d98-d59cdbd52757"
 
 
-async def replayed(query: Query, scenario: str, replay: Replay, config: SourcesConfig) -> Dossier:
+async def replayed(query: Query, scenario: str, replay: Replay, config: LookupConfig) -> Dossier:
     seen: list[str] = []
     dossier = await lookup(query, config, transport=replay(scenario, seen))
     assert seen
@@ -64,7 +63,7 @@ def relation_kinds(dossier: Dossier) -> set[RelationKind]:
 
 
 @pytest.mark.asyncio
-async def test_mainstream_track(replay: Replay, config: SourcesConfig) -> None:
+async def test_mainstream_track(replay: Replay, config: LookupConfig) -> None:
     dossier = await replayed(PARANOID_ANDROID, "paranoid_android", replay, config)
 
     identity = dossier.identity
@@ -120,7 +119,7 @@ async def test_mainstream_track(replay: Replay, config: SourcesConfig) -> None:
 
 
 @pytest.mark.asyncio
-async def test_album_on_a_small_label(replay: Replay, config: SourcesConfig) -> None:
+async def test_album_on_a_small_label(replay: Replay, config: LookupConfig) -> None:
     query = parse_query(
         "Huerco S. - For Those of You Who Have Never (And Also Those Who Have)",
         EntityKind.ALBUM,
@@ -165,7 +164,7 @@ async def test_album_on_a_small_label(replay: Replay, config: SourcesConfig) -> 
 
 
 @pytest.mark.asyncio
-async def test_cyrillic_track_is_not_transliterated(replay: Replay, config: SourcesConfig) -> None:
+async def test_cyrillic_track_is_not_transliterated(replay: Replay, config: LookupConfig) -> None:
     query = parse_query("Кино - Группа крови", EntityKind.TRACK)
 
     dossier = await replayed(query, "kino", replay, config)
@@ -188,7 +187,7 @@ async def test_cyrillic_track_is_not_transliterated(replay: Replay, config: Sour
 
 
 @pytest.mark.asyncio
-async def test_remix_is_not_merged_with_the_original(replay: Replay, config: SourcesConfig) -> None:
+async def test_remix_is_not_merged_with_the_original(replay: Replay, config: LookupConfig) -> None:
     query = parse_query("Everything but the Girl - Missing (Todd Terry Remix)", EntityKind.TRACK)
 
     dossier = await replayed(query, "missing_remix", replay, config)
@@ -232,7 +231,7 @@ async def test_streaming_urls_resolve_to_the_same_recording(
     url: str,
     scenario: str,
     replay: Replay,
-    config: SourcesConfig,
+    config: LookupConfig,
 ) -> None:
     dossier = await replayed(parse_query(url), scenario, replay, config)
 
@@ -248,10 +247,11 @@ async def test_streaming_urls_resolve_to_the_same_recording(
 @pytest.mark.asyncio
 async def test_spotify_resolves_its_urls_when_it_has_credentials(
     replay: Replay,
-    config: SourcesConfig,
+    config: LookupConfig,
 ) -> None:
     query = parse_query("https://open.spotify.com/track/6LgJvl0Xdtc73RJ1mmpotq")
-    without = config.model_copy(update={"spotify": SpotifySettings(rate=1000)})
+    sources = config.sources.model_copy(update={"spotify": SpotifySettings(rate=1000)})
+    without = config.model_copy(update={"sources": sources})
 
     with_spotify = await replayed(query, "spotify_url", replay, config)
     without_spotify = await replayed(query, "spotify_url", replay, without)
@@ -266,7 +266,7 @@ async def test_spotify_resolves_its_urls_when_it_has_credentials(
 
 
 @pytest.mark.asyncio
-async def test_youtube_links_official_uploads(replay: Replay, config: SourcesConfig) -> None:
+async def test_youtube_links_official_uploads(replay: Replay, config: LookupConfig) -> None:
     dossier = await replayed(PARANOID_ANDROID, "paranoid_android", replay, config)
 
     youtube = [link for link in dossier.links if link.service == "youtube"]
@@ -277,7 +277,7 @@ async def test_youtube_links_official_uploads(replay: Replay, config: SourcesCon
 
 
 @pytest.mark.asyncio
-async def test_soundcloud_url_resolves_first(replay: Replay, config: SourcesConfig) -> None:
+async def test_soundcloud_url_resolves_first(replay: Replay, config: LookupConfig) -> None:
     query = parse_query("https://soundcloud.com/radiohead/paranoid-android")
 
     include = [*config.default_sources, "soundcloud"]
@@ -294,7 +294,7 @@ async def test_soundcloud_url_resolves_first(replay: Replay, config: SourcesConf
 
 
 @pytest.mark.asyncio
-async def test_unknown_record_has_no_identity(replay: Replay, config: SourcesConfig) -> None:
+async def test_unknown_record_has_no_identity(replay: Replay, config: LookupConfig) -> None:
     query = parse_query("Zzqx Nonexistent Artist - No Such Song At All", EntityKind.TRACK)
 
     dossier = await replayed(query, "no_match", replay, config)
@@ -307,7 +307,7 @@ async def test_unknown_record_has_no_identity(replay: Replay, config: SourcesCon
 
 
 @pytest.mark.asyncio
-async def test_selection_and_cache(replay: Replay, config: SourcesConfig, tmp_path: Path) -> None:
+async def test_selection_and_cache(replay: Replay, config: LookupConfig, tmp_path: Path) -> None:
     cached = config.model_copy(update={"cache": CacheSettings(path=tmp_path / "cache.sqlite")})
 
     query = parse_query("https://music.apple.com/us/album/x/1097861387?i=1097861770")
@@ -337,7 +337,7 @@ async def test_selection_and_cache(replay: Replay, config: SourcesConfig, tmp_pa
 
 
 @pytest.mark.asyncio
-async def test_bandcamp_url_resolves_first(replay: Replay, config: SourcesConfig) -> None:
+async def test_bandcamp_url_resolves_first(replay: Replay, config: LookupConfig) -> None:
     url = "https://brianleeds.bandcamp.com/album/for-those-of-you-who-have-never-and-also-those-who-have"
 
     dossier = await replayed(parse_query(url), "bandcamp_url", replay, config)
@@ -350,7 +350,7 @@ async def test_bandcamp_url_resolves_first(replay: Replay, config: SourcesConfig
 
 
 @pytest.mark.asyncio
-async def test_discogs_url_resolves_first(replay: Replay, config: SourcesConfig) -> None:
+async def test_discogs_url_resolves_first(replay: Replay, config: LookupConfig) -> None:
     query = parse_query("https://www.discogs.com/master/21491-Radiohead-OK-Computer")
 
     dossier = await replayed(query, "discogs_url", replay, config)
@@ -368,7 +368,7 @@ async def test_discogs_url_resolves_first(replay: Replay, config: SourcesConfig)
 
 
 @pytest.mark.asyncio
-async def test_default_sources_run_without_include(replay: Replay, config: SourcesConfig) -> None:
+async def test_default_sources_run_without_include(replay: Replay, config: LookupConfig) -> None:
     query = parse_query("https://music.apple.com/us/album/x/1097861387?i=1097861770")
     seen: list[str] = []
 
@@ -385,7 +385,7 @@ async def test_default_sources_run_without_include(replay: Replay, config: Sourc
 
 
 @pytest.mark.asyncio
-async def test_include_replaces_the_default_sources(replay: Replay, config: SourcesConfig) -> None:
+async def test_include_replaces_the_default_sources(replay: Replay, config: LookupConfig) -> None:
     query = parse_query("https://music.apple.com/us/album/x/1097861387?i=1097861770")
     seen: list[str] = []
 
@@ -403,7 +403,7 @@ async def test_include_replaces_the_default_sources(replay: Replay, config: Sour
 
 def test_describe_sources_marks_groups_and_the_default_set() -> None:
     infos = describe_sources(
-        SourcesConfig.model_validate({"default_sources": "musicbrainz, deezer"}),
+        LookupConfig.model_validate({"default_sources": "musicbrainz, deezer"}),
     )
 
     assert {info.group for info in infos} == {
@@ -445,10 +445,12 @@ def test_no_source_is_named_like_a_group() -> None:
 
 
 def test_describe_sources_reports_configured_access() -> None:
-    config = SourcesConfig.model_validate(
+    config = LookupConfig.model_validate(
         {
+            "sources": {
+                "bandcamp": {"browser_headless": False, "html_transports": ["browser", "httpx"]},
+            },
             "http": {"browser_headless": True},
-            "bandcamp": {"browser_headless": False, "html_transports": ["browser", "httpx"]},
         },
     )
     sources = {info.source: info for info in describe_sources(config)}
@@ -473,7 +475,7 @@ def test_describe_sources_reports_configured_access() -> None:
 
 
 def test_describe_sources_disables_one_without_permitted_transports() -> None:
-    config = SourcesConfig.model_validate({"http": {"escalation": []}})
+    config = LookupConfig.model_validate({"http": {"escalation": []}})
 
     sources = {info.source: info for info in describe_sources(config)}
 
@@ -485,10 +487,10 @@ def test_describe_sources_disables_one_without_permitted_transports() -> None:
 
 @pytest.mark.asyncio
 async def test_blocked_error_carries_configured_access() -> None:
-    config = SourcesConfig.model_validate(
+    config = LookupConfig.model_validate(
         {
+            "sources": {"deezer": {"html_transports": ["httpx"]}},
             "http": {"escalation": [], "browser_headless": False},
-            "deezer": {"html_transports": ["httpx"]},
         },
     )
     transport = httpx.MockTransport(
@@ -525,7 +527,7 @@ async def test_lookup_closes_shared_browsers(monkeypatch: pytest.MonkeyPatch) ->
 
 @pytest.mark.asyncio
 async def test_lookup_does_not_request_a_source_without_permitted_transports() -> None:
-    config = SourcesConfig.model_validate({"http": {"escalation": []}})
+    config = LookupConfig.model_validate({"http": {"escalation": []}})
     requests: list[httpx.Request] = []
 
     def answer(request: httpx.Request) -> httpx.Response:
@@ -559,10 +561,10 @@ def test_describe_sources() -> None:
     assert sources["odesli"].requires == []
     assert sources["itunes"].status.ready
     assert sources["discogs"].status.ready
-    assert [r.setting for r in sources["discogs"].requires] == ["discogs.token"]
+    assert [r.setting for r in sources["discogs"].requires] == ["sources.discogs.token"]
     assert sources["bandcamp"].status.ready
     assert sources["lastfm"].status.state is SourceState.MISSING_CREDENTIAL
-    assert [r.setting for r in sources["lastfm"].requires] == ["lastfm.api_key"]
+    assert [r.setting for r in sources["lastfm"].requires] == ["sources.lastfm.api_key"]
     assert sources["wikipedia"].status.ready
     assert sources["beatport"].status.ready
     assert sources["beatport"].group is SourceGroup.STREAMING
@@ -584,15 +586,15 @@ def test_describe_sources() -> None:
         assert sources[name].status.state is SourceState.MISSING_CREDENTIAL
         assert sources[name].group is SourceGroup.STREAMING
     assert [r.setting for r in sources["spotify"].requires] == [
-        "spotify.client_id",
-        "spotify.client_secret",
+        "sources.spotify.client_id",
+        "sources.spotify.client_secret",
     ]
 
 
 @pytest.mark.asyncio
 async def test_covers_from_two_sources_merge_per_target(
     replay: Replay,
-    config: SourcesConfig,
+    config: LookupConfig,
 ) -> None:
     query = parse_query("Tim Buckley - Song to the Siren", EntityKind.TRACK)
 
@@ -610,7 +612,7 @@ async def test_covers_from_two_sources_merge_per_target(
 
 
 @pytest.mark.asyncio
-async def test_radio_plays_and_host_comments(replay: Replay, config: SourcesConfig) -> None:
+async def test_radio_plays_and_host_comments(replay: Replay, config: LookupConfig) -> None:
     query = parse_query("Radiohead - Reckoner", EntityKind.TRACK)
 
     dossier = await lookup(query, config, exclude=["lastfm"], transport=replay("reckoner"))
@@ -625,7 +627,7 @@ async def test_radio_plays_and_host_comments(replay: Replay, config: SourcesConf
 
 
 @pytest.mark.asyncio
-async def test_explicit_recording_is_the_original(replay: Replay, config: SourcesConfig) -> None:
+async def test_explicit_recording_is_the_original(replay: Replay, config: LookupConfig) -> None:
     query = parse_query("Kanye West - Stronger", EntityKind.TRACK)
 
     dossier = await lookup(query, config, exclude=["lastfm"], transport=replay("stronger_samples"))
@@ -660,7 +662,7 @@ async def test_radio_search_drops_other_versions_and_missing_artists() -> None:
 
     dossier = await lookup(
         Query(kind=EntityKind.TRACK, artist="Burial", title="Archangel"),
-        SourcesConfig(http=HttpSettings(escalation=())),
+        LookupConfig(http=HttpSettings(escalation=())),
         include=("nts", "wfmu"),
         transport=httpx.MockTransport(respond),
     )
@@ -680,7 +682,7 @@ async def test_radio_search_reports_blocked_source(source: str) -> None:
 
     dossier = await lookup(
         Query(kind=EntityKind.TRACK, artist="Burial", title="Archangel"),
-        SourcesConfig(http=HttpSettings(escalation=(), retries=0)),
+        LookupConfig(http=HttpSettings(escalation=(), retries=0)),
         include=(source,),
         transport=httpx.MockTransport(respond),
     )
@@ -693,7 +695,7 @@ async def test_radio_search_reports_blocked_source(source: str) -> None:
 def test_every_adapter_names_a_catalogue_service_or_none() -> None:
     names = {service.name for service in SERVICES}
 
-    adapters = build_adapters(SourcesConfig(), HttpResources())
+    adapters = build_adapters(LookupConfig(), HttpResources())
 
     assert all(adapter.service is None or adapter.service in names for adapter in adapters)
 
@@ -714,13 +716,13 @@ def test_default_resolves_reads_pages_of_the_adapter_service(
     resolves: bool,
 ) -> None:
     adapters = {
-        adapter.name: adapter for adapter in build_adapters(SourcesConfig(), HttpResources())
+        adapter.name: adapter for adapter in build_adapters(LookupConfig(), HttpResources())
     }
 
     assert adapters[source].resolves(parse_query(text)) is resolves
 
 
 def test_text_query_is_resolved_by_no_adapter() -> None:
-    adapters = build_adapters(SourcesConfig(), HttpResources())
+    adapters = build_adapters(LookupConfig(), HttpResources())
 
     assert not any(adapter.resolves(PARANOID_ANDROID) for adapter in adapters)

@@ -18,16 +18,9 @@ from pydantic_settings import (
 from deadwax import (
     CacheSettings,
     ConfigurationError,
-    DiscogsSettings,
-    GeniusSettings,
     HttpSettings,
-    LastfmSettings,
-    SecondHandSongsSettings,
-    SoundCloudSettings,
-    SourcesConfig,
-    SourceSettings,
-    SpotifySettings,
-    YouTubeSettings,
+    LookupConfig,
+    PerSourceSettings,
 )
 from deadwax.logs import LogSettings, RunLogSettings
 
@@ -35,7 +28,7 @@ APP_NAME = "deadwax"
 CONFIG_FILE_VARIABLE = "DEADWAX_CONFIG_FILE"
 
 # The library's default source set, shown and used when DEADWAX_DEFAULT_SOURCES is unset.
-_DEFAULT_SOURCES: tuple[str, ...] = SourcesConfig.model_fields["default_sources"].default
+_DEFAULT_SOURCES: tuple[str, ...] = LookupConfig.model_fields["default_sources"].default
 
 # TOML file that load_settings() adds below the environment and .env for one load.
 _toml_file: ContextVar[Path | None] = ContextVar("deadwax_toml_file", default=None)
@@ -76,47 +69,7 @@ class Settings(BaseSettings):
     runs: RunLogSettings = Field(default_factory=RunLogSettings)
     http: HttpSettings = Field(default_factory=HttpSettings)
     cache: CacheSettings = Field(default_factory=CacheSettings)
-    musicbrainz: SourceSettings = Field(default_factory=SourceSettings)
-    itunes: SourceSettings = Field(default_factory=SourceSettings)
-    deezer: SourceSettings = Field(default_factory=SourceSettings)
-    odesli: SourceSettings = Field(default_factory=SourceSettings)
-    discogs: DiscogsSettings = Field(default_factory=DiscogsSettings)
-    bandcamp: SourceSettings = Field(default_factory=SourceSettings)
-    lastfm: LastfmSettings = Field(default_factory=LastfmSettings)
-    wikipedia: SourceSettings = Field(default_factory=SourceSettings)
-    listenbrainz: SourceSettings = Field(default_factory=SourceSettings)
-    secondhandsongs: SecondHandSongsSettings = Field(default_factory=SecondHandSongsSettings)
-    kexp: SourceSettings = Field(default_factory=SourceSettings)
-    spotify: SpotifySettings = Field(default_factory=SpotifySettings)
-    youtube: YouTubeSettings = Field(default_factory=YouTubeSettings)
-    genius: GeniusSettings = Field(default_factory=GeniusSettings)
-    soundcloud: SoundCloudSettings = Field(default_factory=SoundCloudSettings)
-    beatport: SourceSettings = Field(default_factory=SourceSettings)
-    hardwax: SourceSettings = Field(default_factory=SourceSettings)
-    soundohm: SourceSettings = Field(default_factory=SourceSettings)
-    juno: SourceSettings = Field(default_factory=SourceSettings)
-    bleep: SourceSettings = Field(default_factory=SourceSettings)
-    forcedexposure: SourceSettings = Field(default_factory=SourceSettings)
-    allmusic: SourceSettings = Field(default_factory=SourceSettings)
-    albumoftheyear: SourceSettings = Field(default_factory=SourceSettings)
-    pressreviews: SourceSettings = Field(default_factory=SourceSettings)
-    ra: SourceSettings = Field(default_factory=SourceSettings)
-    nts: SourceSettings = Field(default_factory=SourceSettings)
-    wfmu: SourceSettings = Field(default_factory=SourceSettings)
-    rateyourmusic: SourceSettings = Field(default_factory=SourceSettings)
-    whosampled: SourceSettings = Field(
-        default_factory=lambda: SourceSettings(browser_headless=False),
-    )
-    tracklists: SourceSettings = Field(
-        default_factory=lambda: SourceSettings(browser_headless=False),
-    )
-    phonica: SourceSettings = Field(default_factory=SourceSettings)
-    boomkat: SourceSettings = Field(
-        default_factory=lambda: SourceSettings(browser_headless=False),
-    )
-    norman: SourceSettings = Field(
-        default_factory=lambda: SourceSettings(browser_headless=False),
-    )
+    sources: PerSourceSettings = Field(default_factory=PerSourceSettings)
 
     @classmethod
     def settings_customise_sources(
@@ -134,13 +87,13 @@ class Settings(BaseSettings):
         toml = TomlConfigSettingsSource(settings_cls, toml_file=toml_file)
         return init_settings, env_settings, dotenv_settings, toml
 
-    def sources_config(self) -> SourcesConfig:
+    def lookup_config(self) -> LookupConfig:
         """Build the library configuration; the cache lives in the user cache directory."""
         cache = self.cache
         if cache.path is None:
             cache = cache.model_copy(update={"path": default_cache_file()})
-        fields = {name: getattr(self, name) for name in SourcesConfig.model_fields}
-        return SourcesConfig.model_validate(fields | {"cache": cache})
+        fields = {name: getattr(self, name) for name in LookupConfig.model_fields}
+        return LookupConfig.model_validate(fields | {"cache": cache})
 
     def run_log(self) -> RunLogSettings:
         """Build the run journal settings; the journal lives in the user log directory."""

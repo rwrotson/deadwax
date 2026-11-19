@@ -15,7 +15,7 @@ from deadwax.core import (
     SourceError,
     SourceState,
 )
-from deadwax.sources import SourcesConfig, parse_query
+from deadwax.sources import LookupConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.odesli import OdesliAdapter
 from deadwax.sources.adapters.odesli.models import PageData
@@ -70,8 +70,8 @@ def adapter(requests: list[httpx.Request], body: bytes | None = None) -> OdesliA
         requests.append(request)
         return httpx.Response(200, content=body or page({"pageData": PAGE_DATA}))
 
-    config = SourcesConfig.model_validate(
-        {"odesli": {"rate": 1000}, "http": {"escalation": []}},
+    config = LookupConfig.model_validate(
+        {"sources": {"odesli": {"rate": 1000}}, "http": {"escalation": []}},
     )
     return OdesliAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 

@@ -30,7 +30,7 @@ from deadwax.sources._http import ClientSpec, HttpClient, HttpResources, Profile
 from deadwax.sources._search import search_key
 from deadwax.sources.adapters.discogs import models
 from deadwax.sources.adapters.discogs import parse as p
-from deadwax.sources.config import SourcesConfig
+from deadwax.sources.config import LookupConfig
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ ANONYMOUS_RATE = 25 / 60
 # httpx's own User-Agent: on 2026-11-12 Discogs refused every User-Agent naming deadwax.
 DEFAULT_USER_AGENT = f"python-httpx/{httpx.__version__}"
 
-SKIPPED_SEARCH = "search needs discogs.token, and earlier sources found no Discogs ID"
+SKIPPED_SEARCH = "search needs sources.discogs.token, and earlier sources found no Discogs ID"
 
 
 class DiscogsAdapter(HttpAdapter):
@@ -64,24 +64,24 @@ class DiscogsAdapter(HttpAdapter):
             Capability.RELATIONS,
         },
     )
-    requires = (Requirement(setting="discogs.token", purpose="search and compilations"),)
+    requires = (Requirement(setting="sources.discogs.token", purpose="search and compilations"),)
     default_user_agent = DEFAULT_USER_AGENT
 
-    def __init__(self, config: SourcesConfig, resources: HttpResources) -> None:
+    def __init__(self, config: LookupConfig, resources: HttpResources) -> None:
         super().__init__(config, resources)
         self._page_client: HttpClient | None = None
 
     @property
     def token(self) -> str | None:
         """Personal access token, if configured."""
-        token = self.config.discogs.token
+        token = self.config.sources.discogs.token
         return token.get_secret_value() if token is not None else None
 
     def status(self) -> SourceStatus:
         """Ready without a token too, as lookups by ID work; the detail notes what is missing."""
         status = super().status()
         if status.ready and self.token is None:
-            return status.model_copy(update={"detail": "no discogs.token: no search"})
+            return status.model_copy(update={"detail": "no sources.discogs.token: no search"})
         return status
 
     def headers(self) -> Mapping[str, str]:
@@ -96,11 +96,10 @@ class DiscogsAdapter(HttpAdapter):
     def client(self) -> HttpClient:
         """API client; slower without a token, as Discogs allows fewer anonymous requests."""
         if self._client is None:
-            config = self.config
-            if self.token is None and config.discogs.rate is None:
-                settings = config.discogs.model_copy(update={"rate": ANONYMOUS_RATE})
-                config = config.model_copy(update={"discogs": settings})
-            self._client = HttpClient(self.client_spec(Profile.API), config, self.resources)
+            settings = self.client_settings
+            if self.token is None and "rate" not in self.settings.model_fields_set:
+                settings = settings.model_copy(update={"rate": ANONYMOUS_RATE})
+            self._client = HttpClient(self.client_spec(Profile.API), settings, self.resources)
         return self._client
 
     @property
@@ -110,7 +109,7 @@ class DiscogsAdapter(HttpAdapter):
             user_agent = self.settings.user_agent
             headers = {"user-agent": user_agent} if user_agent else {}
             spec = ClientSpec(self.name, Profile.BROWSER, headers)
-            self._page_client = HttpClient(spec, self.config, self.resources)
+            self._page_client = HttpClient(spec, self.client_settings, self.resources)
         return self._page_client
 
     async def aclose(self) -> None:

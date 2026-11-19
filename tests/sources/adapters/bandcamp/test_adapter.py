@@ -18,7 +18,7 @@ from deadwax.core import (
     RelationKind,
     SourceError,
 )
-from deadwax.sources import SourcesConfig, parse_query
+from deadwax.sources import LookupConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.bandcamp import BandcampAdapter
 from deadwax.sources.adapters.bandcamp.adapter import MOBILE_API, SEARCH_API, SEARCH_PAGE
@@ -86,8 +86,8 @@ def adapter(routes: Mapping[str, Route], seen: list[str] | None = None) -> Bandc
         status, body = routes.get(url, (404, b"missing"))
         return httpx.Response(status, content=body)
 
-    config = SourcesConfig.model_validate(
-        {"bandcamp": {"rate": 1000}, "http": {"retries": 0, "escalation": []}},
+    config = LookupConfig.model_validate(
+        {"sources": {"bandcamp": {"rate": 1000}}, "http": {"retries": 0, "escalation": []}},
     )
     return BandcampAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 

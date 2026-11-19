@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from deadwax import EntityKind, HttpSettings, Query, RelationKind, SourcesConfig, lookup
+from deadwax import EntityKind, HttpSettings, LookupConfig, Query, RelationKind, lookup
 
 EPISODE = "https://www.nts.live/shows/example/episodes/example-2026"
 
@@ -51,7 +51,7 @@ async def test_nts_episode_has_context_genre_and_neighbours() -> None:
 
     dossier = await lookup(
         Query(kind=EntityKind.TRACK, artist="Burial", title="Archangel"),
-        SourcesConfig(http=HttpSettings(escalation=())),
+        LookupConfig(http=HttpSettings(escalation=())),
         include=("nts",),
         transport=httpx.MockTransport(respond),
     )

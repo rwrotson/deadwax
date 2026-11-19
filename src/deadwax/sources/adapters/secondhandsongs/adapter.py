@@ -32,7 +32,7 @@ class SecondHandSongsAdapter(HttpAdapter):
 
     def headers(self) -> Mapping[str, str]:
         """JSON answers, and the API key when one is set."""
-        api_key = self.config.secondhandsongs.api_key
+        api_key = self.config.sources.secondhandsongs.api_key
         key = {"x-api-key": api_key.get_secret_value()} if api_key is not None else {}
         return {"accept": "application/json", **key}
 

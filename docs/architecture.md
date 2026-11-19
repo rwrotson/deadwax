@@ -45,14 +45,17 @@ import-linter enforces the rules marked *contract* with `uv run poe lint-imports
 From top to bottom:
 
 ```
-deadwax.sources.lookup                  composition: builds adapters and runs the orchestrator
+deadwax.sources.lookup                  composition: runs the orchestrator over the built adapters
+deadwax.sources.registry                `ADAPTERS` in resolver order and `build_adapters`
 deadwax.sources.adapters                one package per source
 deadwax.sources._search                 search keys, search hits, `SearchPageAdapter`, `track_on_release`
 deadwax.sources._adapter | _html        `HttpAdapter` and its default `resolves()` | HTML and JSON-LD helpers
 deadwax.sources.services                service catalogue: hosts and URL rules; URL queries and `parse_query`
-deadwax.sources._http
-deadwax.sources.config
+deadwax.sources._http                   `HttpClient`, built from the resolved `ClientSettings` of its source
+deadwax.sources.config                  `LookupConfig`; one settings class per source holding its defaults
 ```
+
+Each source has one settings class in `config` (rate, HTML transports, browser mode, credentials) and one field in `PerSourceSettings`; `tests/sources/test_registry.py` checks that the fields and `ADAPTERS` name the same sources. `LookupConfig.client_settings(name)` resolves a source's settings over the shared `http` and `cache` sections for its `HttpClient`.
 
 Every adapter is a package `deadwax.sources.adapters.<name>`, named after its source, with the modules `adapter` (the adapter class and its requests), `parse` (pure functions from responses to facts), and optionally `models` (Pydantic models of JSON responses), layered in that order (contract "R4: adapter package modules"). Its tests live in `tests/sources/adapters/<name>/` and its recorded responses in `tests/fixtures/<name>/`.
 
@@ -106,7 +109,7 @@ Transitive dependencies (anyio, h2, httpcore, click, and others) are never impor
 
 ### R7. Lazy optional imports
 
-curl_cffi, Patchright, and Nodriver are imported inside the function that needs them; a missing package raises `ConfigurationError` naming the extra. Type-only references go under `if TYPE_CHECKING:`. `import deadwax` does not load structlog, Pydantic Settings, Typer, rich, platformdirs, curl_cffi, Patchright, or Nodriver; `tests/test_package.py` checks this in a fresh interpreter. `deadwax` imports `deadwax.sources` on first use of one of its names (`lookup`, `SourcesConfig`, …), because httpx loads rich and click at import time whenever they are installed.
+curl_cffi, Patchright, and Nodriver are imported inside the function that needs them; a missing package raises `ConfigurationError` naming the extra. Type-only references go under `if TYPE_CHECKING:`. `import deadwax` does not load structlog, Pydantic Settings, Typer, rich, platformdirs, curl_cffi, Patchright, or Nodriver; `tests/test_package.py` checks this in a fresh interpreter. `deadwax` imports `deadwax.sources` on first use of one of its names (`lookup`, `LookupConfig`, …), because httpx loads rich and click at import time whenever they are installed.
 
 ### R8. Style (Ruff and review)
 

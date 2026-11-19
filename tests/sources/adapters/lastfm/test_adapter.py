@@ -13,7 +13,7 @@ from deadwax.core import (
     Sourced,
     SourceState,
 )
-from deadwax.sources import SourcesConfig, parse_query
+from deadwax.sources import LookupConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.lastfm import LastfmAdapter
 from deadwax.sources.adapters.lastfm.adapter import API, _artist_page
@@ -49,8 +49,11 @@ def make(
         method = request.url.params["method"]
         return httpx.Response(200, content=json.dumps(table[method]).encode())
 
-    config = SourcesConfig.model_validate(
-        {"lastfm": {"rate": 1000, "api_key": key}, "http": {"retries": 0, "escalation": []}},
+    config = LookupConfig.model_validate(
+        {
+            "sources": {"lastfm": {"rate": 1000, "api_key": key}},
+            "http": {"retries": 0, "escalation": []},
+        },
     )
     return LastfmAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 
@@ -136,7 +139,7 @@ def test_status_needs_the_key() -> None:
     status = make(key=None).status()
 
     assert status.state is SourceState.MISSING_CREDENTIAL
-    assert status.detail == "needs lastfm.api_key"
+    assert status.detail == "needs sources.lastfm.api_key"
     assert make().status().ready
 
 

@@ -19,7 +19,7 @@ from deadwax.core import (
     TextKind,
     merge,
 )
-from deadwax.sources import SourcesConfig, parse_query
+from deadwax.sources import LookupConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.soundcloud import SoundCloudAdapter
 
@@ -104,9 +104,9 @@ def make(
             return httpx.Response(200, json={"collection": [BURIAL, LISTENER, LABEL]})
         return httpx.Response(404)
 
-    config = SourcesConfig.model_validate(
+    config = LookupConfig.model_validate(
         {
-            "soundcloud": {"rate": 1000, "client_id": "c1d"},
+            "sources": {"soundcloud": {"rate": 1000, "client_id": "c1d"}},
             "http": {"retries": 0, "escalation": []},
         },
     )
@@ -295,7 +295,7 @@ async def test_rejected_client_id() -> None:
 
 
 def test_missing_client_id_skips_the_source() -> None:
-    status = SoundCloudAdapter(SourcesConfig(), HttpResources()).status()
+    status = SoundCloudAdapter(LookupConfig(), HttpResources()).status()
 
     assert status.state is SourceState.MISSING_CREDENTIAL
-    assert status.detail == "needs soundcloud.client_id"
+    assert status.detail == "needs sources.soundcloud.client_id"

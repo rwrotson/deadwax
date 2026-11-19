@@ -41,17 +41,17 @@ class SoundCloudAdapter(HttpAdapter):
             Capability.METRICS,
         },
     )
-    requires = (Requirement(setting="soundcloud.client_id", purpose="every lookup"),)
+    requires = (Requirement(setting="sources.soundcloud.client_id", purpose="every lookup"),)
     secret_params = frozenset({"client_id"})
 
     @property
     def _client_id(self) -> str | None:
-        client_id = self.config.soundcloud.client_id
+        client_id = self.config.sources.soundcloud.client_id
         return client_id.get_secret_value() if client_id is not None else None
 
     def missing_credential(self) -> str | None:
         """Every API call needs a client ID."""
-        return None if self._client_id else "needs soundcloud.client_id"
+        return None if self._client_id else "needs sources.soundcloud.client_id"
 
     async def _get(self, path: str, **params: str) -> Response:
         try:
@@ -62,7 +62,9 @@ class SoundCloudAdapter(HttpAdapter):
         except BlockedError, NotFoundError, RateLimitedError:
             raise
         except SourceError as error:
-            message = f"SoundCloud refused the request ({error}); is soundcloud.client_id stale?"
+            message = (
+                f"SoundCloud refused the request ({error}); is sources.soundcloud.client_id stale?"
+            )
             raise SourceError(message, url=error.url) from None
 
     async def lookup(self, query: Query, context: LookupContext) -> Partial:

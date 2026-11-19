@@ -22,7 +22,7 @@ from deadwax.core import (
     SourceState,
     merge,
 )
-from deadwax.sources import CacheSettings, SourcesConfig, parse_query
+from deadwax.sources import CacheSettings, LookupConfig, parse_query
 from deadwax.sources._http import HttpResources, open_cache
 from deadwax.sources.adapters.spotify import SpotifyAdapter
 from deadwax.sources.adapters.spotify.models import Copyright, SearchResults
@@ -111,17 +111,17 @@ class Server:
         return httpx.Response(200, json={"tracks": {"items": items}})
 
 
-def config(**changes: object) -> SourcesConfig:
-    return SourcesConfig.model_validate(
+def config(**changes: object) -> LookupConfig:
+    return LookupConfig.model_validate(
         {
-            "spotify": {"rate": 1000, "client_id": "id", "client_secret": "secret"},
+            "sources": {"spotify": {"rate": 1000, "client_id": "id", "client_secret": "secret"}},
             "http": {"retries": 0, "escalation": []},
             **changes,
         },
     )
 
 
-def make(server: Server, settings: SourcesConfig | None = None) -> SpotifyAdapter:
+def make(server: Server, settings: LookupConfig | None = None) -> SpotifyAdapter:
     resources = HttpResources(transport=httpx.MockTransport(server))
     return SpotifyAdapter(settings or config(), resources)
 
@@ -354,14 +354,14 @@ async def test_token_is_never_cached(tmp_path: Path) -> None:
 
 def test_missing_credentials_skip_the_source() -> None:
     adapter = SpotifyAdapter(
-        SourcesConfig.model_validate({"spotify": {"client_id": "id"}}),
+        LookupConfig.model_validate({"sources": {"spotify": {"client_id": "id"}}}),
         HttpResources(),
     )
 
     status = adapter.status()
 
     assert status.state is SourceState.MISSING_CREDENTIAL
-    assert status.detail == "needs spotify.client_id and spotify.client_secret"
+    assert status.detail == "needs sources.spotify.client_id and sources.spotify.client_secret"
 
 
 def test_copyright_marks() -> None:

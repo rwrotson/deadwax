@@ -23,7 +23,7 @@ from deadwax.core import (
     TextKind,
     merge,
 )
-from deadwax.sources import SourcesConfig, parse_query
+from deadwax.sources import LookupConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.phonica import PhonicaAdapter
 from deadwax.sources.adapters.phonica import parse as p
@@ -87,9 +87,9 @@ def make(
             return httpx.Response(404)
         return httpx.Response(200, content=(PAGES / f"{name}.html").read_bytes())
 
-    config = SourcesConfig.model_validate(
+    config = LookupConfig.model_validate(
         {
-            "phonica": {"rate": 1000, "html_transports": ["httpx"]},
+            "sources": {"phonica": {"rate": 1000, "html_transports": ["httpx"]}},
             "http": {"retries": 0, "escalation": []},
         },
     )

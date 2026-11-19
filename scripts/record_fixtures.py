@@ -12,20 +12,23 @@ import httpx
 from pydantic import SecretStr
 
 from deadwax import (
-    DiscogsSettings,
     Dossier,
     EntityKind,
     HttpSettings,
-    LastfmSettings,
+    LookupConfig,
+    PerSourceSettings,
     Query,
-    SoundCloudSettings,
     SourceGroup,
-    SourcesConfig,
-    SpotifySettings,
-    YouTubeSettings,
     parse_query,
 )
-from deadwax.sources import lookup
+from deadwax.sources import (
+    DiscogsSettings,
+    LastfmSettings,
+    SoundCloudSettings,
+    SpotifySettings,
+    YouTubeSettings,
+    lookup,
+)
 
 FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
 SECRET_PARAMS = frozenset({"key", "api_key", "token", "client_id"})
@@ -198,33 +201,50 @@ def credential(source: str, variable: str, scenario: str, live: frozenset[str]) 
     return SecretStr(REPLAY_CREDENTIAL) if load(scenario, source) is not None else None
 
 
-def config(scenario: str, live: frozenset[str]) -> SourcesConfig:
+def config(scenario: str, live: frozenset[str]) -> LookupConfig:
     """Default settings with the credentials of the sources recorded live from the environment.
 
-    The Discogs token and the Last.fm key are read from DEADWAX_DISCOGS__TOKEN and
-    DEADWAX_LASTFM__API_KEY, and only for a source recorded live: a replayed source must make
-    the requests its fixtures hold.
+    The Discogs token and the Last.fm key are read from DEADWAX_SOURCES__DISCOGS__TOKEN and
+    DEADWAX_SOURCES__LASTFM__API_KEY, and only for a source recorded live: a replayed source
+    must make the requests its fixtures hold.
 
     Escalation is off because only plain httpx responses pass through the recording
     transport, and the timeout is long because Discogs allows 25 requests a minute without
     a token.
     """
-    token = os.environ.get("DEADWAX_DISCOGS__TOKEN") if "discogs" in live else None
-    lastfm_key = os.environ.get("DEADWAX_LASTFM__API_KEY") if "lastfm" in live else None
-    return SourcesConfig(
+    token = os.environ.get("DEADWAX_SOURCES__DISCOGS__TOKEN") if "discogs" in live else None
+    lastfm_key = os.environ.get("DEADWAX_SOURCES__LASTFM__API_KEY") if "lastfm" in live else None
+    return LookupConfig(
         http=HttpSettings(escalation=()),
         adapter_timeout=180,
-        discogs=DiscogsSettings(token=SecretStr(token) if token else None),
-        lastfm=LastfmSettings(api_key=SecretStr(lastfm_key) if lastfm_key else None),
-        spotify=SpotifySettings(
-            client_id=credential("spotify", "DEADWAX_SPOTIFY__CLIENT_ID", scenario, live),
-            client_secret=credential("spotify", "DEADWAX_SPOTIFY__CLIENT_SECRET", scenario, live),
-        ),
-        youtube=YouTubeSettings(
-            api_key=credential("youtube", "DEADWAX_YOUTUBE__API_KEY", scenario, live),
-        ),
-        soundcloud=SoundCloudSettings(
-            client_id=credential("soundcloud", "DEADWAX_SOUNDCLOUD__CLIENT_ID", scenario, live),
+        sources=PerSourceSettings(
+            discogs=DiscogsSettings(token=SecretStr(token) if token else None),
+            lastfm=LastfmSettings(api_key=SecretStr(lastfm_key) if lastfm_key else None),
+            spotify=SpotifySettings(
+                client_id=credential(
+                    "spotify",
+                    "DEADWAX_SOURCES__SPOTIFY__CLIENT_ID",
+                    scenario,
+                    live,
+                ),
+                client_secret=credential(
+                    "spotify",
+                    "DEADWAX_SOURCES__SPOTIFY__CLIENT_SECRET",
+                    scenario,
+                    live,
+                ),
+            ),
+            youtube=YouTubeSettings(
+                api_key=credential("youtube", "DEADWAX_SOURCES__YOUTUBE__API_KEY", scenario, live),
+            ),
+            soundcloud=SoundCloudSettings(
+                client_id=credential(
+                    "soundcloud",
+                    "DEADWAX_SOURCES__SOUNDCLOUD__CLIENT_ID",
+                    scenario,
+                    live,
+                ),
+            ),
         ),
     )
 

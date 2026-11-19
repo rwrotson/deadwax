@@ -16,7 +16,7 @@ from deadwax.core import (
     Scope,
     TextKind,
 )
-from deadwax.sources import SourcesConfig, parse_query
+from deadwax.sources import LookupConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.listenbrainz import ListenBrainzAdapter
 from deadwax.sources.adapters.listenbrainz.parse import published
@@ -56,8 +56,8 @@ def make(seen: list[httpx.Request] | None = None) -> ListenBrainzAdapter:
             seen.append(request)
         return httpx.Response(200, content=json.dumps(ROUTES[request.url.path]).encode())
 
-    config = SourcesConfig.model_validate(
-        {"listenbrainz": {"rate": 1000}, "http": {"retries": 0, "escalation": []}},
+    config = LookupConfig.model_validate(
+        {"sources": {"listenbrainz": {"rate": 1000}}, "http": {"retries": 0, "escalation": []}},
     )
     return ListenBrainzAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 

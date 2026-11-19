@@ -22,7 +22,7 @@ from deadwax.core import (
     VersionKind,
     merge,
 )
-from deadwax.sources import SourcesConfig, parse_query
+from deadwax.sources import LookupConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.juno import JunoAdapter
 from deadwax.sources.adapters.juno import parse as p
@@ -86,8 +86,8 @@ def make(
             return httpx.Response(404)
         return httpx.Response(200, content=(PAGES / f"{name}.html").read_bytes())
 
-    config = SourcesConfig.model_validate(
-        {"juno": {"rate": 1000}, "http": {"retries": 0, "escalation": []}},
+    config = LookupConfig.model_validate(
+        {"sources": {"juno": {"rate": 1000}}, "http": {"retries": 0, "escalation": []}},
     )
     return JunoAdapter(config, HttpResources(transport=httpx.MockTransport(handler))), seen
 

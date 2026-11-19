@@ -12,7 +12,7 @@ from deadwax.core import (
     SourceError,
     SourceState,
 )
-from deadwax.sources import SourcesConfig, parse_query
+from deadwax.sources import LookupConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.youtube import YouTubeAdapter
 
@@ -60,9 +60,9 @@ def make(
         found = PLAYLISTS if request.url.params["type"] == "playlist" else VIDEOS
         return httpx.Response(200, json={"items": found if items is None else items})
 
-    config = SourcesConfig.model_validate(
+    config = LookupConfig.model_validate(
         {
-            "youtube": {"rate": 1000, "api_key": "k3y"},
+            "sources": {"youtube": {"rate": 1000, "api_key": "k3y"}},
             "http": {"retries": 0, "escalation": []},
         },
     )
@@ -163,7 +163,7 @@ async def test_without_a_record_name() -> None:
 
 
 def test_missing_key_skips_the_source() -> None:
-    status = YouTubeAdapter(SourcesConfig(), HttpResources()).status()
+    status = YouTubeAdapter(LookupConfig(), HttpResources()).status()
 
     assert status.state is SourceState.MISSING_CREDENTIAL
-    assert status.detail == "needs youtube.api_key"
+    assert status.detail == "needs sources.youtube.api_key"

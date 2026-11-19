@@ -3,15 +3,15 @@ import pytest
 
 from deadwax import EntityKind, ErrorKind, MetricKind, Query, RelationKind, TagKind, TextKind
 from deadwax.core import RecordKey, SourceError
-from deadwax.sources import parse_query
+from deadwax.sources import PerSourceSettings, RateYourMusicSettings, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.rateyourmusic import RateYourMusicAdapter
-from deadwax.sources.config import Escalation, SourcesConfig, SourceSettings
+from deadwax.sources.config import Escalation, LookupConfig
 from deadwax.sources.lookup import lookup
 
 
 def test_album_page_extracts_facts() -> None:
-    adapter = RateYourMusicAdapter(SourcesConfig(), HttpResources())
+    adapter = RateYourMusicAdapter(LookupConfig(), HttpResources())
     html = b"""
     <h1 class="album_title">OK Computer</h1><div class="album_artist"><a>Radiohead</a></div>
     <div class="release_pri_genres"><a>Art Rock</a></div>
@@ -47,7 +47,7 @@ def test_album_page_extracts_facts() -> None:
 
 
 def test_search_and_missing_identity() -> None:
-    adapter = RateYourMusicAdapter(SourcesConfig(), HttpResources())
+    adapter = RateYourMusicAdapter(LookupConfig(), HttpResources())
     key = RecordKey(artist="Radiohead", title="OK Computer", kind=EntityKind.ALBUM)
     assert adapter.search_request(key)[1]["searchtype"] == "l"
     hits = adapter.search_hits(
@@ -61,8 +61,8 @@ def test_search_and_missing_identity() -> None:
 
 
 def test_browser_is_first_and_url_kind() -> None:
-    config = SourcesConfig()
-    assert config.html_transports("rateyourmusic") == (Escalation.BROWSER,)
+    config = LookupConfig()
+    assert config.client_settings("rateyourmusic").html_transports == (Escalation.BROWSER,)
     assert (
         parse_query("https://rateyourmusic.com/release/album/radiohead/ok-computer/").kind
         is EntityKind.ALBUM
@@ -98,8 +98,10 @@ async def test_lookup_failure_and_version_gate(
     error: ErrorKind | None,
     other_version: bool,
 ) -> None:
-    config = SourcesConfig(
-        rateyourmusic=SourceSettings(html_transports=(Escalation.HTTPX,)),
+    config = LookupConfig(
+        sources=PerSourceSettings(
+            rateyourmusic=RateYourMusicSettings(html_transports=(Escalation.HTTPX,)),
+        ),
     )
 
     def respond(request: httpx.Request) -> httpx.Response:

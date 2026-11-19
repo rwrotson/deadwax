@@ -7,7 +7,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import httpx
 import pytest
 
-from deadwax.sources import SourcesConfig
+from deadwax.sources import LookupConfig
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 SECRET_PARAMS = frozenset({"key", "api_key", "token", "client_id"})
@@ -74,19 +74,19 @@ def transport(scenario: str, seen: list[str] | None = None) -> httpx.MockTranspo
     return httpx.MockTransport(handler)
 
 
-def fast_config(**changes: object) -> SourcesConfig:
+def fast_config(**changes: object) -> LookupConfig:
     """Configuration without rate-limit waits, cache, or escalation.
 
     Escalation stays off because curl_cffi opens its own sockets, which pytest-socket
     cannot block, and Playwright would launch a browser.
     """
-    fields: dict[str, object] = {name: dict(FAST) for name in SOURCES}
-    fields["lastfm"] = {**FAST, "api_key": "test-key"}
-    fields["spotify"] = {**FAST, "client_id": "test-id", "client_secret": "test-secret"}
-    fields["youtube"] = {**FAST, "api_key": "test-key"}
-    fields["soundcloud"] = {**FAST, "client_id": "test-id"}
-    fields["http"] = {"escalation": []}
-    return SourcesConfig.model_validate(fields | changes)
+    sources: dict[str, object] = {name: dict(FAST) for name in SOURCES}
+    sources["lastfm"] = {**FAST, "api_key": "test-key"}
+    sources["spotify"] = {**FAST, "client_id": "test-id", "client_secret": "test-secret"}
+    sources["youtube"] = {**FAST, "api_key": "test-key"}
+    sources["soundcloud"] = {**FAST, "client_id": "test-id"}
+    fields = {"sources": sources, "http": {"escalation": []}}
+    return LookupConfig.model_validate(fields | changes)
 
 
 @pytest.fixture
@@ -95,7 +95,7 @@ def replay() -> Callable[..., httpx.MockTransport]:
 
 
 @pytest.fixture
-def config() -> SourcesConfig:
+def config() -> LookupConfig:
     return fast_config()
 
 

@@ -50,8 +50,9 @@ lines = [
     f"`{PREFIX}*` environment variables, then `.env` in the working directory, then a TOML "
     f"file (`--config`, `{PREFIX}CONFIG_FILE`, or `config.toml` in the user configuration "
     "directory); the first one that sets a value wins. The library itself does not read them. "
-    f"Nested sections use `__`, for example `{PREFIX}LOG__LEVEL`; in TOML they are tables "
-    "such as `[log]`. Empty values use the default.",
+    f"Nested sections use `__`, for example `{PREFIX}LOG__LEVEL` or "
+    f"`{PREFIX}SOURCES__DISCOGS__TOKEN`; in TOML they are tables such as `[log]` or "
+    "`[sources.discogs]`. Empty values use the default.",
 ]
 
 top_level = [
@@ -66,8 +67,18 @@ for name, field in Settings.model_fields.items():
     section = nested_model(field)
     if section is None:
         continue
-    lines += ["", f"## {name.capitalize()}", "", (section.__doc__ or "").strip(), ""]
-    lines += table(env_fields(section, f"{PREFIX}{name.upper()}__"))
+    prefix = f"{PREFIX}{name.upper()}__"
+    lines += ["", f"## {name.capitalize()}", "", (section.__doc__ or "").strip()]
+    sources = [
+        (source, model)
+        for source, source_field in section.model_fields.items()
+        if (model := nested_model(source_field)) is not None
+    ]
+    if not sources:
+        lines += ["", *table(env_fields(section, prefix))]
+    for source, model in sources:
+        lines += ["", f"### {source}", "", (model.__doc__ or "").strip(), ""]
+        lines += table(env_fields(model, f"{prefix}{source.upper()}__"))
 
 with mkdocs_gen_files.open("configuration.md", "w") as fd:
     fd.write("\n".join(lines) + "\n")

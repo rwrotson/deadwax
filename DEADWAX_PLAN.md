@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1–R-3 done, R-4 is next.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1–R-4 done, R-5 is next.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -43,9 +43,9 @@ Carried from the v1 decision log, where each has its date and reason. They apply
 - Every adapter, store adapters included, contributes facts through the same matching gate.
 - Passes: identity → enrichment → links. Each pass's context is the identity and links of a merge of the earlier passes, so rejected candidates leak no IDs.
 - `SourceError` (`BlockedError`, `RateLimitedError`, `NotFoundError`) lives in `core.errors`; the orchestrator maps it to `ErrorKind`.
-- Adapters are constructed with their settings; `status()` takes no arguments; `requires` lists setting paths (`discogs.token`) that the CLI maps to `DEADWAX_` names.
+- Adapters are constructed with their settings; `status()` takes no arguments; `requires` lists setting paths (`sources.discogs.token`) that the CLI maps to `DEADWAX_` names.
 - Excluded and disabled adapters produce no error; a missing key or extra gives `skipped`; unknown names in include/exclude raise `ConfigurationError`.
-- Every source has `user_agent` and `proxy` settings (`direct` bypasses the environment proxy). The CLI exposes every `SourcesConfig` section; each field is described and listed in `.env.example`.
+- Every source has `user_agent` and `proxy` settings (`direct` bypasses the environment proxy). The CLI exposes every `LookupConfig` section (per-source settings under `sources`, since R-4); each field is described and listed in `.env.example`.
 - Default API contact is the repository URL.
 - Shared adapter code lives in `sources/_search.py`, `_adapter.py`, `services.py`, `_html`, `_http`; adapters never import each other. Every adapter is a package `sources/adapters/<name>/` (since R-1).
 - `deadwax` imports `deadwax.sources` lazily.
@@ -119,7 +119,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | R-1 | Done | Layout: adapters in `sources/adapters/`, one package per adapter, tests per source, `_base` split, source `ra`, fixtures `tracklists`. |
 | R-2 | Done | Shared helpers: `prose()`, JSON through models, adapter access description. |
 | R-3 | Done | Service catalogue in `sources/services.py`; `service` and default `resolves()` on every adapter; URL rules leave the core. |
-| R-4 | Not started | Source defaults in settings, `LookupConfig` with a `sources` section shared by the CLI, resolved settings for `HttpClient`, registry. |
+| R-4 | Done | Source defaults in settings, `LookupConfig` with a `sources` section shared by the CLI, resolved settings for `HttpClient`, registry. |
 | R-5 | Not started | Core: `Facts` base, `deadline` module, access label out of the core, nested `SourceInfo.access`, shared formatters. |
 | R-6 | Not started | Trace event names, repository cleanup, journal split, architecture docs. |
 | 20 | Not started | Qualification. |
@@ -279,6 +279,26 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 ## Progress evidence and decision log
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
+
+### 2026-11-19 — R-4 evidence (configuration)
+
+Changed:
+- `sources/config.py`: one settings class per source (`MusicBrainzSettings` … `TracklistsSettings`, 33), holding that source's rate, HTML transports, browser mode, and credentials as class defaults; `DEFAULT_RATES` and `SOURCE_HTML_TRANSPORTS` are gone. `PerSourceSettings` has one typed field per source and `of(name)` (base `SourceSettings` for an unknown name). `SourcesConfig` became `LookupConfig` with a `sources` section; its `rate()`, `ttl()`, `proxy()`, `html_transports()`, and `browser_headless()` are replaced by `client_settings(name) -> ClientSettings` (shared `http` with the source's browser mode, rate, TTLs, proxy, and HTML transports after the `http.escalation` allowlist).
+- `Transports` (an `AfterValidator` on `HttpSettings.escalation` and `SourceSettings.html_transports`) is the one place that reads `patchright` as `browser` and rejects repeats.
+- `HttpClient(spec, ClientSettings, resources)`; adapters pass `self.client_settings`. Discogs slows to 25 requests a minute without a token only when its rate is not set (`model_fields_set`).
+- `sources/registry.py` holds `ADAPTERS` and `build_adapters`; import-linter R4 has the `registry` layer between `lookup` and `adapters`. `tests/sources/test_registry.py` checks that adapters and `PerSourceSettings` name the same sources and that each `requires` path exists in its section.
+- CLI `Settings` has one `sources: PerSourceSettings` field instead of 33; `sources_config()` is `lookup_config()`. Variables are `DEADWAX_SOURCES__<NAME>__*`, TOML tables `[sources.<name>]`, setting paths `sources.<name>.<field>`. `--html-transport` only splits names; unknown or repeated ones are "Invalid configuration" usage errors from the validator.
+- Public API: `deadwax` exports `LookupConfig` and `PerSourceSettings` instead of `SourcesConfig` and the seven per-source classes, which `deadwax.sources` still exports with the other 26.
+- The configuration page has a table per source; `.env.example`, README, `docs/sources.md`, `docs/getting_started.md`, `docs/architecture.md`, `docs/reference/index.md`, `scripts/record_fixtures.py`, and the integration tests use the new names.
+
+Decisions:
+- (user) Old `DEADWAX_<NAME>__*` variables and `[<name>]` TOML tables are not detected: like any unknown key they are ignored. Breaking for existing `.env` and `config.toml` files, credentials included.
+- (agent) Every source gets its own settings class, even when it only names the source, so each source's defaults live in one place and the generated page shows them.
+- (agent) Repeated HTML transports are rejected when settings load instead of when a client is built.
+
+Checks: `uv run poe check` passed (fmt-check, lint, lint-imports 16 contracts kept, mypy, 1035 tests, coverage 96.80%); `uv run --group docs properdocs build --strict` passed (the configuration page shows `DEADWAX_SOURCES__TRACKLISTS__RATE` 0.125 and `…__BROWSER_HEADLESS` false); `uv sync --locked --all-groups` passed; `deadwax sources` names `DEADWAX_SOURCES__LASTFM__API_KEY` and, with `DEADWAX_SOURCES__BOOMKAT__ENABLED=false`, shows Boomkat disabled and headed. No live runs (refactor only).
+
+**Suggested message:** `refactor(sources)!: move source defaults into per-source settings and share LookupConfig with the CLI`.
 
 ### 2026-11-19 — R-3 evidence (service catalogue)
 

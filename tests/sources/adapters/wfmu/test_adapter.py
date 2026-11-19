@@ -3,7 +3,7 @@ from collections.abc import Callable
 import httpx
 import pytest
 
-from deadwax import EntityKind, HttpSettings, Query, RelationKind, SourcesConfig, lookup
+from deadwax import EntityKind, HttpSettings, LookupConfig, Query, RelationKind, lookup
 from deadwax.sources.adapters.wfmu import adapter as wfmu_module
 
 
@@ -45,7 +45,7 @@ async def test_wfmu_playlist_comment() -> None:
 
     dossier = await lookup(
         Query(kind=EntityKind.TRACK, artist="Burial", title="Archangel"),
-        SourcesConfig(http=HttpSettings(escalation=())),
+        LookupConfig(http=HttpSettings(escalation=())),
         include=("wfmu",),
         transport=httpx.MockTransport(respond),
     )
@@ -89,7 +89,7 @@ async def test_wfmu_returns_the_playlists_read_before_its_deadline(
 
     dossier = await lookup(
         Query(kind=EntityKind.TRACK, artist="Burial", title="Archangel"),
-        SourcesConfig(http=HttpSettings(escalation=())),
+        LookupConfig(http=HttpSettings(escalation=())),
         include=("wfmu",),
         transport=httpx.MockTransport(respond),
     )

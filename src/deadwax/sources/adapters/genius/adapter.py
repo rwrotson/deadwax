@@ -31,7 +31,7 @@ from deadwax.sources._adapter import HttpAdapter
 from deadwax.sources._http import ClientSpec, HttpClient, HttpResources, Profile
 from deadwax.sources._search import SearchHit, pick_hit, search_key
 from deadwax.sources.adapters.genius import models, parse
-from deadwax.sources.config import SourcesConfig
+from deadwax.sources.config import LookupConfig
 
 
 class GeniusAdapter(HttpAdapter):
@@ -51,19 +51,19 @@ class GeniusAdapter(HttpAdapter):
             Capability.LINKS,
         },
     )
-    requires = (Requirement(setting="genius.token", purpose="every lookup"),)
+    requires = (Requirement(setting="sources.genius.token", purpose="every lookup"),)
 
-    def __init__(self, config: SourcesConfig, resources: HttpResources) -> None:
+    def __init__(self, config: LookupConfig, resources: HttpResources) -> None:
         super().__init__(config, resources)
         self._page_client: HttpClient | None = None
 
     def missing_credential(self) -> str | None:
         """Report when the API token is unavailable."""
-        return "genius.token" if self.config.genius.token is None else None
+        return "sources.genius.token" if self.config.sources.genius.token is None else None
 
     def headers(self) -> Mapping[str, str]:
         """Authorize API calls with the configured token."""
-        token = self.config.genius.token
+        token = self.config.sources.genius.token
         return {"authorization": f"Bearer {token.get_secret_value()}"} if token else {}
 
     @property
@@ -72,7 +72,7 @@ class GeniusAdapter(HttpAdapter):
         if self._page_client is None:
             self._page_client = HttpClient(
                 ClientSpec(self.name, Profile.BROWSER, {}, frozenset(), None),
-                self.config,
+                self.client_settings,
                 self.resources,
             )
         return self._page_client

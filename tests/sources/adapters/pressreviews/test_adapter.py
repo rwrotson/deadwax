@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from deadwax import EntityKind, HttpSettings, Provenance, Query, ReviewLink, SourcesConfig, TextKind
+from deadwax import EntityKind, HttpSettings, LookupConfig, Provenance, Query, ReviewLink, TextKind
 from deadwax.core import BlockedError, LookupContext, RecordKey
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.pressreviews import PressAdapter, parse
@@ -106,7 +106,7 @@ async def test_blocked_press_page() -> None:
         query=query,
         review_links=[ReviewLink(url=url, sources=[Provenance(source="test", url=url)])],
     )
-    config = SourcesConfig(http=HttpSettings(escalation=(), retries=0))
+    config = LookupConfig(http=HttpSettings(escalation=(), retries=0))
     transport = httpx.MockTransport(
         lambda _: httpx.Response(403, text="<title>Just a moment...</title>"),
     )

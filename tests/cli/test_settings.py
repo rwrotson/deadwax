@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from deadwax import ConfigurationError, SourcesConfig
+from deadwax import ConfigurationError, LookupConfig
 from deadwax.cli.settings import Settings, env_fields, load_settings
 
 ENV_EXAMPLE = Path(__file__).parents[2] / ".env.example"
@@ -86,17 +86,17 @@ def test_config_file_from_the_environment_and_the_default(
     isolated_user_dirs: Path,
 ) -> None:
     named = tmp_path / "named.toml"
-    named.write_text("[lastfm]\napi_key = 'k'\n")
+    named.write_text("[sources.lastfm]\napi_key = 'k'\n")
     isolated_user_dirs.parent.mkdir()
-    isolated_user_dirs.write_text("[itunes]\nenabled = false\n")
+    isolated_user_dirs.write_text("[sources.itunes]\nenabled = false\n")
 
     default = load_settings()
     monkeypatch.setenv("DEADWAX_CONFIG_FILE", str(named))
     from_environment = load_settings()
 
-    assert not default.itunes.enabled
-    assert from_environment.itunes.enabled
-    assert from_environment.lastfm.api_key is not None
+    assert not default.sources.itunes.enabled
+    assert from_environment.sources.itunes.enabled
+    assert from_environment.sources.lastfm.api_key is not None
 
 
 def test_named_config_file_must_exist(tmp_path: Path) -> None:
@@ -105,14 +105,17 @@ def test_named_config_file_must_exist(tmp_path: Path) -> None:
 
 
 def test_settings_cover_the_library_configuration(tmp_path: Path) -> None:
-    settings = load_settings(cache={"path": str(tmp_path / "own.sqlite")}, odesli={"rate": 2})
+    settings = load_settings(
+        cache={"path": str(tmp_path / "own.sqlite")},
+        sources={"odesli": {"rate": 2}},
+    )
 
-    config = settings.sources_config()
+    config = settings.lookup_config()
 
-    assert set(SourcesConfig.model_fields) <= set(Settings.model_fields)
+    assert set(LookupConfig.model_fields) <= set(Settings.model_fields)
     assert config.cache.path == tmp_path / "own.sqlite"
-    assert config.odesli.rate == 2
-    assert load_settings().sources_config().cache.path == tmp_path / "cache.sqlite"
+    assert config.sources.odesli.rate == 2
+    assert load_settings().lookup_config().cache.path == tmp_path / "cache.sqlite"
 
 
 @pytest.mark.parametrize(
@@ -127,7 +130,7 @@ def test_default_sources_from_a_comma_separated_variable(
     monkeypatch.setenv("DEADWAX_DEFAULT_SOURCES", value)
     monkeypatch.setenv("DEADWAX_CONCURRENCY", "3")
 
-    config = load_settings().sources_config()
+    config = load_settings().lookup_config()
 
     assert (config.default_sources, config.concurrency) == (expected, 3)
 
@@ -139,6 +142,21 @@ def test_default_sources_from_a_toml_list(tmp_path: Path) -> None:
     assert load_settings(config).default_sources == ("core", "radio")
 
 
+def test_shared_settings_have_the_library_defaults() -> None:
+    settings = load_settings()
+
+    for name in ("adapter_timeout", "default_sources", "concurrency", "http", "sources"):
+        assert getattr(settings, name) == getattr(LookupConfig(), name)
+
+
+def test_source_section_override_keeps_source_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DEADWAX_SOURCES__BOOMKAT__ENABLED", "false")
+
+    boomkat = load_settings().lookup_config().sources.boomkat
+
+    assert (boomkat.enabled, boomkat.browser_headless, boomkat.rate) == (False, False, 0.5)
+
+
 def test_default_source_set_matches_the_library() -> None:
-    assert load_settings().default_sources == SourcesConfig().default_sources
+    assert load_settings().default_sources == LookupConfig().default_sources
     assert "deezer" not in load_settings().default_sources

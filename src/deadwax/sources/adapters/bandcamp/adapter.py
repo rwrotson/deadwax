@@ -23,7 +23,7 @@ from deadwax.sources._http import HttpClient, HttpResources, Profile
 from deadwax.sources._search import search_key
 from deadwax.sources.adapters.bandcamp import models
 from deadwax.sources.adapters.bandcamp import parse as p
-from deadwax.sources.config import SourcesConfig
+from deadwax.sources.config import LookupConfig
 from deadwax.sources.services import recognize
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ class BandcampAdapter(HttpAdapter):
     profile = Profile.BROWSER
     additional_profiles = (Profile.API,)
 
-    def __init__(self, config: SourcesConfig, resources: HttpResources) -> None:
+    def __init__(self, config: LookupConfig, resources: HttpResources) -> None:
         super().__init__(config, resources)
         self._api_client: HttpClient | None = None
 
@@ -63,7 +63,7 @@ class BandcampAdapter(HttpAdapter):
         if self._api_client is None:
             self._api_client = HttpClient(
                 self.client_spec(Profile.API),
-                self.config,
+                self.client_settings,
                 self.resources,
             )
         return self._api_client

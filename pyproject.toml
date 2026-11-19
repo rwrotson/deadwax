@@ -295,7 +295,16 @@ layers = [
 name = "R4: sources modules"
 type = "layers"
 containers = ["deadwax.sources"]
-layers = ["lookup", "adapters", "_search", "_adapter | _html", "services", "_http", "config"]
+layers = [
+    "lookup",
+    "registry",
+    "adapters",
+    "_search",
+    "_adapter | _html",
+    "services",
+    "_http",
+    "config",
+]
 
 [[tool.importlinter.contracts]]
 name = "R4: adapters are independent"

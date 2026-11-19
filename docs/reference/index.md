@@ -15,8 +15,9 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.core.markdown` | Render a dossier as Markdown |
 | `deadwax.core.adapter` | Define the adapter protocol, source status, and lookup context |
 | `deadwax.core.orchestrator` | Run adapters pass by pass and merge their results |
-| `deadwax.sources.config` | Define HTTP, cache, and per-source settings |
-| `deadwax.sources.lookup` | Build the adapters and look a query up |
+| `deadwax.sources.config` | Define the lookup configuration: HTTP, cache, and each source's settings with its defaults |
+| `deadwax.sources.lookup` | Describe the sources and look a query up |
+| `deadwax.sources.registry` | List the adapters in resolver order and build them |
 | `deadwax.sources.services` | Service catalogue of hosts and URL rules; parse record page URLs into queries |
 | `deadwax.sources.adapters.musicbrainz.adapter` | Find recordings and release groups in MusicBrainz |
 | `deadwax.sources.adapters.musicbrainz.parse` | Turn MusicBrainz responses into identity and facts |

@@ -20,7 +20,7 @@ from deadwax.core import (
     TextKind,
     merge,
 )
-from deadwax.sources import SourcesConfig, parse_query
+from deadwax.sources import LookupConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.soundohm import SoundohmAdapter
 
@@ -68,8 +68,8 @@ def make(
             return httpx.Response(200, content=(PAGES / SERVED[url]).read_bytes())
         return httpx.Response(404)
 
-    config = SourcesConfig.model_validate(
-        {"soundohm": {"rate": 1000}, "http": {"retries": 0, "escalation": []}},
+    config = LookupConfig.model_validate(
+        {"sources": {"soundohm": {"rate": 1000}}, "http": {"retries": 0, "escalation": []}},
     )
     return SoundohmAdapter(config, HttpResources(transport=httpx.MockTransport(handler))), seen
 

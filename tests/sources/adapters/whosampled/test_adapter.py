@@ -4,7 +4,8 @@ import httpx
 import pytest
 
 from deadwax import EntityKind, ErrorKind, Query, RelationKind
-from deadwax.sources.config import Escalation, SourcesConfig, SourceSettings
+from deadwax.sources import PerSourceSettings, WhoSampledSettings
+from deadwax.sources.config import Escalation, LookupConfig
 from deadwax.sources.lookup import lookup
 
 FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "whosampled"
@@ -14,7 +15,11 @@ FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "whosampled"
 async def test_real_record_page_extracts_connections_and_sample_offsets() -> None:
     page = (FIXTURES / "whosampled.html").read_bytes()
     sample = (FIXTURES / "sample.html").read_bytes()
-    config = SourcesConfig(whosampled=SourceSettings(html_transports=(Escalation.HTTPX,)))
+    config = LookupConfig(
+        sources=PerSourceSettings(
+            whosampled=WhoSampledSettings(html_transports=(Escalation.HTTPX,)),
+        ),
+    )
 
     def respond(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, content=sample if "/sample/" in request.url.path else page)
@@ -43,7 +48,11 @@ async def test_real_record_page_extracts_connections_and_sample_offsets() -> Non
 
 @pytest.mark.asyncio
 async def test_missing_record_is_reported() -> None:
-    config = SourcesConfig(whosampled=SourceSettings(html_transports=(Escalation.HTTPX,)))
+    config = LookupConfig(
+        sources=PerSourceSettings(
+            whosampled=WhoSampledSettings(html_transports=(Escalation.HTTPX,)),
+        ),
+    )
     dossier = await lookup(
         Query(kind=EntityKind.TRACK, artist="Daft Punk", title="One More Time"),
         config,
@@ -55,7 +64,11 @@ async def test_missing_record_is_reported() -> None:
 
 @pytest.mark.asyncio
 async def test_redirect_to_the_artist_page_is_not_found() -> None:
-    config = SourcesConfig(whosampled=SourceSettings(html_transports=(Escalation.HTTPX,)))
+    config = LookupConfig(
+        sources=PerSourceSettings(
+            whosampled=WhoSampledSettings(html_transports=(Escalation.HTTPX,)),
+        ),
+    )
 
     def respond(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/Radiohead/":
@@ -76,7 +89,11 @@ async def test_redirect_to_the_artist_page_is_not_found() -> None:
 
 @pytest.mark.asyncio
 async def test_blocked_page_is_reported() -> None:
-    config = SourcesConfig(whosampled=SourceSettings(html_transports=(Escalation.HTTPX,)))
+    config = LookupConfig(
+        sources=PerSourceSettings(
+            whosampled=WhoSampledSettings(html_transports=(Escalation.HTTPX,)),
+        ),
+    )
     dossier = await lookup(
         Query(kind=EntityKind.TRACK, artist="Daft Punk", title="One More Time"),
         config,
@@ -95,7 +112,11 @@ async def test_blocked_page_is_reported() -> None:
 @pytest.mark.asyncio
 async def test_different_version_adds_no_facts() -> None:
     page = (FIXTURES / "whosampled.html").read_bytes()
-    config = SourcesConfig(whosampled=SourceSettings(html_transports=(Escalation.HTTPX,)))
+    config = LookupConfig(
+        sources=PerSourceSettings(
+            whosampled=WhoSampledSettings(html_transports=(Escalation.HTTPX,)),
+        ),
+    )
     dossier = await lookup(
         Query(kind=EntityKind.TRACK, artist="Daft Punk", title="One More Time (Extended Mix)"),
         config,
@@ -110,7 +131,11 @@ async def test_different_version_adds_no_facts() -> None:
 async def test_direct_record_url_needs_no_search() -> None:
     page = (FIXTURES / "whosampled.html").read_bytes()
     sample = (FIXTURES / "sample.html").read_bytes()
-    config = SourcesConfig(whosampled=SourceSettings(html_transports=(Escalation.HTTPX,)))
+    config = LookupConfig(
+        sources=PerSourceSettings(
+            whosampled=WhoSampledSettings(html_transports=(Escalation.HTTPX,)),
+        ),
+    )
     dossier = await lookup(
         Query(url="https://www.whosampled.com/Daft-Punk/One-More-Time/"),
         config,

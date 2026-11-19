@@ -40,17 +40,17 @@ class LastfmAdapter(HttpAdapter):
     capabilities = frozenset(
         {Capability.IDENTITY, Capability.TAGS, Capability.TEXTS, Capability.RELATIONS},
     )
-    requires = (Requirement(setting="lastfm.api_key", purpose="every lookup"),)
+    requires = (Requirement(setting="sources.lastfm.api_key", purpose="every lookup"),)
     secret_params = frozenset({"api_key"})
 
     @property
     def _key(self) -> str | None:
-        api_key = self.config.lastfm.api_key
+        api_key = self.config.sources.lastfm.api_key
         return api_key.get_secret_value() if api_key is not None else None
 
     def missing_credential(self) -> str | None:
         """Every Last.fm API call needs a key."""
-        return None if self._key else "needs lastfm.api_key"
+        return None if self._key else "needs sources.lastfm.api_key"
 
     async def _call[M: models.ApiModel](self, model: type[M], method: str, **params: str) -> M:
         query = {"method": method, **params, "api_key": self._key or "", "format": "json"}

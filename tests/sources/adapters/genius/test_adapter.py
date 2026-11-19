@@ -5,7 +5,7 @@ import pytest
 from pydantic import SecretStr
 
 from deadwax.core import EntityKind, LookupContext, RelationKind, TextKind
-from deadwax.sources import GeniusSettings, SourcesConfig, parse_query
+from deadwax.sources import GeniusSettings, LookupConfig, PerSourceSettings, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.genius import GeniusAdapter
 from deadwax.sources.adapters.genius.parse import lyrics
@@ -58,7 +58,9 @@ def response(request: httpx.Request) -> httpx.Response:
 
 @pytest.mark.asyncio
 async def test_song_facts_and_lyrics() -> None:
-    config = SourcesConfig(genius=GeniusSettings(token=SecretStr("test-token")))
+    config = LookupConfig(
+        sources=PerSourceSettings(genius=GeniusSettings(token=SecretStr("test-token"))),
+    )
     adapter = GeniusAdapter(config, HttpResources(transport=httpx.MockTransport(response)))
     query = parse_query("Example Artist - Example Song", kind=EntityKind.TRACK)
     try:
@@ -90,7 +92,9 @@ async def test_missing_song() -> None:
     def empty(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"response": {"hits": []}})
 
-    config = SourcesConfig(genius=GeniusSettings(token=SecretStr("test-token")))
+    config = LookupConfig(
+        sources=PerSourceSettings(genius=GeniusSettings(token=SecretStr("test-token"))),
+    )
     adapter = GeniusAdapter(config, HttpResources(transport=httpx.MockTransport(empty)))
     query = parse_query("Example Artist - Example Song", kind=EntityKind.TRACK)
     try:
@@ -107,7 +111,9 @@ async def test_blocked_page_keeps_api_facts() -> None:
             return httpx.Response(403, text="Just a moment...")
         return response(request)
 
-    config = SourcesConfig(genius=GeniusSettings(token=SecretStr("test-token")))
+    config = LookupConfig(
+        sources=PerSourceSettings(genius=GeniusSettings(token=SecretStr("test-token"))),
+    )
     adapter = GeniusAdapter(config, HttpResources(transport=httpx.MockTransport(blocked)))
     query = parse_query("Example Artist - Example Song", kind=EntityKind.TRACK)
     try:

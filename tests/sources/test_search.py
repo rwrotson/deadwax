@@ -21,7 +21,7 @@ from deadwax.core import (
     VersionInfo,
     VersionKind,
 )
-from deadwax.sources import SourcesConfig, SourceSettings, parse_query
+from deadwax.sources import LookupConfig, SourceSettings, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources._search import SearchHit, SearchPageAdapter, pick_hit, search_key
 
@@ -61,7 +61,7 @@ class FakeShop(SearchPageAdapter):
         return Partial(source=self.name, candidate=candidate)
 
 
-def shop(config: SourcesConfig, pages: dict[str, str], requested: list[str]) -> FakeShop:
+def shop(config: LookupConfig, pages: dict[str, str], requested: list[str]) -> FakeShop:
     def handler(request: httpx.Request) -> httpx.Response:
         url = str(request.url)
         requested.append(url)
@@ -114,7 +114,7 @@ def test_search_key_of_a_url_query_comes_from_earlier_passes() -> None:
 
 @pytest.mark.asyncio
 async def test_search_page_adapter_searches_picks_and_reads_the_page(
-    config: SourcesConfig,
+    config: LookupConfig,
 ) -> None:
     requested: list[str] = []
     pages = {
@@ -132,7 +132,7 @@ async def test_search_page_adapter_searches_picks_and_reads_the_page(
 
 @pytest.mark.asyncio
 async def test_search_page_adapter_reads_a_resolved_url_without_searching(
-    config: SourcesConfig,
+    config: LookupConfig,
 ) -> None:
     requested: list[str] = []
     url = "https://burial.bandcamp.com/track/archangel"
@@ -149,7 +149,7 @@ async def test_search_page_adapter_reads_a_resolved_url_without_searching(
 
 @pytest.mark.asyncio
 async def test_search_page_adapter_reads_a_page_found_by_earlier_passes(
-    config: SourcesConfig,
+    config: LookupConfig,
 ) -> None:
     requested: list[str] = []
     url = "https://burial.bandcamp.com/track/archangel"
@@ -172,7 +172,7 @@ async def test_search_page_adapter_reads_a_page_found_by_earlier_passes(
     ],
 )
 async def test_search_page_adapter_not_found(
-    config: SourcesConfig,
+    config: LookupConfig,
     query: Query,
     results: str,
     message: str,

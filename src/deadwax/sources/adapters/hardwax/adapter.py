@@ -4,7 +4,7 @@ from deadwax.core import Capability, Partial, Pass, RecordKey, SourceGroup
 from deadwax.sources._http import HttpClient, HttpResources, Profile
 from deadwax.sources._search import SearchHit, SearchPageAdapter
 from deadwax.sources.adapters.hardwax import parse as p
-from deadwax.sources.config import SourcesConfig
+from deadwax.sources.config import LookupConfig
 
 
 class HardWaxAdapter(SearchPageAdapter):
@@ -25,7 +25,7 @@ class HardWaxAdapter(SearchPageAdapter):
     )
     service = p.SERVICE
 
-    def __init__(self, config: SourcesConfig, resources: HttpResources) -> None:
+    def __init__(self, config: LookupConfig, resources: HttpResources) -> None:
         super().__init__(config, resources)
         self._feed_client: HttpClient | None = None
 
@@ -35,7 +35,7 @@ class HardWaxAdapter(SearchPageAdapter):
         if self._feed_client is None:
             self._feed_client = HttpClient(
                 self.client_spec(Profile.API),
-                self.config,
+                self.client_settings,
                 self.resources,
             )
         return self._feed_client

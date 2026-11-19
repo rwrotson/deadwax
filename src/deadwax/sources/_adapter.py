@@ -14,7 +14,7 @@ from deadwax.core import (
     SourceStatus,
 )
 from deadwax.sources._http import ClientSpec, HttpClient, HttpResources, Profile
-from deadwax.sources.config import SourcesConfig, SourceSettings
+from deadwax.sources.config import ClientSettings, LookupConfig, SourceSettings
 from deadwax.sources.services import service_of
 
 
@@ -37,7 +37,7 @@ class HttpAdapter(ABC):
     secret_params: frozenset[str] = frozenset()
     required_marker: bytes | None = None
 
-    def __init__(self, config: SourcesConfig, resources: HttpResources) -> None:
+    def __init__(self, config: LookupConfig, resources: HttpResources) -> None:
         self.config = config
         self.resources = resources
         self._client: HttpClient | None = None
@@ -45,8 +45,12 @@ class HttpAdapter(ABC):
     @property
     def settings(self) -> SourceSettings:
         """Settings of this source."""
-        settings: SourceSettings = getattr(self.config, self.name)
-        return settings
+        return self.config.sources.of(self.name)
+
+    @property
+    def client_settings(self) -> ClientSettings:
+        """HTTP settings of this source's clients."""
+        return self.config.client_settings(self.name)
 
     @property
     def _reads_html(self) -> bool:
@@ -55,18 +59,19 @@ class HttpAdapter(ABC):
     def access(self) -> SourceAccess:
         """Describe the configured routes to this source in their attempt order."""
         html = self._reads_html
+        settings = self.client_settings
         return SourceAccess(
             api=Profile.API in (self.profile, *self.additional_profiles),
             html_transports=(
                 [
                     "patchright" if step.value == "browser" else step.value
-                    for step in self.config.html_transports(self.name)
+                    for step in settings.html_transports
                 ]
                 if html
                 else []
             ),
-            browser_headless=self.config.browser_headless(self.name) if html else None,
-            headed_fallback=html and self.config.http.headed_fallback,
+            browser_headless=settings.http.browser_headless if html else None,
+            headed_fallback=html and settings.http.headed_fallback,
         )
 
     def missing_credential(self) -> str | None:
@@ -77,7 +82,7 @@ class HttpAdapter(ABC):
         """Report whether the adapter is enabled and has what it needs."""
         if not self.settings.enabled:
             return SourceStatus(source=self.name, state=SourceState.DISABLED)
-        if self._reads_html and not self.config.html_transports(self.name):
+        if self._reads_html and not self.client_settings.html_transports:
             return SourceStatus(
                 source=self.name,
                 state=SourceState.DISABLED,
@@ -118,7 +123,11 @@ class HttpAdapter(ABC):
     def client(self) -> HttpClient:
         """HTTP client of this adapter, created on first use."""
         if self._client is None:
-            self._client = HttpClient(self.client_spec(self.profile), self.config, self.resources)
+            self._client = HttpClient(
+                self.client_spec(self.profile),
+                self.client_settings,
+                self.resources,
+            )
         return self._client
 
     @abstractmethod

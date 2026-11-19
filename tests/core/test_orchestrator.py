@@ -275,7 +275,7 @@ async def test_unready_adapters_are_skipped_and_disabled_ones_are_silent() -> No
     missing_key = FakeAdapter(
         "lastfm",
         state=SourceState.MISSING_CREDENTIAL,
-        detail="needs lastfm.api_key",
+        detail="needs sources.lastfm.api_key",
     )
     missing_extra = FakeAdapter("bandcamp", state=SourceState.MISSING_EXTRA)
     disabled = FakeAdapter("discogs", state=SourceState.DISABLED)
@@ -283,7 +283,7 @@ async def test_unready_adapters_are_skipped_and_disabled_ones_are_silent() -> No
     dossier = await run(TRACK, [missing_key, missing_extra, disabled], now=lambda: NOW)
 
     assert [(e.source, e.kind, e.reason) for e in dossier.errors] == [
-        ("lastfm", ErrorKind.SKIPPED, "needs lastfm.api_key"),
+        ("lastfm", ErrorKind.SKIPPED, "needs sources.lastfm.api_key"),
         ("bandcamp", ErrorKind.SKIPPED, "missing_extra"),
     ]
     assert [missing_key.calls, missing_extra.calls, disabled.calls] == [[], [], []]

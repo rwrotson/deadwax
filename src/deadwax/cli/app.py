@@ -14,10 +14,8 @@ from deadwax import (
     ConfigurationError,
     Dossier,
     EntityKind,
-    Escalation,
     InvalidQueryError,
-    SourcesConfig,
-    SourceSettings,
+    PerSourceSettings,
     describe_sources,
     lookup,
     parse_query,
@@ -158,40 +156,15 @@ def _names(value: str | None) -> list[str] | None:
     return [name.strip() for name in value.split(",") if name.strip()] if value else None
 
 
-def _html_transports(value: str) -> tuple[Escalation, ...]:
-    """Parse a complete, ordered list of HTML transports from a command option."""
-    names = [name.strip().lower() for name in value.split(",")]
+def _html_transports(value: str) -> tuple[str, ...]:
+    """Split a complete, ordered list of HTML transports from a command option.
+
+    The settings check the names, read 'patchright' as 'browser', and reject repeats.
+    """
+    names = tuple(name.strip().lower() for name in value.split(","))
     if not names or any(not name for name in names):
         raise _usage_error("--html-transport needs comma-separated transport names")
-    try:
-        steps = tuple(
-            Escalation.BROWSER if (step := Escalation(name)) is Escalation.PATCHRIGHT else step
-            for name in names
-        )
-    except ValueError as error:
-        raise _usage_error(f"unknown HTML transport: {error}") from error
-    if len(steps) != len(set(steps)):
-        raise _usage_error("--html-transport contains a duplicate transport")
-    return steps
-
-
-def _source_browser_overrides(
-    headless: bool,
-    headed: bool,
-    steps: tuple[Escalation, ...] | None,
-) -> dict[str, object]:
-    """Build source overrides for one lookup."""
-    overrides: dict[str, object] = {}
-    for name, field in SourcesConfig.model_fields.items():
-        section = field.annotation
-        if isinstance(section, type) and issubclass(section, SourceSettings):
-            source_overrides: dict[str, object] = {}
-            if headless or headed:
-                source_overrides["browser_headless"] = headless
-            if steps is not None:
-                source_overrides["html_transports"] = steps
-            overrides[name] = source_overrides
-    return overrides
+    return names
 
 
 def _browser_overrides(
@@ -204,13 +177,15 @@ def _browser_overrides(
         raise _usage_error("--headless and --headed cannot be used together")
     overrides: dict[str, object] = {}
     http: dict[str, object] = {}
+    source: dict[str, object] = {}
     if headless or headed:
-        http["browser_headless"] = headless
-    steps = _html_transports(html_transport) if html_transport is not None else None
-    if steps is not None:
-        http["escalation"] = tuple(step for step in steps if step is not Escalation.HTTPX)
-    if headless or headed or steps is not None:
-        overrides.update(_source_browser_overrides(headless, headed, steps))
+        http["browser_headless"] = source["browser_headless"] = headless
+    if html_transport is not None:
+        steps = _html_transports(html_transport)
+        http["escalation"] = tuple(step for step in steps if step != "httpx")
+        source["html_transports"] = steps
+    if source:
+        overrides["sources"] = {name: dict(source) for name in PerSourceSettings.model_fields}
     if http:
         overrides["http"] = http
     return overrides
@@ -288,7 +263,7 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
             dossier: Dossier = asyncio.run(
                 lookup(
                     parsed,
-                    settings.sources_config(),
+                    settings.lookup_config(),
                     include=_names(sources),
                     exclude=_names(exclude) or (),
                 ),
@@ -313,7 +288,7 @@ def sources_command(
     settings = _settings(config, verbose)
     with _journal(ctx, settings, "sources"):
         try:
-            infos = describe_sources(settings.sources_config())
+            infos = describe_sources(settings.lookup_config())
         except ConfigurationError as error:
             raise _usage_error(str(error)) from error
         print_sources(infos, output)

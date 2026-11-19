@@ -31,10 +31,10 @@ Every `lookup` and `sources` call is journaled in the user log directory: one JS
 ```python
 import asyncio
 
-from deadwax import EntityKind, SourcesConfig, lookup, parse_query
+from deadwax import EntityKind, LookupConfig, lookup, parse_query
 
 dossier = asyncio.run(
-    lookup(parse_query("Burial - Archangel", kind=EntityKind.TRACK), SourcesConfig())
+    lookup(parse_query("Burial - Archangel", kind=EntityKind.TRACK), LookupConfig())
 )
 print(dossier.model_dump_json(indent=2))
 ```
@@ -67,17 +67,17 @@ Every source is described in detail in [the sources guide](https://rwrotson.gith
 
 | Source | Status | Contributes | Caveats |
 |--------|--------|-------------|---------|
-| Discogs | implemented; search needs `discogs.token` | genres and styles, credits with roles and tracks, notes, labels with catalog numbers, barcodes, other versions of the master, compilations, the label's other releases, members, groups, aliases, user reviews; resolves Discogs URLs | without a token reads only the IDs MusicBrainz gives (25 requests a minute); sends httpx's User-Agent because Discogs refuses deadwax's; review pages may be `blocked` |
+| Discogs | implemented; search needs `sources.discogs.token` | genres and styles, credits with roles and tracks, notes, labels with catalog numbers, barcodes, other versions of the master, compilations, the label's other releases, members, groups, aliases, user reviews; resolves Discogs URLs | without a token reads only the IDs MusicBrainz gives (25 requests a minute); sends httpx's User-Agent because Discogs refuses deadwax's; review pages may be `blocked` |
 | Bandcamp | implemented | tags, About and Credits texts, credits, fan comments, recommendations as similar releases, label, the label's other releases; resolves `bandcamp.com` album and track pages | scraped pages; a track found on another artist's album contributes only its identity, links and own notes |
-| Last.fm | implemented, needs `lastfm.api_key` | weighted tags (artist-wide ones marked `artist`), wiki texts, similar tracks or artists | `skipped` without the key |
+| Last.fm | implemented, needs `sources.lastfm.api_key` | weighted tags (artist-wide ones marked `artist`), wiki texts, similar tracks or artists | `skipped` without the key |
 | Wikipedia/Wikidata | implemented | genres, producers, composers, lyricists, labels, date, the album a song is on, review scores, lead and music sections of the English and original-language articles | section headings recognised in en, ru, ja, de, fr; other languages give the lead |
 | ListenBrainz | implemented | listen and listener counts, similar recordings and artists, CritiqueBrainz reviews | needs MusicBrainz IDs from the identity pass |
-| SecondHandSongs | implemented | first release date, writers, covers, the original of a cover, adaptations | songs only; about 10–20 requests a minute without `secondhandsongs.api_key` |
+| SecondHandSongs | implemented | first release date, writers, covers, the original of a cover, adaptations | songs only; about 10–20 requests a minute without `sources.secondhandsongs.api_key` |
 | KEXP | implemented | the latest 25 plays as broadcasts with programs and hosts, host comments | |
 | NTS | implemented, opt-in | episode broadcasts, neighbouring tracks, episode genres marked as context | searches the current JSON track index; at most 10 matching episodes |
 | WFMU | implemented, opt-in | playlist broadcasts and DJ comments | searches the artist browser because the basic and advanced searches are unavailable; at most 10 recent matching playlists |
-| Spotify | implemented, needs `spotify.client_id` and `spotify.client_secret` | links, ISRC or barcode, ℗ and © lines; label, popularity, and previews when Spotify gives them; resolves Spotify URLs | `skipped` without credentials; development-mode apps get no label, popularity, or previews; no audio features |
-| YouTube | implemented, needs `youtube.api_key` | links to uploads of the record only, official channels first | about 100 lookups a day on the free quota |
+| Spotify | implemented, needs `sources.spotify.client_id` and `sources.spotify.client_secret` | links, ISRC or barcode, ℗ and © lines; label, popularity, and previews when Spotify gives them; resolves Spotify URLs | `skipped` without credentials; development-mode apps get no label, popularity, or previews; no audio features |
+| YouTube | implemented, needs `sources.youtube.api_key` | links to uploads of the record only, official channels first | about 100 lookups a day on the free quota |
 | Beatport | implemented, opt-in | tempo, key, genre and sub-genre, mix name as the version, ISRC, label and catalog number, remixers, DJ charts that list the track; resolves Beatport URLs | Cloudflare: needs the `stealth` or `browser` extra, else `blocked` |
 | Hard Wax | implemented, opt-in | one-line shop text, store section as genre, label and catalog number, the release a track is on; resolves Hard Wax product pages | searched through the shop's JSON feed |
 | Soundohm | implemented, opt-in | full shop text (often the label's press release), genre, label, catalog number, year; resolves Soundohm product pages | albums only: product pages list no tracks |
@@ -87,8 +87,8 @@ Every source is described in detail in [the sources guide](https://rwrotson.gith
 | Phonica | implemented, opt-in | shop description, genres, release details | Patchright headless; search title and artist separately through a browser session |
 | Boomkat | implemented, opt-in | editorial description and genres | Patchright with a visible window; headless meets Cloudflare |
 | Norman Records | implemented, opt-in | release identity and genres from a product URL | Nodriver with a visible window; text search is unavailable |
-| SoundCloud | implemented, opt-in, needs `soundcloud.client_id` | uploader descriptions, genre and tags, plays, likes and reposts, notable reposting accounts, uploads absent elsewhere (edits, bootlegs) as other versions; resolves SoundCloud URLs | no new API apps: the web client's ID changes now and then and must be replaced by hand |
-| Genius | implemented, default, needs `genius.token` | song description, annotations, credits, song relations, full lyrics when available | API facts remain when the HTML page is blocked |
+| SoundCloud | implemented, opt-in, needs `sources.soundcloud.client_id` | uploader descriptions, genre and tags, plays, likes and reposts, notable reposting accounts, uploads absent elsewhere (edits, bootlegs) as other versions; resolves SoundCloud URLs | no new API apps: the web client's ID changes now and then and must be replaced by hand |
+| Genius | implemented, default, needs `sources.genius.token` | song description, annotations, credits, song relations, full lyrics when available | API facts remain when the HTML page is blocked |
 | AllMusic | experimental, opt-in | review, rating, critic, styles, moods, themes, credits; similar albums when available | The *OK Computer* search and album page were live-verified through a persistent Patchright profile; direct requests may be blocked |
 | Rate Your Music | experimental, opt-in | primary and secondary genres, descriptors, user rating and vote count, chart positions, up to ten visible full user reviews | requires express permission for automated access and the `browser` extra; live page parsing is unverified |
 | WhoSampled | implemented, opt-in | samples, covers and remixes; sample element and positions where shown | direct recording pages through the headed `browser` extra; the site's search path is excluded by robots.txt |
@@ -112,7 +112,7 @@ Never used: Juno Download (shut down), Every Noise at Once, direct Metacritic sc
 
 ## Configuration
 
-The library takes settings as arguments and never reads the environment. The `deadwax` command loads `deadwax.cli.settings.Settings` from flags, `DEADWAX_*` environment variables, `.env`, and a TOML file (`--config`, `DEADWAX_CONFIG_FILE`, or `config.toml` in the user configuration directory), in that order of precedence; sections are nested with `__` (for example `DEADWAX_LASTFM__API_KEY=…`) or TOML tables (`[lastfm]`). The command caches responses in the user cache directory. Requests use the proxy from the environment (`HTTPS_PROXY`, `NO_PROXY`); `DEADWAX_HTTP__PROXY` or `DEADWAX_<SOURCE>__PROXY` set `direct` or another proxy, for example `DEADWAX_DEEZER__PROXY=direct` when a site refuses the proxy's address. For HTML requests, each source has an ordered `html_transports` list in code, overridable by a TOML array or `DEADWAX_<SOURCE>__HTML_TRANSPORTS` JSON array. `DEADWAX_HTTP__BROWSER_HEADLESS=false` shows the browser globally; `DEADWAX_<SOURCE>__BROWSER_HEADLESS` sets a source's mode. `DEADWAX_HTTP__PATCHRIGHT_CHANNEL=chrome` selects installed Chrome with a temporary profile. `DEADWAX_HTTP__PATCHRIGHT_PROFILE_DIR` or `DEADWAX_HTTP__NODRIVER_PROFILE_DIR` opts into a dedicated persistent profile for one transport; never use your regular Chrome profile. `DEADWAX_HTTP__BROWSER_CHALLENGE_WAIT` controls how long browser transports wait for a challenge or required page state. A lookup shares one browser per transport among its sources. A challenged headless page is retried once in a visible browser, which then serves the rest of the lookup. In a visible browser, a challenged page is brought to the front, one at a time, and waits `DEADWAX_HTTP__HEADED_CHALLENGE_WAIT` seconds (default 60) for a manual solve. A source with its own proxy route gets a sibling persistent profile such as `<dir>-direct`. `DEADWAX_HTTP__HEADED_FALLBACK=false` turns this off. On one lookup, `--headless` or `--headed` overrides all source modes, and `--html-transport browser,nodriver` sets the exact HTML transport order without changing saved settings. See `.env.example` and the generated configuration page in the documentation.
+The library takes settings as arguments and never reads the environment. The `deadwax` command loads `deadwax.cli.settings.Settings` from flags, `DEADWAX_*` environment variables, `.env`, and a TOML file (`--config`, `DEADWAX_CONFIG_FILE`, or `config.toml` in the user configuration directory), in that order of precedence; sections are nested with `__` (for example `DEADWAX_SOURCES__LASTFM__API_KEY=…`) or TOML tables (`[sources.lastfm]`). The command caches responses in the user cache directory. Requests use the proxy from the environment (`HTTPS_PROXY`, `NO_PROXY`); `DEADWAX_HTTP__PROXY` or `DEADWAX_SOURCES__<SOURCE>__PROXY` set `direct` or another proxy, for example `DEADWAX_SOURCES__DEEZER__PROXY=direct` when a site refuses the proxy's address. For HTML requests, each source has an ordered `html_transports` list in code, overridable by a TOML array or `DEADWAX_SOURCES__<SOURCE>__HTML_TRANSPORTS` JSON array. `DEADWAX_HTTP__BROWSER_HEADLESS=false` shows the browser globally; `DEADWAX_SOURCES__<SOURCE>__BROWSER_HEADLESS` sets a source's mode. `DEADWAX_HTTP__PATCHRIGHT_CHANNEL=chrome` selects installed Chrome with a temporary profile. `DEADWAX_HTTP__PATCHRIGHT_PROFILE_DIR` or `DEADWAX_HTTP__NODRIVER_PROFILE_DIR` opts into a dedicated persistent profile for one transport; never use your regular Chrome profile. `DEADWAX_HTTP__BROWSER_CHALLENGE_WAIT` controls how long browser transports wait for a challenge or required page state. A lookup shares one browser per transport among its sources. A challenged headless page is retried once in a visible browser, which then serves the rest of the lookup. In a visible browser, a challenged page is brought to the front, one at a time, and waits `DEADWAX_HTTP__HEADED_CHALLENGE_WAIT` seconds (default 60) for a manual solve. A source with its own proxy route gets a sibling persistent profile such as `<dir>-direct`. `DEADWAX_HTTP__HEADED_FALLBACK=false` turns this off. On one lookup, `--headless` or `--headed` overrides all source modes, and `--html-transport browser,nodriver` sets the exact HTML transport order without changing saved settings. See `.env.example` and the generated configuration page in the documentation.
 
 ### Credentials
 
@@ -120,27 +120,27 @@ Sources without their credential are `skipped` (or, where noted, work with less)
 
 | Setting | Source | Needed |
 |---------|--------|--------|
-| `DEADWAX_DISCOGS__TOKEN` | Discogs | for search; without it only IDs from MusicBrainz are read |
-| `DEADWAX_LASTFM__API_KEY` | Last.fm | for every lookup |
-| `DEADWAX_SECONDHANDSONGS__API_KEY` | SecondHandSongs | optional; raises the request limit |
-| `DEADWAX_SPOTIFY__CLIENT_ID`, `DEADWAX_SPOTIFY__CLIENT_SECRET` | Spotify | for every lookup |
-| `DEADWAX_YOUTUBE__API_KEY` | YouTube | for every lookup |
-| `DEADWAX_SOUNDCLOUD__CLIENT_ID` | SoundCloud | for every lookup |
-| `DEADWAX_GENIUS__TOKEN` | Genius | for every lookup |
+| `DEADWAX_SOURCES__DISCOGS__TOKEN` | Discogs | for search; without it only IDs from MusicBrainz are read |
+| `DEADWAX_SOURCES__LASTFM__API_KEY` | Last.fm | for every lookup |
+| `DEADWAX_SOURCES__SECONDHANDSONGS__API_KEY` | SecondHandSongs | optional; raises the request limit |
+| `DEADWAX_SOURCES__SPOTIFY__CLIENT_ID`, `DEADWAX_SOURCES__SPOTIFY__CLIENT_SECRET` | Spotify | for every lookup |
+| `DEADWAX_SOURCES__YOUTUBE__API_KEY` | YouTube | for every lookup |
+| `DEADWAX_SOURCES__SOUNDCLOUD__CLIENT_ID` | SoundCloud | for every lookup |
+| `DEADWAX_SOURCES__GENIUS__TOKEN` | Genius | for every lookup |
 
-**Discogs token.** Sign in at discogs.com, open [Settings → Developers](https://www.discogs.com/settings/developers), and press **Generate new token**. Copy the personal access token into `DEADWAX_DISCOGS__TOKEN`.
+**Discogs token.** Sign in at discogs.com, open [Settings → Developers](https://www.discogs.com/settings/developers), and press **Generate new token**. Copy the personal access token into `DEADWAX_SOURCES__DISCOGS__TOKEN`.
 
-**Last.fm API key.** Sign in at last.fm and fill in [Create API account](https://www.last.fm/api/account/create) (application name and description; the callback URL may stay empty). Copy the **API key** into `DEADWAX_LASTFM__API_KEY`; the shared secret is not used.
+**Last.fm API key.** Sign in at last.fm and fill in [Create API account](https://www.last.fm/api/account/create) (application name and description; the callback URL may stay empty). Copy the **API key** into `DEADWAX_SOURCES__LASTFM__API_KEY`; the shared secret is not used.
 
-**SecondHandSongs API key.** Optional. Request one as described on the [SecondHandSongs API page](https://secondhandsongs.com/page/API) and put it into `DEADWAX_SECONDHANDSONGS__API_KEY`.
+**SecondHandSongs API key.** Optional. Request one as described on the [SecondHandSongs API page](https://secondhandsongs.com/page/API) and put it into `DEADWAX_SOURCES__SECONDHANDSONGS__API_KEY`.
 
-**Spotify client ID and secret.** Sign in at the [Spotify developer dashboard](https://developer.spotify.com/dashboard) and press **Create app**: any name and description, any redirect URI (for example `http://127.0.0.1:8888/callback`), and **Web API** checked. In the app's **Settings**, copy **Client ID** and **Client secret** into `DEADWAX_SPOTIFY__CLIENT_ID` and `DEADWAX_SPOTIFY__CLIENT_SECRET`.
+**Spotify client ID and secret.** Sign in at the [Spotify developer dashboard](https://developer.spotify.com/dashboard) and press **Create app**: any name and description, any redirect URI (for example `http://127.0.0.1:8888/callback`), and **Web API** checked. In the app's **Settings**, copy **Client ID** and **Client secret** into `DEADWAX_SOURCES__SPOTIFY__CLIENT_ID` and `DEADWAX_SOURCES__SPOTIFY__CLIENT_SECRET`.
 
-**YouTube Data API key.** In the [Google Cloud console](https://console.cloud.google.com/), create a project, open **APIs & Services → Library**, and enable **YouTube Data API v3**. Then **APIs & Services → Credentials → Create credentials → API key**; restricting the key to YouTube Data API v3 is advised. Put it into `DEADWAX_YOUTUBE__API_KEY`. The free quota of 10,000 units a day allows about 100 lookups (100 units a search).
+**YouTube Data API key.** In the [Google Cloud console](https://console.cloud.google.com/), create a project, open **APIs & Services → Library**, and enable **YouTube Data API v3**. Then **APIs & Services → Credentials → Create credentials → API key**; restricting the key to YouTube Data API v3 is advised. Put it into `DEADWAX_SOURCES__YOUTUBE__API_KEY`. The free quota of 10,000 units a day allows about 100 lookups (100 units a search).
 
-**SoundCloud client ID.** SoundCloud registers no new API apps. The client ID of an app registered earlier (soundcloud.com/you/apps) works and does not change. Otherwise copy the ID of SoundCloud's web client by hand: open soundcloud.com with the browser's developer tools on the **Network** tab, filter for `api-v2`, and copy the `client_id` parameter (32 characters) of any request to `api-v2.soundcloud.com` into `DEADWAX_SOUNDCLOUD__CLIENT_ID`. Using the web client's ID is unofficial, and SoundCloud changes it now and then: when deadwax reports "is soundcloud.client_id stale?", copy it again.
+**SoundCloud client ID.** SoundCloud registers no new API apps. The client ID of an app registered earlier (soundcloud.com/you/apps) works and does not change. Otherwise copy the ID of SoundCloud's web client by hand: open soundcloud.com with the browser's developer tools on the **Network** tab, filter for `api-v2`, and copy the `client_id` parameter (32 characters) of any request to `api-v2.soundcloud.com` into `DEADWAX_SOURCES__SOUNDCLOUD__CLIENT_ID`. Using the web client's ID is unofficial, and SoundCloud changes it now and then: when deadwax reports "is sources.soundcloud.client_id stale?", copy it again.
 
-**Genius token.** Sign in at [Genius API Clients](https://genius.com/api-clients), create an API client, open its details, and copy the client access token into `DEADWAX_GENIUS__TOKEN`.
+**Genius token.** Sign in at [Genius API Clients](https://genius.com/api-clients), create an API client, open its details, and copy the client access token into `DEADWAX_SOURCES__GENIUS__TOKEN`.
 
 ## Development
 

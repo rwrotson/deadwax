@@ -23,7 +23,7 @@ from deadwax.sources._http import HttpClient, HttpResources
 from deadwax.sources._search import pick_hit, search_key
 from deadwax.sources.adapters.spotify import models
 from deadwax.sources.adapters.spotify import parse as p
-from deadwax.sources.config import SourcesConfig
+from deadwax.sources.config import LookupConfig
 from deadwax.sources.services import recognize
 
 API = "https://api.spotify.com/v1/"
@@ -46,20 +46,20 @@ class SpotifyAdapter(HttpAdapter):
     service = "spotify"
     capabilities = frozenset({Capability.IDENTITY, Capability.LINKS, Capability.METRICS})
     requires = (
-        Requirement(setting="spotify.client_id", purpose="every lookup"),
-        Requirement(setting="spotify.client_secret", purpose="every lookup"),
+        Requirement(setting="sources.spotify.client_id", purpose="every lookup"),
+        Requirement(setting="sources.spotify.client_secret", purpose="every lookup"),
     )
 
-    def __init__(self, config: SourcesConfig, resources: HttpResources) -> None:
+    def __init__(self, config: LookupConfig, resources: HttpResources) -> None:
         super().__init__(config, resources)
         self._token: str | None = None
         self._token_client: HttpClient | None = None
 
     def missing_credential(self) -> str | None:
         """Every Web API call needs an app's client ID and secret."""
-        settings = self.config.spotify
+        settings = self.config.sources.spotify
         if settings.client_id is None or settings.client_secret is None:
-            return "needs spotify.client_id and spotify.client_secret"
+            return "needs sources.spotify.client_id and sources.spotify.client_secret"
         return None
 
     def resolves(self, query: Query) -> bool:
@@ -71,7 +71,11 @@ class SpotifyAdapter(HttpAdapter):
         """Client of the token endpoint; it shares the rate limits but not the response cache."""
         if self._token_client is None:
             resources = dataclasses.replace(self.resources, cache=None)
-            self._token_client = HttpClient(self.client_spec(self.profile), self.config, resources)
+            self._token_client = HttpClient(
+                self.client_spec(self.profile),
+                self.client_settings,
+                resources,
+            )
         return self._token_client
 
     async def aclose(self) -> None:
@@ -87,7 +91,7 @@ class SpotifyAdapter(HttpAdapter):
         A token lives an hour and the adapter one lookup, so it is not refreshed.
         """
         if self._token is None:
-            settings = self.config.spotify
+            settings = self.config.sources.spotify
             client_id = settings.client_id.get_secret_value() if settings.client_id else ""
             secret = settings.client_secret.get_secret_value() if settings.client_secret else ""
             basic = base64.b64encode(f"{client_id}:{secret}".encode()).decode()

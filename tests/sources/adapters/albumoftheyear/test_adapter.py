@@ -15,8 +15,9 @@ from deadwax.core import (
     NotFoundError,
     RecordKey,
 )
+from deadwax.sources import AlbumOfTheYearSettings, PerSourceSettings
 from deadwax.sources.adapters.albumoftheyear import AlbumOfTheYearAdapter
-from deadwax.sources.config import Escalation, SourcesConfig, SourceSettings
+from deadwax.sources.config import Escalation, LookupConfig
 from deadwax.sources.lookup import lookup
 
 AOTY_PAGES = Path(__file__).resolve().parents[3] / "fixtures" / "albumoftheyear" / "pages"
@@ -108,7 +109,11 @@ async def test_albumoftheyear_track_query_finds_its_single() -> None:
 
     dossier = await lookup(
         Query(kind=EntityKind.TRACK, artist="Radiohead", title="There There"),
-        SourcesConfig(albumoftheyear=SourceSettings(html_transports=(Escalation.HTTPX,))),
+        LookupConfig(
+            sources=PerSourceSettings(
+                albumoftheyear=AlbumOfTheYearSettings(html_transports=(Escalation.HTTPX,)),
+            ),
+        ),
         include=["albumoftheyear"],
         transport=httpx.MockTransport(respond),
     )

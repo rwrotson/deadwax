@@ -12,7 +12,7 @@ from deadwax.core import (
     Query,
     SourceError,
 )
-from deadwax.sources import SourcesConfig, parse_query
+from deadwax.sources import LookupConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.deezer import DeezerAdapter
 
@@ -31,8 +31,8 @@ def adapter(routes: dict[str, tuple[int, bytes]], seen: list[str] | None = None)
         status, body = routes.get(str(request.url), (404, b"missing"))
         return httpx.Response(status, content=body)
 
-    config = SourcesConfig.model_validate(
-        {"deezer": {"rate": 1000}, "http": {"retries": 0, "escalation": []}},
+    config = LookupConfig.model_validate(
+        {"sources": {"deezer": {"rate": 1000}}, "http": {"retries": 0, "escalation": []}},
     )
     return DeezerAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 

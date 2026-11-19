@@ -1,6 +1,6 @@
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated, Self
+from typing import Annotated, Any, Self
 from urllib.parse import urlsplit
 
 from pydantic import (
@@ -81,6 +81,25 @@ class Escalation(StrEnum):
     NODRIVER = "nodriver"
 
 
+def _normalize_transports(value: tuple[Escalation, ...]) -> tuple[Escalation, ...]:
+    """Read 'patchright' as 'browser' and reject repeated transports."""
+    steps = tuple(Escalation.BROWSER if step is Escalation.PATCHRIGHT else step for step in value)
+    if len(steps) != len(set(steps)):
+        raise ValueError("HTML transports must be distinct ('patchright' is 'browser')")
+    return steps
+
+
+# Ordered HTML transports; 'patchright' is another name of 'browser'.
+type Transports = Annotated[tuple[Escalation, ...], AfterValidator(_normalize_transports)]
+
+DEFAULT_HTML_TRANSPORTS: tuple[Escalation, ...] = (
+    Escalation.HTTPX,
+    Escalation.IMPERSONATE,
+    Escalation.BROWSER,
+    Escalation.NODRIVER,
+)
+
+
 class HttpSettings(_Model):
     """HTTP behaviour shared by all adapters."""
 
@@ -100,7 +119,7 @@ class HttpSettings(_Model):
         ge=0,
         description="Longest Retry-After wait, in seconds, before giving up",
     )
-    escalation: tuple[Escalation, ...] = Field(
+    escalation: Transports = Field(
         default=(Escalation.IMPERSONATE, Escalation.BROWSER, Escalation.NODRIVER),
         description="Additional HTML transports allowed globally; source order is preserved",
     )
@@ -198,19 +217,33 @@ class CacheSettings(_Model):
     )
 
 
+def _rate(default: float, note: str = "") -> Any:  # noqa: ANN401 -- a Pydantic field
+    return Field(default=default, gt=0, description=f"Requests per second{note}")
+
+
+def _transports(*default: Escalation) -> Any:  # noqa: ANN401 -- a Pydantic field
+    return Field(
+        default=default,
+        description="Ordered HTML transports, filtered by http.escalation",
+    )
+
+
+def _headless(default: bool | None = None) -> Any:  # noqa: ANN401 -- a Pydantic field
+    return Field(
+        default=default,
+        description="Browser mode of this source; unset uses http.browser_headless",
+    )
+
+
 class SourceSettings(_Model):
-    """Settings of one source."""
+    """Settings of one source; each source's subclass holds its defaults."""
 
     enabled: bool = Field(default=True, description="Use this source")
-    rate: float | None = Field(
-        default=None,
-        gt=0,
-        description="Requests per second; the source default when unset",
-    )
+    rate: float = _rate(1.0)
     ttl: float | None = Field(
         default=None,
         ge=0,
-        description="Cache lifetime in seconds; the cache default when unset",
+        description="Cache lifetime in seconds; cache.ttl when unset",
     )
     user_agent: str | None = Field(
         default=None,
@@ -220,43 +253,93 @@ class SourceSettings(_Model):
         default=None,
         description="Proxy of this source: 'direct' or an http(s):// URL; http.proxy when unset",
     )
-    html_transports: tuple[Escalation, ...] | None = Field(
-        default=None,
-        description="Ordered HTML transports; unset: the source's built-in order",
-    )
-    browser_headless: bool | None = Field(
-        default=None,
-        description="Browser mode for this source; unset uses the shared HTTP setting",
-    )
+    html_transports: Transports = _transports(*DEFAULT_HTML_TRANSPORTS)
+    browser_headless: bool | None = _headless()
+
+
+# Request rates follow each source's limits: MusicBrainz 1/s, iTunes Search about 20/min,
+# Deezer 50 per 5 s, Discogs 60/min with a token, SecondHandSongs 10-20/min without a key;
+# YouTube search costs 100 of 10,000 daily quota units; scraped pages are fetched slowly on
+# purpose.
+
+
+class MusicBrainzSettings(SourceSettings):
+    """Settings of the MusicBrainz source."""
+
+
+class ItunesSettings(SourceSettings):
+    """Settings of the iTunes Search source."""
+
+    rate: float = _rate(0.3)
+
+
+class DeezerSettings(SourceSettings):
+    """Settings of the Deezer source."""
+
+    rate: float = _rate(2.0)
+
+
+class OdesliSettings(SourceSettings):
+    """Settings of the Odesli (song.link) source."""
+
+    rate: float = _rate(0.5)
 
 
 class DiscogsSettings(SourceSettings):
     """Settings of the Discogs source."""
 
+    rate: float = _rate(1.0, "; without a token and unset, 25 a minute")
     token: SecretStr | None = Field(
         default=None,
         description="Personal access token; needed for search",
     )
 
 
+class BandcampSettings(SourceSettings):
+    """Settings of the Bandcamp source."""
+
+    rate: float = _rate(0.5)
+
+
 class LastfmSettings(SourceSettings):
     """Settings of the Last.fm source."""
 
+    rate: float = _rate(4.0)
     api_key: SecretStr | None = Field(default=None, description="API key")
+
+
+class WikipediaSettings(SourceSettings):
+    """Settings of the Wikipedia and Wikidata source."""
+
+    rate: float = _rate(5.0)
+
+
+class ListenBrainzSettings(SourceSettings):
+    """Settings of the ListenBrainz source."""
+
+    rate: float = _rate(2.0)
 
 
 class SecondHandSongsSettings(SourceSettings):
     """Settings of the SecondHandSongs source."""
 
+    rate: float = _rate(0.25)
     api_key: SecretStr | None = Field(
         default=None,
         description="API key raising the request limit; lookups work without it",
     )
 
 
+class KexpSettings(SourceSettings):
+    """Settings of the KEXP source."""
+
+    rate: float = _rate(2.0)
+
+
 class SpotifySettings(SourceSettings):
     """Settings of the Spotify source."""
 
+    rate: float = _rate(2.0)
     client_id: SecretStr | None = Field(
         default=None,
         description="Client ID of a Spotify app; needed with the client secret",
@@ -288,84 +371,210 @@ class SoundCloudSettings(SourceSettings):
     )
 
 
-# Requests per second each source allows: MusicBrainz 1/s, iTunes Search about 20/min,
-# Deezer 50 per 5 s, Discogs 60/min with a token, SecondHandSongs 10-20/min without a key;
-# YouTube search costs 100 of 10,000 daily quota units; scraped pages are fetched slowly on
-# purpose.
-DEFAULT_RATES: dict[str, float] = {
-    "musicbrainz": 1.0,
-    "itunes": 0.3,
-    "deezer": 2.0,
-    "odesli": 0.5,
-    "discogs": 1.0,
-    "bandcamp": 0.5,
-    "lastfm": 4.0,
-    "wikipedia": 5.0,
-    "listenbrainz": 2.0,
-    "secondhandsongs": 0.25,
-    "kexp": 2.0,
-    "spotify": 2.0,
-    "youtube": 1.0,
-    "soundcloud": 1.0,
-    "beatport": 0.5,
-    "hardwax": 0.5,
-    "soundohm": 0.5,
-    "juno": 0.5,
-    "bleep": 0.5,
-    "forcedexposure": 0.5,
-    "genius": 1.0,
-    "allmusic": 0.5,
-    "albumoftheyear": 0.5,
-    "phonica": 0.5,
-    "boomkat": 0.5,
-    "norman": 0.5,
-    "pressreviews": 0.5,
-    "ra": 0.5,
-    "nts": 0.5,
-    "wfmu": 0.5,
-    "rateyourmusic": 0.5,
-    "whosampled": 0.5,
-    "tracklists": 0.125,
-}
+class BeatportSettings(SourceSettings):
+    """Settings of the Beatport source."""
 
-DEFAULT_HTML_TRANSPORTS: tuple[Escalation, ...] = (
-    Escalation.HTTPX,
-    Escalation.IMPERSONATE,
-    Escalation.BROWSER,
-    Escalation.NODRIVER,
-)
-
-SOURCE_HTML_TRANSPORTS: dict[str, tuple[Escalation, ...]] = {
-    "rateyourmusic": (Escalation.BROWSER,),
-    "whosampled": (Escalation.BROWSER,),
-    "tracklists": (Escalation.BROWSER,),
-    "phonica": (Escalation.BROWSER,),
-    "boomkat": (Escalation.BROWSER,),
-    "norman": (Escalation.NODRIVER,),
-    "beatport": (
+    rate: float = _rate(0.5)
+    html_transports: Transports = _transports(
         Escalation.NODRIVER,
         Escalation.BROWSER,
         Escalation.IMPERSONATE,
         Escalation.HTTPX,
-    ),
-    "juno": (
+    )
+
+
+class HardWaxSettings(SourceSettings):
+    """Settings of the Hard Wax source."""
+
+    rate: float = _rate(0.5)
+
+
+class SoundohmSettings(SourceSettings):
+    """Settings of the Soundohm source."""
+
+    rate: float = _rate(0.5)
+
+
+class JunoSettings(SourceSettings):
+    """Settings of the Juno source."""
+
+    rate: float = _rate(0.5)
+    html_transports: Transports = _transports(
         Escalation.IMPERSONATE,
         Escalation.BROWSER,
         Escalation.NODRIVER,
         Escalation.HTTPX,
-    ),
-    "bleep": (Escalation.BROWSER, Escalation.HTTPX, Escalation.IMPERSONATE, Escalation.NODRIVER),
-    "forcedexposure": (
+    )
+
+
+class BleepSettings(SourceSettings):
+    """Settings of the Bleep source."""
+
+    rate: float = _rate(0.5)
+    html_transports: Transports = _transports(
         Escalation.BROWSER,
         Escalation.HTTPX,
         Escalation.IMPERSONATE,
         Escalation.NODRIVER,
-    ),
-}
+    )
 
 
-class SourcesConfig(_Model):
-    """Configuration of all sources and the HTTP stack."""
+class ForcedExposureSettings(SourceSettings):
+    """Settings of the Forced Exposure source."""
+
+    rate: float = _rate(0.5)
+    html_transports: Transports = _transports(
+        Escalation.BROWSER,
+        Escalation.HTTPX,
+        Escalation.IMPERSONATE,
+        Escalation.NODRIVER,
+    )
+
+
+class AllMusicSettings(SourceSettings):
+    """Settings of the AllMusic source."""
+
+    rate: float = _rate(0.5)
+
+
+class AlbumOfTheYearSettings(SourceSettings):
+    """Settings of the Album of the Year source."""
+
+    rate: float = _rate(0.5)
+
+
+class PhonicaSettings(SourceSettings):
+    """Settings of the Phonica source."""
+
+    rate: float = _rate(0.5)
+    html_transports: Transports = _transports(Escalation.BROWSER)
+
+
+class BoomkatSettings(SourceSettings):
+    """Settings of the Boomkat source."""
+
+    rate: float = _rate(0.5)
+    html_transports: Transports = _transports(Escalation.BROWSER)
+    browser_headless: bool | None = _headless(default=False)
+
+
+class NormanSettings(SourceSettings):
+    """Settings of the Norman Records source."""
+
+    rate: float = _rate(0.5)
+    html_transports: Transports = _transports(Escalation.NODRIVER)
+    browser_headless: bool | None = _headless(default=False)
+
+
+class PressReviewsSettings(SourceSettings):
+    """Settings of the press review source (Pitchfork, The Quietus, The Wire)."""
+
+    rate: float = _rate(0.5)
+
+
+class ResidentAdvisorSettings(SourceSettings):
+    """Settings of the Resident Advisor source."""
+
+    rate: float = _rate(0.5)
+
+
+class NtsSettings(SourceSettings):
+    """Settings of the NTS source."""
+
+    rate: float = _rate(0.5)
+
+
+class WfmuSettings(SourceSettings):
+    """Settings of the WFMU source."""
+
+    rate: float = _rate(0.5)
+
+
+class RateYourMusicSettings(SourceSettings):
+    """Settings of the Rate Your Music source."""
+
+    rate: float = _rate(0.5)
+    html_transports: Transports = _transports(Escalation.BROWSER)
+
+
+class WhoSampledSettings(SourceSettings):
+    """Settings of the WhoSampled source."""
+
+    rate: float = _rate(0.5)
+    html_transports: Transports = _transports(Escalation.BROWSER)
+    browser_headless: bool | None = _headless(default=False)
+
+
+class TracklistsSettings(SourceSettings):
+    """Settings of the 1001Tracklists source."""
+
+    rate: float = _rate(0.125)
+    html_transports: Transports = _transports(Escalation.BROWSER)
+    browser_headless: bool | None = _headless(default=False)
+
+
+class PerSourceSettings(_Model):
+    """Settings of each source, by source name."""
+
+    musicbrainz: MusicBrainzSettings = MusicBrainzSettings()
+    itunes: ItunesSettings = ItunesSettings()
+    deezer: DeezerSettings = DeezerSettings()
+    odesli: OdesliSettings = OdesliSettings()
+    discogs: DiscogsSettings = DiscogsSettings()
+    bandcamp: BandcampSettings = BandcampSettings()
+    lastfm: LastfmSettings = LastfmSettings()
+    wikipedia: WikipediaSettings = WikipediaSettings()
+    listenbrainz: ListenBrainzSettings = ListenBrainzSettings()
+    secondhandsongs: SecondHandSongsSettings = SecondHandSongsSettings()
+    kexp: KexpSettings = KexpSettings()
+    spotify: SpotifySettings = SpotifySettings()
+    youtube: YouTubeSettings = YouTubeSettings()
+    genius: GeniusSettings = GeniusSettings()
+    soundcloud: SoundCloudSettings = SoundCloudSettings()
+    beatport: BeatportSettings = BeatportSettings()
+    hardwax: HardWaxSettings = HardWaxSettings()
+    soundohm: SoundohmSettings = SoundohmSettings()
+    juno: JunoSettings = JunoSettings()
+    bleep: BleepSettings = BleepSettings()
+    forcedexposure: ForcedExposureSettings = ForcedExposureSettings()
+    allmusic: AllMusicSettings = AllMusicSettings()
+    albumoftheyear: AlbumOfTheYearSettings = AlbumOfTheYearSettings()
+    phonica: PhonicaSettings = PhonicaSettings()
+    boomkat: BoomkatSettings = BoomkatSettings()
+    norman: NormanSettings = NormanSettings()
+    pressreviews: PressReviewsSettings = PressReviewsSettings()
+    ra: ResidentAdvisorSettings = ResidentAdvisorSettings()
+    nts: NtsSettings = NtsSettings()
+    wfmu: WfmuSettings = WfmuSettings()
+    rateyourmusic: RateYourMusicSettings = RateYourMusicSettings()
+    whosampled: WhoSampledSettings = WhoSampledSettings()
+    tracklists: TracklistsSettings = TracklistsSettings()
+
+    def of(self, source: str) -> SourceSettings:
+        """Return a source's settings; an unknown name gets the base defaults."""
+        settings = getattr(self, source, None)
+        return settings if isinstance(settings, SourceSettings) else SourceSettings()
+
+
+class ClientSettings(_Model):
+    """HTTP settings of one source after its own settings override the shared ones."""
+
+    http: HttpSettings
+    rate: float = Field(gt=0)
+    ttl: float = Field(ge=0)
+    not_found_ttl: float = Field(ge=0)
+    blocked_ttl: float = Field(ge=0)
+    proxy: Proxy | None = None
+    html_transports: tuple[Escalation, ...]
+
+    @property
+    def proxy_url(self) -> str | None:
+        """Return the proxy setting: 'direct', a URL, or None for the environment."""
+        return self.proxy.get_secret_value() if self.proxy is not None else None
+
+
+class LookupConfig(_Model):
+    """Configuration of a lookup: sources, the HTTP stack, and the cache."""
 
     http: HttpSettings = HttpSettings()
     cache: CacheSettings = CacheSettings()
@@ -375,87 +584,21 @@ class SourcesConfig(_Model):
         description="Source and group names a lookup runs when no source list is given",
     )
     concurrency: int = Field(default=8, ge=1, description="Sources queried at once in a lookup")
-    musicbrainz: SourceSettings = SourceSettings()
-    itunes: SourceSettings = SourceSettings()
-    deezer: SourceSettings = SourceSettings()
-    odesli: SourceSettings = SourceSettings()
-    discogs: DiscogsSettings = DiscogsSettings()
-    bandcamp: SourceSettings = SourceSettings()
-    lastfm: LastfmSettings = LastfmSettings()
-    wikipedia: SourceSettings = SourceSettings()
-    listenbrainz: SourceSettings = SourceSettings()
-    secondhandsongs: SecondHandSongsSettings = SecondHandSongsSettings()
-    kexp: SourceSettings = SourceSettings()
-    spotify: SpotifySettings = SpotifySettings()
-    youtube: YouTubeSettings = YouTubeSettings()
-    genius: GeniusSettings = GeniusSettings()
-    soundcloud: SoundCloudSettings = SoundCloudSettings()
-    beatport: SourceSettings = SourceSettings()
-    hardwax: SourceSettings = SourceSettings()
-    soundohm: SourceSettings = SourceSettings()
-    juno: SourceSettings = SourceSettings()
-    bleep: SourceSettings = SourceSettings()
-    forcedexposure: SourceSettings = SourceSettings()
-    allmusic: SourceSettings = SourceSettings()
-    albumoftheyear: SourceSettings = SourceSettings()
-    phonica: SourceSettings = SourceSettings()
-    boomkat: SourceSettings = SourceSettings(browser_headless=False)
-    norman: SourceSettings = SourceSettings(browser_headless=False)
-    pressreviews: SourceSettings = SourceSettings()
-    ra: SourceSettings = SourceSettings()
-    nts: SourceSettings = SourceSettings()
-    wfmu: SourceSettings = SourceSettings()
-    rateyourmusic: SourceSettings = SourceSettings()
-    whosampled: SourceSettings = SourceSettings(browser_headless=False)
-    tracklists: SourceSettings = SourceSettings(browser_headless=False)
+    sources: PerSourceSettings = PerSourceSettings()
 
-    def browser_headless(self, source: str) -> bool:
-        """Return the browser mode selected for a source."""
-        settings = getattr(self, source, None)
-        if isinstance(settings, SourceSettings) and settings.browser_headless is not None:
-            return settings.browser_headless
-        return self.http.browser_headless
-
-    def rate(self, source: str) -> float:
-        """Return the request rate of a source in requests per second."""
-        settings = getattr(self, source, None)
-        if isinstance(settings, SourceSettings) and settings.rate is not None:
-            return settings.rate
-        return DEFAULT_RATES.get(source, 1.0)
-
-    def html_transports(self, source: str) -> tuple[Escalation, ...]:
-        """Return this source's ordered HTML transports after the global allowlist."""
-        settings = getattr(self, source, None)
-        selected = (
-            settings.html_transports
-            if isinstance(settings, SourceSettings) and settings.html_transports is not None
-            else SOURCE_HTML_TRANSPORTS.get(source, DEFAULT_HTML_TRANSPORTS)
+    def client_settings(self, source: str) -> ClientSettings:
+        """Resolve the HTTP settings of a source's clients."""
+        settings = self.sources.of(source)
+        allowed = {Escalation.HTTPX, *self.http.escalation}
+        headless = settings.browser_headless
+        if headless is None:
+            headless = self.http.browser_headless
+        return ClientSettings(
+            http=self.http.model_copy(update={"browser_headless": headless}),
+            rate=settings.rate,
+            ttl=self.cache.ttl if settings.ttl is None else settings.ttl,
+            not_found_ttl=self.cache.not_found_ttl,
+            blocked_ttl=self.cache.blocked_ttl,
+            proxy=self.http.proxy if settings.proxy is None else settings.proxy,
+            html_transports=tuple(step for step in settings.html_transports if step in allowed),
         )
-        allowed = {
-            Escalation.BROWSER if step is Escalation.PATCHRIGHT else step
-            for step in (Escalation.HTTPX, *self.http.escalation)
-        }
-        result = tuple(
-            Escalation.BROWSER if step is Escalation.PATCHRIGHT else step
-            for step in selected
-            if step in allowed or (step is Escalation.PATCHRIGHT and Escalation.BROWSER in allowed)
-        )
-        if len(result) != len(set(result)):
-            raise ValueError(
-                f"{source}.html_transports must contain distinct permitted transports",
-            )
-        return result
-
-    def proxy(self, source: str) -> str | None:
-        """Return the proxy setting of a source: 'direct', a URL, or None for the environment."""
-        settings = getattr(self, source, None)
-        if isinstance(settings, SourceSettings) and settings.proxy is not None:
-            return settings.proxy.get_secret_value()
-        return self.http.proxy.get_secret_value() if self.http.proxy is not None else None
-
-    def ttl(self, source: str) -> float:
-        """Return the cache lifetime of a source's responses."""
-        settings = getattr(self, source, None)
-        if isinstance(settings, SourceSettings) and settings.ttl is not None:
-            return settings.ttl
-        return self.cache.ttl

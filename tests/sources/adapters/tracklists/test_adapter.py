@@ -4,7 +4,8 @@ import httpx
 import pytest
 
 from deadwax import EntityKind, ErrorKind, Query, RelationKind
-from deadwax.sources.config import Escalation, SourcesConfig, SourceSettings
+from deadwax.sources import PerSourceSettings, TracklistsSettings
+from deadwax.sources.config import Escalation, LookupConfig
 from deadwax.sources.lookup import lookup
 
 FIXTURES = Path(__file__).resolve().parents[3] / "fixtures" / "tracklists"
@@ -15,8 +16,10 @@ async def test_search_track_and_verified_set() -> None:
     search = (FIXTURES / "search.html").read_bytes()
     track = (FIXTURES / "tracklists.html").read_bytes()
     dj_set = (FIXTURES / "set.html").read_bytes()
-    config = SourcesConfig(
-        tracklists=SourceSettings(rate=1000, html_transports=(Escalation.HTTPX,)),
+    config = LookupConfig(
+        sources=PerSourceSettings(
+            tracklists=TracklistsSettings(rate=1000, html_transports=(Escalation.HTTPX,)),
+        ),
     )
 
     def respond(request: httpx.Request) -> httpx.Response:
@@ -42,7 +45,11 @@ async def test_search_track_and_verified_set() -> None:
 
 @pytest.mark.asyncio
 async def test_missing_track() -> None:
-    config = SourcesConfig(tracklists=SourceSettings(html_transports=(Escalation.HTTPX,)))
+    config = LookupConfig(
+        sources=PerSourceSettings(
+            tracklists=TracklistsSettings(html_transports=(Escalation.HTTPX,)),
+        ),
+    )
     dossier = await lookup(
         Query(kind=EntityKind.TRACK, artist="Daft Punk", title="One More Time"),
         config,
@@ -56,7 +63,11 @@ async def test_missing_track() -> None:
 
 @pytest.mark.asyncio
 async def test_blocked_page() -> None:
-    config = SourcesConfig(tracklists=SourceSettings(html_transports=(Escalation.HTTPX,)))
+    config = LookupConfig(
+        sources=PerSourceSettings(
+            tracklists=TracklistsSettings(html_transports=(Escalation.HTTPX,)),
+        ),
+    )
     dossier = await lookup(
         Query(kind=EntityKind.TRACK, artist="Daft Punk", title="One More Time"),
         config,
@@ -75,7 +86,11 @@ async def test_blocked_page() -> None:
 @pytest.mark.asyncio
 async def test_another_version_adds_no_set_relations() -> None:
     track = (FIXTURES / "tracklists.html").read_bytes()
-    config = SourcesConfig(tracklists=SourceSettings(html_transports=(Escalation.HTTPX,)))
+    config = LookupConfig(
+        sources=PerSourceSettings(
+            tracklists=TracklistsSettings(html_transports=(Escalation.HTTPX,)),
+        ),
+    )
     dossier = await lookup(
         Query(kind=EntityKind.TRACK, artist="Daft Punk", title="One More Time (Extended Mix)"),
         config,
@@ -90,8 +105,10 @@ async def test_another_version_adds_no_set_relations() -> None:
 async def test_direct_track_url_needs_no_search() -> None:
     track = (FIXTURES / "tracklists.html").read_bytes()
     dj_set = (FIXTURES / "set.html").read_bytes()
-    config = SourcesConfig(
-        tracklists=SourceSettings(rate=1000, html_transports=(Escalation.HTTPX,)),
+    config = LookupConfig(
+        sources=PerSourceSettings(
+            tracklists=TracklistsSettings(rate=1000, html_transports=(Escalation.HTTPX,)),
+        ),
     )
 
     def respond(request: httpx.Request) -> httpx.Response:

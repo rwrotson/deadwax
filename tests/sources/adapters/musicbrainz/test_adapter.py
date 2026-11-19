@@ -15,7 +15,12 @@ from deadwax.core import (
     Sourced,
     VersionKind,
 )
-from deadwax.sources import SourcesConfig, SourceSettings, parse_query
+from deadwax.sources import (
+    LookupConfig,
+    MusicBrainzSettings,
+    PerSourceSettings,
+    parse_query,
+)
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.musicbrainz import MusicBrainzAdapter
 
@@ -54,7 +59,7 @@ async def lookup(
     identity: Identity | None = None,
 ) -> Partial:
     resources = HttpResources(transport=httpx.MockTransport(respond(routes)))
-    config = SourcesConfig(musicbrainz=SourceSettings(rate=1000))
+    config = LookupConfig(sources=PerSourceSettings(musicbrainz=MusicBrainzSettings(rate=1000)))
     adapter = MusicBrainzAdapter(config, resources)
     context = LookupContext(query=query, identity=identity or Identity())
     try:
@@ -237,7 +242,7 @@ async def test_recording_without_artist_credit() -> None:
 
 
 def test_resolves_musicbrainz_and_spotify_urls() -> None:
-    adapter = MusicBrainzAdapter(SourcesConfig(), HttpResources())
+    adapter = MusicBrainzAdapter(LookupConfig(), HttpResources())
 
     assert adapter.resolves(parse_query("https://open.spotify.com/track/1"))
     assert adapter.resolves(parse_query(f"https://musicbrainz.org/recording/{RECORDING['id']}"))

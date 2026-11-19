@@ -49,14 +49,14 @@ A text query must state `--album` or `--track`; a URL implies its kind. Options:
 ```python
 import asyncio
 
-from deadwax import EntityKind, SourcesConfig, lookup, parse_query
+from deadwax import EntityKind, LookupConfig, lookup, parse_query
 
 query = parse_query("Radiohead - Paranoid Android", EntityKind.TRACK)
-dossier = asyncio.run(lookup(query, SourcesConfig()))
+dossier = asyncio.run(lookup(query, LookupConfig()))
 print(dossier.model_dump_json(indent=2))
 ```
 
-The library never reads the environment and caches nothing unless `SourcesConfig.cache.path` is set. A failing source never raises out of `lookup()`; it appears in `dossier.errors`. Library errors derive from `DeadwaxError`.
+The library never reads the environment and caches nothing unless `LookupConfig.cache.path` is set. A failing source never raises out of `lookup()`; it appears in `dossier.errors`. Library errors derive from `DeadwaxError`.
 
 A base install (`pip install deadwax`) depends on Pydantic, httpx, and selectolax. Optional extras add application features:
 

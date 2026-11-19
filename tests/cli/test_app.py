@@ -14,8 +14,8 @@ from deadwax import (
     EntityKind,
     Escalation,
     Identity,
+    LookupConfig,
     Query,
-    SourcesConfig,
 )
 from deadwax.cli import app as app_module
 from deadwax.cli.app import EXIT_NOTHING_MATCHED, EXIT_USAGE, app, select_runs
@@ -30,14 +30,14 @@ class FakeLookup:
 
     dossier: Dossier
     error: Exception | None = None
-    calls: list[tuple[Query, SourcesConfig, Collection[str] | None, Collection[str]]] = field(
+    calls: list[tuple[Query, LookupConfig, Collection[str] | None, Collection[str]]] = field(
         default_factory=list,
     )
 
     async def __call__(
         self,
         query: Query,
-        config: SourcesConfig,
+        config: LookupConfig,
         *,
         include: Collection[str] | None = None,
         exclude: Collection[str] = (),
@@ -128,8 +128,8 @@ def test_browser_flags_override_environment_for_one_lookup(
     monkeypatch.setenv("DEADWAX_HTTP__BROWSER_HEADLESS", "false")
     monkeypatch.setenv("DEADWAX_HTTP__ESCALATION", '["browser"]')
     monkeypatch.setenv("DEADWAX_HTTP__PATCHRIGHT_PROFILE_DIR", str(tmp_path / "profile"))
-    monkeypatch.setenv("DEADWAX_DISCOGS__TOKEN", "example-token")
-    monkeypatch.setenv("DEADWAX_BLEEP__RATE", "0.25")
+    monkeypatch.setenv("DEADWAX_SOURCES__DISCOGS__TOKEN", "example-token")
+    monkeypatch.setenv("DEADWAX_SOURCES__BLEEP__RATE", "0.25")
 
     flagged = runner.invoke(
         app,
@@ -141,25 +141,28 @@ def test_browser_flags_override_environment_for_one_lookup(
     flagged_config = fake.calls[0][1]
     plain_config = fake.calls[1][1]
     assert flagged_config.http.browser_headless
-    assert flagged_config.browser_headless("phonica")
-    assert flagged_config.browser_headless("boomkat")
-    assert flagged_config.browser_headless("norman")
+    assert flagged_config.client_settings("phonica").http.browser_headless
+    assert flagged_config.client_settings("boomkat").http.browser_headless
+    assert flagged_config.client_settings("norman").http.browser_headless
     assert flagged_config.http.patchright_profile_dir == tmp_path / "profile"
-    assert flagged_config.discogs.token is not None
-    assert flagged_config.discogs.token.get_secret_value() == "example-token"
-    assert flagged_config.bleep.rate == 0.25
-    assert flagged_config.html_transports("beatport") == (
+    assert flagged_config.sources.discogs.token is not None
+    assert flagged_config.sources.discogs.token.get_secret_value() == "example-token"
+    assert flagged_config.sources.bleep.rate == 0.25
+    assert flagged_config.client_settings("beatport").html_transports == (
         Escalation.BROWSER,
         Escalation.NODRIVER,
     )
-    assert flagged_config.html_transports("bleep") == (
+    assert flagged_config.client_settings("bleep").html_transports == (
         Escalation.BROWSER,
         Escalation.NODRIVER,
     )
     assert not plain_config.http.browser_headless
-    assert not plain_config.browser_headless("boomkat")
-    assert not plain_config.browser_headless("norman")
-    assert plain_config.html_transports("beatport") == (Escalation.BROWSER, Escalation.HTTPX)
+    assert not plain_config.client_settings("boomkat").http.browser_headless
+    assert not plain_config.client_settings("norman").http.browser_headless
+    assert plain_config.client_settings("beatport").html_transports == (
+        Escalation.BROWSER,
+        Escalation.HTTPX,
+    )
 
 
 def test_headed_overrides_headless_environment(
@@ -172,7 +175,7 @@ def test_headed_overrides_headless_environment(
 
     assert result.exit_code == 0
     assert not fake.calls[0][1].http.browser_headless
-    assert not fake.calls[0][1].browser_headless("phonica")
+    assert not fake.calls[0][1].client_settings("phonica").http.browser_headless
 
 
 @pytest.mark.parametrize(
@@ -180,8 +183,8 @@ def test_headed_overrides_headless_environment(
     [
         (["--headless", "--headed"], "cannot be used together"),
         (["--html-transport", ""], "needs comma-separated"),
-        (["--html-transport", "browser,patchright"], "duplicate transport"),
-        (["--html-transport", "browser,unknown"], "unknown HTML transport"),
+        (["--html-transport", "browser,patchright"], "must be distinct"),
+        (["--html-transport", "browser,unknown"], "Invalid configuration"),
     ],
 )
 def test_invalid_browser_flags_are_usage_errors(
@@ -257,20 +260,20 @@ def test_config_file_and_environment_reach_the_sources(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     config = tmp_path / "deadwax.toml"
-    config.write_text("adapter_timeout = 12\n[lastfm]\napi_key = 'from-file'\n")
-    monkeypatch.setenv("DEADWAX_ITUNES__ENABLED", "false")
+    config.write_text("adapter_timeout = 12\n[sources.lastfm]\napi_key = 'from-file'\n")
+    monkeypatch.setenv("DEADWAX_SOURCES__ITUNES__ENABLED", "false")
 
     result = runner.invoke(app, ["--track", "a - b", "--config", str(config)])
 
     assert result.exit_code == 0, result.output
-    [(_, sources, _, _)] = fake.calls
-    assert sources.adapter_timeout == 12
-    assert sources.lastfm.api_key is not None
-    assert not sources.itunes.enabled
+    [(_, lookup_config, _, _)] = fake.calls
+    assert lookup_config.adapter_timeout == 12
+    assert lookup_config.sources.lastfm.api_key is not None
+    assert not lookup_config.sources.itunes.enabled
 
 
 def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("DEADWAX_ITUNES__ENABLED", "false")
+    monkeypatch.setenv("DEADWAX_SOURCES__ITUNES__ENABLED", "false")
     monkeypatch.setenv("COLUMNS", "200")
 
     table = runner.invoke(app, ["sources"])
@@ -313,8 +316,8 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
         "whosampled": "ready",
         "tracklists": "ready",
     }
-    assert "DEADWAX_DISCOGS__TOKEN" in table.stdout
-    assert "DEADWAX_LASTFM__API_KEY" in table.stdout
+    assert "DEADWAX_SOURCES__DISCOGS__TOKEN" in table.stdout
+    assert "DEADWAX_SOURCES__LASTFM__API_KEY" in table.stdout
     assert {(row["group"], row["default"]) for row in json.loads(as_json.stdout)} == {
         ("core", True),
         ("core", False),
@@ -410,7 +413,7 @@ def test_browser_prompts_reach_stderr_without_verbose(
 
     async def prompting(
         query: Query,
-        config: SourcesConfig,
+        config: LookupConfig,
         *,
         include: Collection[str] | None = None,
         exclude: Collection[str] = (),
@@ -460,7 +463,7 @@ def test_a_lookup_is_journaled(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("DEADWAX_LASTFM__API_KEY", "secret-key")
+    monkeypatch.setenv("DEADWAX_SOURCES__LASTFM__API_KEY", "secret-key")
 
     result = runner.invoke(app, ["--track", "Everything but the Girl - Missing"])
 

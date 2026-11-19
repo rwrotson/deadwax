@@ -35,7 +35,7 @@ from deadwax.sources._http.profiles import CHROME, Profile, api_headers, browser
 from deadwax.sources._http.ratelimit import HostLimiters, Sleep
 from deadwax.sources._http.retry import RETRY_STATUSES, RetryPolicy
 from deadwax.sources._http.sessions import BROWSER_STEPS, BrowserSessions, FetcherFactory
-from deadwax.sources.config import DIRECT, Escalation, HttpSettings, SourcesConfig
+from deadwax.sources.config import DIRECT, ClientSettings, Escalation, HttpSettings
 
 logger = logging.getLogger(__name__)
 
@@ -189,14 +189,17 @@ class HttpClient:
     A headless browser that meets a challenge retries headed, and the source stays headed.
     """
 
-    def __init__(self, spec: ClientSpec, config: SourcesConfig, resources: HttpResources) -> None:
+    def __init__(
+        self,
+        spec: ClientSpec,
+        settings: ClientSettings,
+        resources: HttpResources,
+    ) -> None:
         self.spec = spec
-        self._config = config
-        self._settings = config.http.model_copy(
-            update={"browser_headless": config.browser_headless(spec.source)},
-        )
+        self.settings = settings
+        self._settings = settings.http
         self._resources = resources
-        self._proxy = config.proxy(spec.source)
+        self._proxy = settings.proxy_url
         self._route = route(self._proxy)
         self._browser_settings = self._settings.model_copy(
             update={
@@ -231,7 +234,7 @@ class HttpClient:
         )
 
         self._steps = (
-            escalation_steps(config.html_transports(spec.source), resources.installed)
+            escalation_steps(settings.html_transports, resources.installed)
             if spec.profile is Profile.BROWSER
             else [Escalation.HTTPX]
         )
@@ -250,7 +253,7 @@ class HttpClient:
         self._unavailable = (
             [
                 f"{step} unavailable: install {_EXTRA_PACKAGES[step]}"
-                for step in config.html_transports(spec.source)
+                for step in settings.html_transports
                 if step not in self._steps and step is not Escalation.HTTPX
             ]
             if spec.profile is Profile.BROWSER
@@ -376,7 +379,7 @@ class HttpClient:
                         "x-deadwax-transports": self._policy_signature,
                     },
                 )
-                await cache.put(key, marker, self._config.cache.blocked_ttl)
+                await cache.put(key, marker, self.settings.blocked_ttl)
             raise
         response = Response(
             url=redact(response.url, self.spec.secret_params),
@@ -385,9 +388,9 @@ class HttpClient:
             headers=response.headers,
         )
         if cache is not None and response.ok:
-            await cache.put(key, response, self._config.ttl(self.spec.source))
+            await cache.put(key, response, self.settings.ttl)
         elif cache is not None and response.status == _NOT_FOUND:
-            await cache.put(key, response, self._config.cache.not_found_ttl)
+            await cache.put(key, response, self.settings.not_found_ttl)
         return response
 
     def _check(self, response: Response) -> Response:
@@ -533,7 +536,7 @@ class HttpClient:
     ) -> Response:
         """Send one request through a transport, retrying on 429, 5xx, and network errors."""
         host = urlsplit(request.url).hostname or ""
-        limiter = self._resources.limiters.get(host, self._config.rate(self.spec.source))
+        limiter = self._resources.limiters.get(host, self.settings.rate)
         rng = self._resources.rng
         attempt = 0
 

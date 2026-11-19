@@ -25,7 +25,7 @@ from deadwax.core import (
     VersionKind,
     merge,
 )
-from deadwax.sources import SourcesConfig, parse_query
+from deadwax.sources import LookupConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.beatport import BeatportAdapter, models
 from deadwax.sources.adapters.beatport import parse as p
@@ -71,8 +71,8 @@ def make(
             return httpx.Response(200, content=(PAGES / f"{SERVED[url]}.html").read_bytes())
         return httpx.Response(404)
 
-    config = SourcesConfig.model_validate(
-        {"beatport": {"rate": 1000}, "http": {"retries": 0, "escalation": []}},
+    config = LookupConfig.model_validate(
+        {"sources": {"beatport": {"rate": 1000}}, "http": {"retries": 0, "escalation": []}},
     )
     return BeatportAdapter(config, HttpResources(transport=httpx.MockTransport(handler))), seen
 

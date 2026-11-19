@@ -4,32 +4,35 @@ import pytest
 from pydantic import SecretStr
 
 from deadwax import (
-    DiscogsSettings,
     Dossier,
     EntityKind,
     ErrorKind,
-    GeniusSettings,
-    LastfmSettings,
-    SoundCloudSettings,
-    SourcesConfig,
-    SpotifySettings,
+    LookupConfig,
+    PerSourceSettings,
     TextKind,
-    YouTubeSettings,
     lookup,
     parse_query,
     parse_title,
 )
 from deadwax.core import RecordKey, Verdict, compare
+from deadwax.sources import (
+    DiscogsSettings,
+    GeniusSettings,
+    LastfmSettings,
+    SoundCloudSettings,
+    SpotifySettings,
+    YouTubeSettings,
+)
 
 # Read at import (`poe test-live` loads .env): the autouse fixture removes DEADWAX_* variables
 # before each test.
-DISCOGS_TOKEN = os.environ.get("DEADWAX_DISCOGS__TOKEN")
-LASTFM_KEY = os.environ.get("DEADWAX_LASTFM__API_KEY")
-SPOTIFY_ID = os.environ.get("DEADWAX_SPOTIFY__CLIENT_ID")
-SPOTIFY_SECRET = os.environ.get("DEADWAX_SPOTIFY__CLIENT_SECRET")
-YOUTUBE_KEY = os.environ.get("DEADWAX_YOUTUBE__API_KEY")
-SOUNDCLOUD_ID = os.environ.get("DEADWAX_SOUNDCLOUD__CLIENT_ID")
-GENIUS_TOKEN = os.environ.get("DEADWAX_GENIUS__TOKEN")
+DISCOGS_TOKEN = os.environ.get("DEADWAX_SOURCES__DISCOGS__TOKEN")
+LASTFM_KEY = os.environ.get("DEADWAX_SOURCES__LASTFM__API_KEY")
+SPOTIFY_ID = os.environ.get("DEADWAX_SOURCES__SPOTIFY__CLIENT_ID")
+SPOTIFY_SECRET = os.environ.get("DEADWAX_SOURCES__SPOTIFY__CLIENT_SECRET")
+YOUTUBE_KEY = os.environ.get("DEADWAX_SOURCES__YOUTUBE__API_KEY")
+SOUNDCLOUD_ID = os.environ.get("DEADWAX_SOURCES__SOUNDCLOUD__CLIENT_ID")
+GENIUS_TOKEN = os.environ.get("DEADWAX_SOURCES__GENIUS__TOKEN")
 
 # Tracks from a personal library as "Artist - Title" from their tags. Tracks of compilations
 # tagged "Various Artists" use the artist from the title, and an untagged file its name.
@@ -67,18 +70,20 @@ def _secret(value: str | None) -> SecretStr | None:
     return SecretStr(value) if value else None
 
 
-def live_config() -> SourcesConfig:
+def live_config() -> LookupConfig:
     """Default settings, with every source's credential from the environment."""
-    return SourcesConfig(
-        discogs=DiscogsSettings(token=_secret(DISCOGS_TOKEN)),
-        lastfm=LastfmSettings(api_key=_secret(LASTFM_KEY)),
-        spotify=SpotifySettings(
-            client_id=_secret(SPOTIFY_ID),
-            client_secret=_secret(SPOTIFY_SECRET),
+    return LookupConfig(
+        sources=PerSourceSettings(
+            discogs=DiscogsSettings(token=_secret(DISCOGS_TOKEN)),
+            lastfm=LastfmSettings(api_key=_secret(LASTFM_KEY)),
+            spotify=SpotifySettings(
+                client_id=_secret(SPOTIFY_ID),
+                client_secret=_secret(SPOTIFY_SECRET),
+            ),
+            youtube=YouTubeSettings(api_key=_secret(YOUTUBE_KEY)),
+            soundcloud=SoundCloudSettings(client_id=_secret(SOUNDCLOUD_ID)),
+            genius=GeniusSettings(token=_secret(GENIUS_TOKEN)),
         ),
-        youtube=YouTubeSettings(api_key=_secret(YOUTUBE_KEY)),
-        soundcloud=SoundCloudSettings(client_id=_secret(SOUNDCLOUD_ID)),
-        genius=GeniusSettings(token=_secret(GENIUS_TOKEN)),
     )
 
 

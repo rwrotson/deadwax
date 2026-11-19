@@ -13,7 +13,7 @@ from deadwax.core import (
     Scope,
     merge,
 )
-from deadwax.sources import SourcesConfig, parse_query
+from deadwax.sources import LookupConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.secondhandsongs import SecondHandSongsAdapter
 from deadwax.sources.adapters.secondhandsongs.parse import website
@@ -85,9 +85,9 @@ def make(
             return httpx.Response(404, json={"error": {"code": 10001}})
         return httpx.Response(200, content=json.dumps(body).encode())
 
-    config = SourcesConfig.model_validate(
+    config = LookupConfig.model_validate(
         {
-            "secondhandsongs": {"rate": 1000, "api_key": api_key},
+            "sources": {"secondhandsongs": {"rate": 1000, "api_key": api_key}},
             "http": {"retries": 0, "escalation": []},
         },
     )

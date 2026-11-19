@@ -16,7 +16,7 @@ from deadwax.core import (
     Scope,
     TextKind,
 )
-from deadwax.sources import SourcesConfig, parse_query
+from deadwax.sources import LookupConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.wikipedia import WikipediaAdapter
 
@@ -114,8 +114,8 @@ def make(seen: list[httpx.Request] | None = None, **overrides: Handler) -> Wikip
         body = overrides.get(route, {"wikidata": wikidata, "articles": articles}[route])(request)
         return httpx.Response(200, content=json.dumps(body).encode())
 
-    config = SourcesConfig.model_validate(
-        {"wikipedia": {"rate": 1000}, "http": {"retries": 0, "escalation": []}},
+    config = LookupConfig.model_validate(
+        {"sources": {"wikipedia": {"rate": 1000}}, "http": {"retries": 0, "escalation": []}},
     )
     return WikipediaAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
 

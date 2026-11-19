@@ -7,9 +7,9 @@ from deadwax import (
     EntityKind,
     ErrorKind,
     HttpSettings,
+    LookupConfig,
     Query,
     Scope,
-    SourcesConfig,
     TextKind,
     lookup,
 )
@@ -86,7 +86,7 @@ async def test_search_finds_review_without_an_incoming_link() -> None:
         return httpx.Response(200, json={"data": data})
 
     query = Query(kind=EntityKind.ALBUM, artist="Burial", title="Untrue")
-    config = SourcesConfig(http=HttpSettings(escalation=()))
+    config = LookupConfig(http=HttpSettings(escalation=()))
 
     result = await lookup(
         query,
@@ -114,7 +114,7 @@ async def test_search_rejects_another_version() -> None:
         )
 
     query = Query(kind=EntityKind.ALBUM, artist="Burial", title="Untrue")
-    config = SourcesConfig(http=HttpSettings(escalation=()))
+    config = LookupConfig(http=HttpSettings(escalation=()))
 
     result = await lookup(
         query,
@@ -130,7 +130,7 @@ async def test_search_rejects_another_version() -> None:
 @pytest.mark.asyncio
 async def test_blocked_graphql_search() -> None:
     query = Query(kind=EntityKind.ALBUM, artist="Burial", title="Untrue")
-    config = SourcesConfig(http=HttpSettings(escalation=(), retries=0))
+    config = LookupConfig(http=HttpSettings(escalation=(), retries=0))
     transport = httpx.MockTransport(
         lambda _: httpx.Response(403, text="<title>Just a moment...</title>"),
     )

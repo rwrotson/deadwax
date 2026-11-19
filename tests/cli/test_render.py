@@ -146,7 +146,7 @@ INFOS = [
         default=True,
         pass_=Pass.ENRICH,
         capabilities=[Capability.TAGS],
-        requires=[Requirement(setting="lastfm.api_key", purpose="every lookup")],
+        requires=[Requirement(setting="sources.lastfm.api_key", purpose="every lookup")],
         status=SourceStatus(source="lastfm", state=SourceState.MISSING_CREDENTIAL, detail="x"),
     ),
     SourceInfo(
@@ -198,7 +198,7 @@ def test_sources(output: OutputFormat) -> None:
         assert json.loads(text)[2]["html_transports"] == ["httpx", "patchright", "nodriver"]
         assert json.loads(text)[2]["browser_headless"] is False
     else:
-        assert "missing DEADWAX_LASTFM__API_KEY" in text
+        assert "missing DEADWAX_SOURCES__LASTFM__API_KEY" in text
         assert "missing extra: deadwax[browser]" in text
         assert "disabled" in text
         assert "identity, links" in text
@@ -208,7 +208,7 @@ def test_sources(output: OutputFormat) -> None:
 
 
 def test_env_variable() -> None:
-    assert env_variable("discogs.token") == "DEADWAX_DISCOGS__TOKEN"
+    assert env_variable("sources.discogs.token") == "DEADWAX_SOURCES__DISCOGS__TOKEN"
 
 
 KEY = {"artist": "Everything but the Girl", "title": "Missing", "version": "original"}
