@@ -7,7 +7,7 @@ from typing import Protocol, cast
 from urllib.parse import urlsplit, urlunsplit
 
 from deadwax.core import ConfigurationError, SourceError, pause_adapter_timeout
-from deadwax.sources._http.challenge import SOLVE_PROMPT, detect_challenge
+from deadwax.sources._http.challenge import SOLVABLE_CHALLENGES, SOLVE_PROMPT, detect_challenge
 from deadwax.sources._http.messages import (
     Request,
     Response,
@@ -235,11 +235,10 @@ class NodriverFetcher:
     ) -> Response:
         """Wait for the page to clear; a visible browser then asks the visitor for help."""
         response, ready = await self._poll(tab, request, responses, self._challenge_wait)
-        if (
-            ready
-            or self._headless
-            or detect_challenge(response.status, response.headers, response.content) is None
-        ):
+        if ready or self._headless:
+            return response
+        challenge = detect_challenge(response.status, response.headers, response.content)
+        if challenge not in SOLVABLE_CHALLENGES:
             return response
         async with pause_adapter_timeout(), self._front:
             await tab.bring_to_front()
@@ -279,7 +278,14 @@ class NodriverFetcher:
                 navigation_status,
                 self._max_bytes,
             )
-            incomplete = (
+            loading = (
+                await asyncio.wait_for(
+                    tab.evaluate("document.readyState", return_by_value=True),
+                    timeout=self._timeout,
+                )
+                == "loading"
+            )
+            incomplete = loading or (
                 request.required_marker is not None and request.required_marker not in content
             )
             if (

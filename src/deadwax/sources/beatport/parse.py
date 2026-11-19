@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from typing import Any
 
@@ -25,6 +26,7 @@ from deadwax.core import (
     TagKind,
     VersionInfo,
     classify_marker,
+    trace,
 )
 from deadwax.sources._base import SearchHit
 from deadwax.sources._html import parse_html
@@ -35,6 +37,11 @@ SERVICE = "beatport"
 SITE = "https://www.beatport.com"
 REMIXER = "remixer"
 
+# Characters of an unreadable page state kept in the journal.
+_SNIPPET_CHARS = 200
+
+logger = logging.getLogger(__name__)
+
 type PageProps = dict[str, Any]
 
 
@@ -43,9 +50,18 @@ def page_props(content: bytes, url: str) -> PageProps:
     script = parse_html(content).css_first("script#__NEXT_DATA__")
     if script is None:
         raise SourceError("the Beatport page has no __NEXT_DATA__ state", url=url)
+    text = script.text()
     try:
-        state = json.loads(script.text())
+        state = json.loads(text)
     except ValueError:
+        trace(
+            logger,
+            "parse.unrecognized",
+            url=url,
+            length=len(text),
+            head=text[:_SNIPPET_CHARS],
+            tail=text[-_SNIPPET_CHARS:],
+        )
         raise SourceError("the Beatport page state is not valid JSON", url=url) from None
     props = state.get("props", {}).get("pageProps") if isinstance(state, dict) else None
     if not isinstance(props, dict):

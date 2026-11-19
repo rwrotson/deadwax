@@ -39,6 +39,7 @@ class Scenario:
     close_fails: bool = False
     goto_fails: bool = False
     goto_error: str | None = None
+    ready_states: list[str] = field(default_factory=list)
     never_idle: bool = False
     launches: list[dict[str, object]] = field(default_factory=list)
     contexts: list[dict[str, object]] = field(default_factory=list)
@@ -104,7 +105,13 @@ class FakePage:
             return self.scenario.html_sequence.pop(0)
         return self.scenario.html
 
-    async def evaluate(self, script: str, arguments: dict[str, object]) -> dict[str, object]:
+    async def evaluate(
+        self,
+        script: str,
+        arguments: dict[str, object] | None = None,
+    ) -> object:
+        if arguments is None:
+            return self.scenario.ready_states.pop(0) if self.scenario.ready_states else "complete"
         return {
             "url": arguments["url"],
             "status": 200,
@@ -491,3 +498,26 @@ async def test_only_the_launch_is_kept_out_of_the_adapter_timeout(
 
     assert pauses == ["paused"]
     assert len(scenario.launches) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_document_still_loading_is_not_ready(scenario: Scenario) -> None:
+    scenario.ready_states = ["loading", "complete"]
+    fetcher = BrowserFetcher(timeout=5, max_bytes=100, challenge_wait=1)
+
+    response = await fetcher.fetch(PAGE)
+
+    assert response.text == "<html>page</html>"
+    assert scenario.ready_states == []
+
+
+@pytest.mark.asyncio
+async def test_a_refusal_is_not_offered_for_solving(scenario: Scenario) -> None:
+    scenario.statuses = [403]
+    scenario.html = "<html><a href='https://errors.edgesuite.net/x'>Access Denied</a></html>"
+    fetcher = BrowserFetcher(timeout=5, max_bytes=1000, headless=False, challenge_wait=0)
+
+    response = await fetcher.fetch(PAGE)
+
+    assert response.status == 403
+    assert scenario.fronts == []

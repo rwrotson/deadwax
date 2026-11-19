@@ -24,6 +24,7 @@ class FakeTab:
     callback: Callable[[object], None] | None = None
     closed: bool = False
     fronts: int = 0
+    ready_states: list[str] = field(default_factory=list)
 
     def add_handler(self, event: object, callback: Callable[[object], None]) -> None:
         self.callback = callback
@@ -48,7 +49,9 @@ class FakeTab:
     async def bring_to_front(self) -> None:
         self.fronts += 1
 
-    async def evaluate(self, expression: str, *, return_by_value: bool) -> int:
+    async def evaluate(self, expression: str, *, return_by_value: bool) -> object:
+        if expression == "document.readyState":
+            return self.ready_states.pop(0) if self.ready_states else "complete"
         return self.navigation_status
 
     async def sleep(self, seconds: float) -> None:
@@ -333,3 +336,25 @@ async def test_an_error_status_without_a_page_is_returned(scenario: Scenario) ->
 
     assert response.status == 403
     assert response.content == b""
+
+
+@pytest.mark.asyncio
+async def test_a_document_still_loading_is_not_ready(scenario: Scenario) -> None:
+    scenario.tab.ready_states = ["loading", "complete"]
+    fetcher = NodriverFetcher(timeout=5, max_bytes=100, challenge_wait=1)
+
+    await fetcher.fetch(Request("GET", "https://example.test/page"))
+
+    assert scenario.tab.ready_states == []
+
+
+@pytest.mark.asyncio
+async def test_a_refusal_is_not_offered_for_solving(scenario: Scenario) -> None:
+    scenario.tab.status = 403
+    scenario.tab.content = "<html><a href='https://errors.edgesuite.net/x'>Denied</a></html>"
+    fetcher = NodriverFetcher(timeout=5, max_bytes=1000, headless=False, challenge_wait=0)
+
+    response = await fetcher.fetch(Request("GET", "https://example.test/page"))
+
+    assert response.status == 403
+    assert scenario.tab.fronts == 0

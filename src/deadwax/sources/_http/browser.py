@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urlsplit, urlunsplit
 
 from deadwax.core import ConfigurationError, SourceError, pause_adapter_timeout
-from deadwax.sources._http.challenge import SOLVE_PROMPT, detect_challenge
+from deadwax.sources._http.challenge import SOLVABLE_CHALLENGES, SOLVE_PROMPT, detect_challenge
 from deadwax.sources._http.messages import (
     Request,
     Response,
@@ -28,6 +28,9 @@ MISSING_EXTRA = (
 MISSING_BROWSER = "Chromium for Patchright is not installed: run 'patchright install chromium'"
 
 _POLL_SECONDS = 0.25
+
+# Page errors while a navigation replaces the document; the next poll reads the new one.
+_NAVIGATING = ("page is navigating and changing the content", "Execution context was destroyed")
 
 # Chromium's navigation error for an error status whose body it does not render.
 _STATUS_WITHOUT_PAGE = "net::ERR_HTTP_RESPONSE_CODE_FAILURE"
@@ -251,7 +254,9 @@ class BrowserFetcher:
     ) -> bytes:
         """Wait for the page to clear; a visible browser then asks the visitor for help."""
         content, ready = await self._poll(page, request, navigations, self._challenge_wait)
-        if ready or self._headless or detect_challenge(_status(navigations), {}, content) is None:
+        if ready or self._headless:
+            return content
+        if detect_challenge(_status(navigations), {}, content) not in SOLVABLE_CHALLENGES:
             return content
         async with pause_adapter_timeout(), self._front:
             await page.bring_to_front()
@@ -278,15 +283,16 @@ class BrowserFetcher:
         while True:
             try:
                 content = (await page.content()).encode()
+                loading = await page.evaluate("document.readyState") == "loading"
             except Error as error:
                 if (
-                    "page is navigating and changing the content" not in str(error)
+                    not any(marker in str(error) for marker in _NAVIGATING)
                     or asyncio.get_running_loop().time() >= deadline
                 ):
                     raise
                 await asyncio.sleep(_POLL_SECONDS)
                 continue
-            incomplete = (
+            incomplete = loading or (
                 request.required_marker is not None and request.required_marker not in content
             )
             if not incomplete and detect_challenge(_status(navigations), {}, content) is None:

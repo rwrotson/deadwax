@@ -263,6 +263,17 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
 
+### 2026-11-19 — Loaded documents, refusals, and the There There identity (Stage 20 partial)
+
+Run `20261119T124341Z-631257` (`radiohead - there there`, 103 s) after `75beef9`: Discogs and Genius succeeded through the headed browser; WhoSampled reported `not_found`; RYM `blocked` (Cloudflare HTTP 503). Remaining:
+- Beatport: the track page loaded after a manual challenge (200, 220 KB) but its `__NEXT_DATA__` was not valid JSON, while the same page parsed in the previous run. Likely the content was read while the reloaded document was still loading.
+- Deezer: the headed fallback showed an Akamai block, a refusal of the address with nothing to solve, yet waited 60 s with the prompt.
+- AllMusic: the page was the *Mercury Music Prize 2003* compilation. MusicBrainz chose recording `bb4dcf01`, which appears only on two compilations, because the Hail to the Thief recording `04207ca7` (50 releases) is titled `There There. (The Boney King of Nowhere.)` and `compare` gives `title_score=0.46` → `no_match`. The parenthetical alternative title is not a version marker and stays in the base title. Not fixed: changing core matching needs a decision.
+
+Changed: Patchright and Nodriver treat a page as ready only when `document.readyState` is not `loading` (transient navigation errors during that check are retried). The prompt and the manual wait apply only to `SOLVABLE_CHALLENGES` (Cloudflare challenge or Turnstile, captchas, AWS WAF, Fastly, Sucuri); refusals return at once. Beatport records `parse.unrecognized` (length, head, tail of the state) before its JSON error.
+
+Verification: `uv run poe check` passed (978 offline tests, 96.75% coverage); `uv run --group docs properdocs build --strict` passed. Live behaviour unverified.
+
 ### 2026-11-19 — Browser timeout budget and follow-up fixes (Stage 20 partial)
 
 Run `20261119T122953Z-7df17b` (`radiohead - there there`, `--sources all --no-cache`) after `52c6c67`. The table pasted with it repeated the previous run; the journal shows: no "not installed" errors; Beatport found the track through the headed fallback; Album of the Year and 1001Tracklists loaded. Remaining:

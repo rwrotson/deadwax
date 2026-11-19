@@ -1,4 +1,5 @@
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -269,6 +270,20 @@ async def test_unreadable_page(content: str, message: str) -> None:
 
     with pytest.raises(SourceError, match=message):
         await looked_up(adapter, parse_query(REMIX_EDIT))
+
+
+def test_unreadable_page_state_is_traced(
+    traced: Callable[[str], list[dict[str, object]]],
+) -> None:
+    state = '{"props": {"pageProps": {"track":'
+    content = f'<script id="__NEXT_DATA__">{state}</script>'.encode()
+
+    with pytest.raises(SourceError, match="not valid JSON"):
+        p.page_props(content, "https://www.beatport.com/track/x/1")
+
+    [event] = traced("parse.unrecognized")
+    assert event["length"] == len(state)
+    assert event["tail"] == state
 
 
 def test_search_results_of_another_shape_give_no_hits() -> None:
