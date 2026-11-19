@@ -1,13 +1,14 @@
 import asyncio
-import dataclasses
 import hashlib
 import importlib.util
 import logging
 import random
+import re
 import time
 from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from pathlib import Path
 from types import TracebackType
 from typing import Self
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -20,7 +21,6 @@ from deadwax.core import (
     NotFoundError,
     RateLimitedError,
     SourceError,
-    pause_adapter_timeout,
     trace,
 )
 from deadwax.sources._http.browser import BrowserFetcher
@@ -74,6 +74,7 @@ def _nodriver(settings: HttpSettings, proxy: str | None) -> Fetcher:
         browser_path=settings.nodriver_browser_path,
         sandbox=settings.nodriver_sandbox,
         challenge_wait=settings.browser_challenge_wait,
+        manual_challenge_wait=settings.headed_challenge_wait,
         profile_dir=settings.nodriver_profile_dir,
     )
 
@@ -86,6 +87,7 @@ def _browser(settings: HttpSettings, proxy: str | None) -> Fetcher:
         headless=settings.browser_headless,
         channel=settings.patchright_channel,
         challenge_wait=settings.browser_challenge_wait,
+        manual_challenge_wait=settings.headed_challenge_wait,
         profile_dir=settings.patchright_profile_dir,
     )
 
@@ -116,6 +118,14 @@ def route(proxy: str | None) -> str:
         return DIRECT
     parts = urlsplit(proxy)
     return f"{parts.scheme}://{parts.netloc.rpartition('@')[2]}"
+
+
+def route_profile(directory: Path | None, route_name: str) -> Path | None:
+    """Return the persistent profile of a route; Chrome cannot open one profile twice."""
+    if directory is None or route_name == _ENVIRONMENT_ROUTE:
+        return directory
+    suffix = re.sub(r"[^A-Za-z0-9.]+", "-", urlsplit(route_name).netloc or route_name)
+    return directory.with_name(f"{directory.name}-{suffix.strip('-')}")
 
 
 def redact(url: str, secret_params: Collection[str]) -> str:
@@ -187,6 +197,18 @@ class HttpClient:
         self._resources = resources
         self._proxy = config.proxy(spec.source)
         self._route = route(self._proxy)
+        self._browser_settings = self._settings.model_copy(
+            update={
+                "patchright_profile_dir": route_profile(
+                    self._settings.patchright_profile_dir,
+                    self._route,
+                ),
+                "nodriver_profile_dir": route_profile(
+                    self._settings.nodriver_profile_dir,
+                    self._route,
+                ),
+            },
+        )
 
         self._policy = RetryPolicy(
             retries=self._settings.retries,
@@ -470,21 +492,11 @@ class HttpClient:
         async with sessions.use(
             step,
             factory,
-            self._settings,
+            self._browser_settings,
             self._proxy,
             headed=self._headed,
         ) as fetcher:
-            if not self._fell_back:
-                return await fetcher.fetch(request)
-
-            # A visitor may solve the challenge by hand; that wait is not adapter time.
-            async with pause_adapter_timeout():
-                return await fetcher.fetch(
-                    dataclasses.replace(
-                        request,
-                        challenge_wait=self._settings.headed_challenge_wait,
-                    ),
-                )
+            return await fetcher.fetch(request)
 
     async def _attempt(
         self,

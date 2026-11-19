@@ -1,12 +1,13 @@
 import asyncio
 import contextlib
+import logging
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urlsplit, urlunsplit
 
-from deadwax.core import ConfigurationError, SourceError
-from deadwax.sources._http.challenge import detect_challenge
+from deadwax.core import ConfigurationError, SourceError, pause_adapter_timeout
+from deadwax.sources._http.challenge import SOLVE_PROMPT, detect_challenge
 from deadwax.sources._http.messages import (
     Request,
     Response,
@@ -28,6 +29,11 @@ MISSING_BROWSER = "Chromium for Patchright is not installed: run 'patchright ins
 
 _POLL_SECONDS = 0.25
 
+# Launch errors that mean the browser executable is absent, not that this launch failed.
+_MISSING_EXECUTABLE = ("Executable doesn't exist", "is not found at")
+
+logger = logging.getLogger(__name__)
+
 
 def launch_proxy(proxy: str | None) -> dict[str, Any]:
     """Chromium launch options for a proxy setting; Chromium ignores proxy variables."""
@@ -42,6 +48,10 @@ def launch_proxy(proxy: str | None) -> dict[str, Any]:
         options["username"] = unquote(parts.username)
         options["password"] = unquote(parts.password or "")
     return {"proxy": options}
+
+
+def _status(navigations: list[PageResponse]) -> int:
+    return navigations[-1].status if navigations else 200
 
 
 class BrowserFetcher:
@@ -59,6 +69,7 @@ class BrowserFetcher:
         headless: bool = True,
         channel: str = "chromium",
         challenge_wait: float = 5.0,
+        manual_challenge_wait: float = 60.0,
         profile_dir: Path | None = None,
     ) -> None:
         try:
@@ -72,12 +83,16 @@ class BrowserFetcher:
         self._headless = headless
         self._channel = channel
         self._challenge_wait = challenge_wait
+        self._manual_challenge_wait = manual_challenge_wait
         self._profile_dir = profile_dir
         self._profile: tempfile.TemporaryDirectory[str] | None = None
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
         self._opening = asyncio.Lock()
+
+        # One challenged page at a time is brought to the front of a visible browser.
+        self._front = asyncio.Lock()
 
     async def _open(self) -> BrowserContext:
         async with self._opening:
@@ -112,7 +127,9 @@ class BrowserFetcher:
                 )
             except Error as error:
                 await self.aclose()
-                raise ConfigurationError(MISSING_BROWSER) from error
+                if any(marker in str(error) for marker in _MISSING_EXECUTABLE):
+                    raise ConfigurationError(MISSING_BROWSER) from error
+                raise TransportError(f"browser launch failed: {error}") from error
             accept_language = dict(self._identity.headers).get("accept-language", "en-US")
             self._context = await self._browser.new_context(
                 user_agent=self._identity.user_agent,
@@ -212,9 +229,31 @@ class BrowserFetcher:
         request: Request,
         navigations: list[PageResponse],
     ) -> bytes:
+        """Wait for the page to clear; a visible browser then asks the visitor for help."""
+        content, ready = await self._poll(page, request, navigations, self._challenge_wait)
+        if ready or self._headless or detect_challenge(_status(navigations), {}, content) is None:
+            return content
+        async with pause_adapter_timeout(), self._front:
+            await page.bring_to_front()
+            logger.warning(SOLVE_PROMPT, page.url, self._manual_challenge_wait)
+            content, _ = await self._poll(
+                page,
+                request,
+                navigations,
+                self._manual_challenge_wait,
+            )
+        return content
+
+    async def _poll(
+        self,
+        page: Page,
+        request: Request,
+        navigations: list[PageResponse],
+        wait: float,
+    ) -> tuple[bytes, bool]:
+        """Return the content once it is ready or the wait ends, and whether it is ready."""
         from patchright.async_api import Error  # noqa: PLC0415 -- optional extra (R7)
 
-        wait = self._challenge_wait if request.challenge_wait is None else request.challenge_wait
         deadline = asyncio.get_running_loop().time() + wait
         while True:
             try:
@@ -227,16 +266,14 @@ class BrowserFetcher:
                     raise
                 await asyncio.sleep(_POLL_SECONDS)
                 continue
-            final = navigations[-1] if navigations else None
-            status = final.status if final is not None else 200
             incomplete = (
                 request.required_marker is not None and request.required_marker not in content
             )
-            if not incomplete and detect_challenge(status, {}, content) is None:
-                return content
+            if not incomplete and detect_challenge(_status(navigations), {}, content) is None:
+                return content, True
             remaining = deadline - asyncio.get_running_loop().time()
             if remaining <= 0:
-                return content
+                return content, False
             await asyncio.sleep(min(_POLL_SECONDS, remaining))
 
     async def aclose(self) -> None:

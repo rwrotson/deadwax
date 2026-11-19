@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -22,6 +23,7 @@ class FakeTab:
     navigation_status: int = 200
     callback: Callable[[object], None] | None = None
     closed: bool = False
+    fronts: int = 0
 
     def add_handler(self, event: object, callback: Callable[[object], None]) -> None:
         self.callback = callback
@@ -42,6 +44,9 @@ class FakeTab:
 
     async def send(self, command: object) -> None:
         pass
+
+    async def bring_to_front(self) -> None:
+        self.fronts += 1
 
     async def evaluate(self, expression: str, *, return_by_value: bool) -> int:
         return self.navigation_status
@@ -95,6 +100,7 @@ class Scenario:
     tab: FakeTab = field(default_factory=FakeTab)
     launched: list[dict[str, object]] = field(default_factory=list)
     browser: FakeBrowser | None = None
+    launch_error: Exception | None = None
 
 
 @pytest.fixture
@@ -103,6 +109,8 @@ def scenario(monkeypatch: pytest.MonkeyPatch) -> Scenario:
 
     async def start(**kwargs: object) -> FakeBrowser:
         await asyncio.sleep(0)
+        if state.launch_error is not None:
+            raise state.launch_error
         state.launched.append(kwargs)
         state.browser = FakeBrowser(state.tab)
         return state.browser
@@ -258,18 +266,56 @@ async def test_concurrent_first_fetches_launch_one_browser(scenario: Scenario) -
     assert len(scenario.launched) == 1
 
 
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        (FileNotFoundError("could not determine browser executable"), ConfigurationError),
+        (RuntimeError("profile is already in use"), TransportError),
+    ],
+)
 @pytest.mark.asyncio
-async def test_request_challenge_wait_overrides_the_browser_setting(scenario: Scenario) -> None:
-    scenario.tab.content_sequence = ["<html>loading</html>", "<html>READY</html>"]
-    fetcher = NodriverFetcher(timeout=5, max_bytes=100, challenge_wait=0)
+async def test_launch_failures(
+    scenario: Scenario,
+    error: Exception,
+    expected: type[Exception],
+) -> None:
+    scenario.launch_error = error
+    fetcher = NodriverFetcher(timeout=5, max_bytes=100)
 
-    response = await fetcher.fetch(
-        Request(
-            "GET",
-            "https://example.test/page",
-            required_marker=b"READY",
-            challenge_wait=1,
-        ),
+    with pytest.raises(expected):
+        await fetcher.fetch(Request("GET", "https://example.test/page"))
+
+
+@pytest.mark.asyncio
+async def test_visible_browser_brings_a_challenge_to_the_front(
+    scenario: Scenario,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    challenge = "<html><title>Just a moment...</title></html>"
+    scenario.tab.content_sequence = [challenge, challenge, "<html>solved</html>"]
+    fetcher = NodriverFetcher(
+        timeout=5,
+        max_bytes=100,
+        headless=False,
+        challenge_wait=0,
+        manual_challenge_wait=1,
     )
 
-    assert response.text == "<html>READY</html>"
+    with caplog.at_level(logging.WARNING, logger="deadwax.sources._http.nodriver"):
+        response = await fetcher.fetch(Request("GET", "https://example.test/page"))
+
+    assert response.text == "<html>solved</html>"
+    assert scenario.tab.fronts == 1
+    assert "solve the challenge in the browser window" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_visible_browser_returns_a_page_missing_only_its_marker(scenario: Scenario) -> None:
+    fetcher = NodriverFetcher(timeout=5, max_bytes=100, headless=False, challenge_wait=0)
+
+    response = await fetcher.fetch(
+        Request("GET", "https://example.test/page", required_marker=b"MISSING"),
+    )
+
+    assert b"MISSING" not in response.content
+    assert scenario.tab.fronts == 0

@@ -1,12 +1,13 @@
 import asyncio
+import logging
 import re
 from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import Protocol, cast
 from urllib.parse import urlsplit, urlunsplit
 
-from deadwax.core import ConfigurationError, SourceError
-from deadwax.sources._http.challenge import detect_challenge
+from deadwax.core import ConfigurationError, SourceError, pause_adapter_timeout
+from deadwax.sources._http.challenge import SOLVE_PROMPT, detect_challenge
 from deadwax.sources._http.messages import (
     Request,
     Response,
@@ -40,6 +41,7 @@ class _Tab(Protocol):
     async def evaluate(self, expression: str, *, return_by_value: bool) -> object: ...
     async def sleep(self, seconds: float) -> object: ...
     async def get_content(self) -> str: ...
+    async def bring_to_front(self) -> object: ...
     async def close(self) -> object: ...
     def add_handler(self, event: object, callback: Callable[[object], None]) -> None: ...
 
@@ -64,6 +66,8 @@ MISSING_EXTRA = (
 MISSING_BROWSER = "Chrome for Nodriver is not installed"
 _MIN_HTTP_STATUS = 100
 _POLL_SECONDS = 0.25
+
+logger = logging.getLogger(__name__)
 
 
 def _proxy_args(proxy: str | None) -> list[str]:
@@ -143,6 +147,7 @@ class NodriverFetcher:
         browser_path: Path | None = None,
         sandbox: bool = True,
         challenge_wait: float = 5.0,
+        manual_challenge_wait: float = 60.0,
         profile_dir: Path | None = None,
     ) -> None:
         try:
@@ -156,9 +161,13 @@ class NodriverFetcher:
         self._browser_path = browser_path
         self._sandbox = sandbox
         self._challenge_wait = challenge_wait
+        self._manual_challenge_wait = manual_challenge_wait
         self._profile_dir = profile_dir
         self._browser: _Browser | None = None
         self._opening = asyncio.Lock()
+
+        # One challenged tab at a time is brought to the front of a visible browser.
+        self._front = asyncio.Lock()
 
     async def _open(self) -> _Browser:
         async with self._opening:
@@ -179,8 +188,10 @@ class NodriverFetcher:
                 if not self._sandbox:
                     options["sandbox"] = False
                 self._browser = await start(**options)
-            except (OSError, RuntimeError) as error:
+            except FileNotFoundError as error:
                 raise ConfigurationError(MISSING_BROWSER) from error
+            except (OSError, RuntimeError) as error:
+                raise TransportError(f"browser launch failed: {error}") from error
         return self._browser
 
     async def fetch(self, request: Request) -> Response:
@@ -216,7 +227,28 @@ class NodriverFetcher:
         request: Request,
         responses: list[_NavigationResponse],
     ) -> Response:
-        wait = self._challenge_wait if request.challenge_wait is None else request.challenge_wait
+        """Wait for the page to clear; a visible browser then asks the visitor for help."""
+        response, ready = await self._poll(tab, request, responses, self._challenge_wait)
+        if (
+            ready
+            or self._headless
+            or detect_challenge(response.status, response.headers, response.content) is None
+        ):
+            return response
+        async with pause_adapter_timeout(), self._front:
+            await tab.bring_to_front()
+            logger.warning(SOLVE_PROMPT, tab.url, self._manual_challenge_wait)
+            response, _ = await self._poll(tab, request, responses, self._manual_challenge_wait)
+        return response
+
+    async def _poll(
+        self,
+        tab: _Tab,
+        request: Request,
+        responses: list[_NavigationResponse],
+        wait: float,
+    ) -> tuple[Response, bool]:
+        """Return the page once it is ready or the wait ends, and whether it is ready."""
         deadline = asyncio.get_running_loop().time() + wait
         while True:
             content = (await asyncio.wait_for(tab.get_content(), timeout=self._timeout)).encode()
@@ -237,10 +269,10 @@ class NodriverFetcher:
                 not incomplete
                 and detect_challenge(response.status, response.headers, content) is None
             ):
-                return response
+                return response, True
             remaining = deadline - asyncio.get_running_loop().time()
             if remaining <= 0:
-                return response
+                return response, False
             await asyncio.sleep(min(_POLL_SECONDS, remaining))
 
     async def aclose(self) -> None:

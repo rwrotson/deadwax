@@ -37,6 +37,7 @@ from deadwax.sources._http import (
     escalation_steps,
     redact,
     route,
+    route_profile,
 )
 from deadwax.sources._http import client as client_module
 
@@ -107,6 +108,8 @@ class Setup:
     created: list[Escalation] = field(default_factory=list)
     proxies: list[str | None] = field(default_factory=list)
     headless: list[bool] = field(default_factory=list)
+    profiles: list[Path | None] = field(default_factory=list)
+    profile_dir: Path | None = None
     headed_fallback: bool = False
     resources: HttpResources | None = None
 
@@ -122,6 +125,7 @@ class Setup:
                 self.created.append(step)
                 self.proxies.append(proxy)
                 self.headless.append(settings.browser_headless)
+                self.profiles.append(settings.patchright_profile_dir)
                 fetcher = self.fetchers[step]
                 if isinstance(fetcher, ConfigurationError):
                     raise fetcher
@@ -150,6 +154,7 @@ class Setup:
                 contact="https://c",
                 headed_fallback=self.headed_fallback,
                 headed_challenge_wait=42,
+                patchright_profile_dir=self.profile_dir,
             ),
             cache=CacheSettings(blocked_ttl=self.blocked_ttl),
             lastfm=LastfmSettings(proxy=SecretStr(self.proxy) if self.proxy else None),
@@ -205,7 +210,7 @@ async def test_a_challenged_headless_browser_retries_headed_and_stays_headed() -
 
     assert first.text == second.text == "<html>ok</html>"
     assert setup.headless == [True, False]
-    assert [request.challenge_wait for request in browser.requests] == [None, 42, 42]
+    assert len(browser.requests) == 3
 
 
 @pytest.mark.asyncio
@@ -548,6 +553,39 @@ async def test_escalation_steps_use_the_source_proxy() -> None:
         await client.get(URL)
 
     assert setup.proxies == ["http://user:secret@proxy.example:8080"]
+
+
+@pytest.mark.parametrize(
+    ("proxy", "profile"),
+    [(None, "browser"), ("direct", "browser-direct")],
+)
+@pytest.mark.asyncio
+async def test_each_route_uses_its_own_persistent_profile(
+    tmp_path: Path,
+    proxy: str | None,
+    profile: str,
+) -> None:
+    setup = Setup(Server([httpx.Response(403, content=CHALLENGE)]), proxy=proxy)
+    setup.profile_dir = tmp_path / "browser"
+    setup.fetchers = {Escalation.BROWSER: FakeFetcher("browser", [page()])}
+
+    async with setup.client(Profile.BROWSER, escalation=Escalation.BROWSER) as client:
+        await client.get(URL)
+
+    assert setup.profiles == [tmp_path / profile]
+
+
+@pytest.mark.parametrize(
+    ("directory", "route_name", "expected"),
+    [
+        (None, "direct", None),
+        (Path("p"), "environment", Path("p")),
+        (Path("a/p"), "direct", Path("a/p-direct")),
+        (Path("p"), "http://proxy.example:8080", Path("p-proxy.example-8080")),
+    ],
+)
+def test_route_profile(directory: Path | None, route_name: str, expected: Path | None) -> None:
+    assert route_profile(directory, route_name) == expected
 
 
 @pytest.mark.parametrize(

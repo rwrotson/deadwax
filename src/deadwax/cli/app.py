@@ -54,6 +54,9 @@ _OUTCOMES = {
 # Outcomes that `runs --failed` lists.
 _FAILED = frozenset(RunOutcome) - {RunOutcome.OK}
 
+# Logger of the browser transports, whose warnings ask for a challenge solved by hand.
+_BROWSER_LOGGER = "deadwax.sources._http"
+
 
 class _LookupByDefault(TyperGroup):
     """Run `lookup` when the first argument is not a subcommand, so `deadwax QUERY` works."""
@@ -64,6 +67,21 @@ class _LookupByDefault(TyperGroup):
         if args and args[0] not in self.commands and args[0] not in _ROOT_OPTIONS:
             args = ["lookup", *args]
         return super().parse_args(ctx, args)
+
+
+class _BrowserNotice(logging.Handler):
+    """Print browser transport warnings to stderr when other logs are hidden."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        typer.echo(record.getMessage(), err=True)
+
+
+def _show_browser_notices(show: bool) -> None:
+    browser_logger = logging.getLogger(_BROWSER_LOGGER)
+    for handler in [h for h in browser_logger.handlers if isinstance(h, _BrowserNotice)]:
+        browser_logger.removeHandler(handler)
+    if show:
+        browser_logger.addHandler(_BrowserNotice(logging.WARNING))
 
 
 app = typer.Typer(
@@ -113,6 +131,7 @@ def _settings(config: Path | None, verbose: bool, **overrides: object) -> Settin
 
     log = settings.log.model_copy(update={"level": "DEBUG"}) if verbose else settings.log
     setup_logging(log, console=verbose)
+    _show_browser_notices(not verbose)
     if not verbose:
         # httpx logs every request at INFO; deadwax reports failures in the dossier instead.
         for name in ("httpx", "httpcore"):

@@ -10,6 +10,7 @@ from .client import (
     escalation_steps,
     redact,
     route,
+    route_profile,
 )
 from .impersonate import ImpersonateFetcher
 from .messages import Fetcher, Request, Response, ResponseTooLargeError, TransportError
@@ -64,4 +65,5 @@ __all__ = [
     "parse_retry_after",
     "redact",
     "route",
+    "route_profile",
 ]

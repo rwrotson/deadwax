@@ -1,5 +1,8 @@
 from collections.abc import Mapping
 
+# Warning shown while a visible browser waits for a visitor to complete a challenge.
+SOLVE_PROMPT = "solve the challenge in the browser window: %s (up to %d s)"
+
 # Interstitials that replace the page whatever the status; matched case-insensitively.
 _CHALLENGE_MARKERS = (
     ("<title>just a moment...</title>", "Cloudflare challenge"),

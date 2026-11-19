@@ -400,6 +400,42 @@ def test_verbose_enables_debug_logging(
     assert logging.getLogger("httpx").level == logging.NOTSET
 
 
+def test_browser_prompts_reach_stderr_without_verbose(
+    monkeypatch: pytest.MonkeyPatch,
+    dossier: Dossier,
+    clean_root_logger: logging.Logger,
+) -> None:
+    browser_logger = logging.getLogger("deadwax.sources._http.browser")
+
+    async def prompting(
+        query: Query,
+        config: SourcesConfig,
+        *,
+        include: Collection[str] | None = None,
+        exclude: Collection[str] = (),
+    ) -> Dossier:
+        browser_logger.warning("solve the challenge in the browser window: %s", "https://x")
+        browser_logger.info("not shown")
+        return dossier
+
+    monkeypatch.setattr(app_module, "lookup", prompting)
+
+    try:
+        quiet = runner.invoke(app, ["--track", "Radiohead - Reckoner"])
+        runner.invoke(app, ["--track", "Radiohead - Reckoner", "--verbose"])
+        notices = [
+            handler
+            for handler in logging.getLogger("deadwax.sources._http").handlers
+            if type(handler).__name__ == "_BrowserNotice"
+        ]
+    finally:
+        app_module._show_browser_notices(show=False)
+
+    assert "solve the challenge in the browser window: https://x\n" in quiet.stderr
+    assert "not shown" not in quiet.stderr
+    assert notices == []
+
+
 def test_invalid_configuration_is_a_usage_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DEADWAX_LOG__LEVEL", "LOUD")
 

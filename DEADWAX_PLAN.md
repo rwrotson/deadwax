@@ -263,6 +263,20 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
 
+### 2026-11-19 — Browser blocks after shared sessions (Stage 20 partial)
+
+Run `20261119T120927Z-2e3a98` (`radiohead - true love waits`, `--sources all --no-cache`) after `5d4b838`. Journal findings:
+- Deezer, Discogs, and Beatport reported "Chromium for Patchright is not installed". Cause: `.env` sets `proxy=direct` for Deezer and Discogs, so `BrowserSessions` opened two browsers on one persistent profile, and Chrome refuses a second open. Patchright's launch error was reported as a missing browser, and the client dropped the step for the run (regression from `5d4b838`).
+- AllMusic, Album of the Year, and Rate Your Music fell back to headed together in one window. Only AllMusic cleared (it cleared itself); AOTY and RYM waited 60 s in background tabs. The user saw no window or prompt.
+- Boomkat and WhoSampled (configured headed) waited only `browser_challenge_wait`; the headed 1001Tracklists fetch (27.7 s) hit the 30 s adapter timeout.
+- Not changed: Forced Exposure HTTP 403 without a recognised challenge (no escalation); the Genius HTML `goto` timeout in headless mode.
+
+Decisions (user): a sibling persistent profile per proxy route; the manual-solve wait for every headed page.
+
+Changed: `route_profile()` gives non-environment routes `<dir>-direct` / `<dir>-<host>-<port>`. Patchright reports a launch error as a missing browser only when the executable is absent, otherwise as `TransportError("browser launch failed: …")`, which does not drop the step. Nodriver maps only `FileNotFoundError` to a missing browser. In headed mode, a page still challenged after `browser_challenge_wait` takes a per-browser front lock, is brought to the front, logs `SOLVE_PROMPT` at WARNING, and waits `headed_challenge_wait`, all outside the adapter timeout. The CLI prints these warnings (message only) to stderr in normal runs. `Request.challenge_wait` was removed; the wait is a fetcher setting.
+
+Verification: `uv run poe check` passed (966 offline tests); docs build passed. Live behaviour unverified.
+
 ### 2026-11-19 — Shared browser sessions and headed fallback (Stage 20 partial)
 
 Requested after an uncached `--sources all` run in which headed sources opened a window per request and several headless sources ended as Cloudflare blocks.

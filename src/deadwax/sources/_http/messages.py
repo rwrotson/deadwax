@@ -26,9 +26,6 @@ class Request:
     body: bytes | None = None
     required_marker: bytes | None = None
 
-    # Seconds a browser waits for a challenge to clear; None keeps the transport's setting.
-    challenge_wait: float | None = None
-
     @property
     def full_url(self) -> str:
         """URL with the query string."""

@@ -129,8 +129,8 @@ class HttpSettings(_Model):
         default=60.0,
         ge=0,
         description=(
-            "Seconds a headed fallback waits for a challenge to clear, for example by hand; "
-            "not counted in the adapter timeout"
+            "Seconds a visible browser waits, after the automatic wait, for a challenge "
+            "completed by hand; not counted in the adapter timeout"
         ),
     )
     nodriver_browser_path: Path | None = Field(

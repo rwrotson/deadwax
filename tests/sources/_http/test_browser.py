@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import sys
 import types
 from collections.abc import Callable
@@ -32,6 +33,7 @@ class Scenario:
     html_sequence: list[str] = field(default_factory=list)
     statuses: list[int] = field(default_factory=lambda: [403, 200])
     launch_fails: bool = False
+    launch_error: str = "Executable doesn't exist"
     close_fails: bool = False
     goto_fails: bool = False
     never_idle: bool = False
@@ -39,6 +41,7 @@ class Scenario:
     contexts: list[dict[str, object]] = field(default_factory=list)
     pages: list[FakePage] = field(default_factory=list)
     closed: list[str] = field(default_factory=list)
+    fronts: list[FakePage] = field(default_factory=list)
 
 
 @dataclass
@@ -87,6 +90,9 @@ class FakePage:
     async def wait_for_load_state(self, state: str, **options: object) -> None:
         if self.scenario.never_idle:
             raise FakeError("Timeout")
+
+    async def bring_to_front(self) -> None:
+        self.scenario.fronts.append(self)
 
     async def content(self) -> str:
         if self.scenario.html_sequence:
@@ -140,7 +146,7 @@ class FakeChromium:
         await asyncio.sleep(0)
         self.scenario.launches.append(options)
         if self.scenario.launch_fails:
-            raise FakeError("Executable doesn't exist")
+            raise FakeError(self.scenario.launch_error)
         return FakeBrowser(self.scenario)
 
     async def launch_persistent_context(self, **options: object) -> FakeContext:
@@ -176,6 +182,7 @@ def scenario(monkeypatch: pytest.MonkeyPatch) -> Scenario:
     return state
 
 
+CHALLENGE = "<html><title>Just a moment...</title></html>"
 PAGE = Request("GET", "https://www.discogs.com/release/1-reviews", (("page", "2"),))
 
 
@@ -377,12 +384,61 @@ async def test_concurrent_first_fetches_launch_one_browser(scenario: Scenario) -
 
 
 @pytest.mark.asyncio
-async def test_request_challenge_wait_overrides_the_browser_setting(scenario: Scenario) -> None:
-    scenario.html_sequence = ["<html>loading</html>", "<html>READY</html>"]
-    fetcher = BrowserFetcher(timeout=5, max_bytes=100, challenge_wait=0)
+async def test_other_launch_failures_are_transport_errors(scenario: Scenario) -> None:
+    scenario.launch_fails = True
+    scenario.launch_error = "ProcessSingleton: the profile is already in use"
+    fetcher = BrowserFetcher(timeout=5, max_bytes=100)
 
-    response = await fetcher.fetch(
-        Request("GET", PAGE.url, required_marker=b"READY", challenge_wait=1),
+    with pytest.raises(TransportError, match="browser launch failed: ProcessSingleton"):
+        await fetcher.fetch(PAGE)
+
+
+@pytest.mark.asyncio
+async def test_visible_browser_brings_a_challenge_to_the_front(
+    scenario: Scenario,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    scenario.html_sequence = [CHALLENGE, CHALLENGE, "<html>solved</html>"]
+    fetcher = BrowserFetcher(
+        timeout=5,
+        max_bytes=100,
+        headless=False,
+        challenge_wait=0,
+        manual_challenge_wait=1,
     )
 
-    assert response.text == "<html>READY</html>"
+    with caplog.at_level(logging.WARNING, logger="deadwax.sources._http.browser"):
+        response = await fetcher.fetch(PAGE)
+
+    assert response.text == "<html>solved</html>"
+    assert scenario.fronts == scenario.pages
+    assert "solve the challenge in the browser window" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_challenged_pages_take_the_front_one_at_a_time(scenario: Scenario) -> None:
+    scenario.html = CHALLENGE
+    fetcher = BrowserFetcher(
+        timeout=5,
+        max_bytes=100,
+        headless=False,
+        challenge_wait=0,
+        manual_challenge_wait=0.05,
+    )
+    started = asyncio.get_running_loop().time()
+
+    await asyncio.gather(fetcher.fetch(PAGE), fetcher.fetch(PAGE))
+
+    assert len(scenario.fronts) == 2
+    assert asyncio.get_running_loop().time() - started >= 0.1
+
+
+@pytest.mark.asyncio
+async def test_headless_browser_does_not_ask_for_help(scenario: Scenario) -> None:
+    scenario.html = CHALLENGE
+    fetcher = BrowserFetcher(timeout=5, max_bytes=100, challenge_wait=0)
+
+    response = await fetcher.fetch(PAGE)
+
+    assert response.text == CHALLENGE
+    assert scenario.fronts == []
