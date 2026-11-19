@@ -11,11 +11,13 @@ from pydantic import ValidationError
 from typer.core import TyperGroup
 
 from deadwax import (
+    Capability,
     ConfigurationError,
     Dossier,
     EntityKind,
     InvalidQueryError,
     PerSourceSettings,
+    Request,
     TraceEvent,
     describe_sources,
     lookup,
@@ -153,6 +155,20 @@ def _journal(ctx: typer.Context, settings: Settings, command: str) -> Iterator[R
         journal.set_outcome(RunOutcome.OK, 0)
 
 
+def _facets(value: str | None) -> frozenset[Capability] | None:
+    """Parse comma-separated facet names; an unknown name is an `InvalidQueryError`."""
+    names = _names(value)
+    if names is None:
+        return None
+    known = {facet.value: facet for facet in Capability}
+    unknown = [name for name in names if name not in known]
+    if unknown:
+        raise InvalidQueryError(
+            f"unknown facets: {', '.join(unknown)}; known: {', '.join(known)}",
+        )
+    return frozenset(known[name] for name in names)
+
+
 def _names(value: str | None) -> list[str] | None:
     return [name.strip() for name in value.split(",") if name.strip()] if value else None
 
@@ -224,6 +240,16 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
         str | None,
         typer.Option("--exclude", help="Skip these sources or groups, comma-separated."),
     ] = None,
+    facets: Annotated[
+        str | None,
+        typer.Option(
+            "--facets",
+            help=(
+                "Only these kinds of facts, comma-separated: "
+                f"{', '.join(facet.value for facet in Capability)}; default: all."
+            ),
+        ),
+    ] = None,
     output: FormatOption = OutputFormat.PRETTY,
     no_cache: Annotated[bool, typer.Option("--no-cache", help="Bypass the cache.")] = False,
     timeout: Annotated[
@@ -260,10 +286,11 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
         kind = EntityKind.ALBUM if album else EntityKind.TRACK if track else None
         try:
             parsed = parse_query(query, kind)
+            request = Request(query=parsed, facets=_facets(facets))
             journal.event(TraceEvent.QUERY_PARSED, query=parsed.model_dump(mode="json"))
             dossier: Dossier = asyncio.run(
                 lookup(
-                    parsed,
+                    request,
                     settings.lookup_config(),
                     include=_names(sources),
                     exclude=_names(exclude) or (),

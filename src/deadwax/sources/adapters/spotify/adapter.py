@@ -44,7 +44,9 @@ class SpotifyAdapter(HttpAdapter):
     pass_ = Pass.ENRICH
     group = SourceGroup.STREAMING
     service = "spotify"
-    capabilities = frozenset({Capability.IDENTITY, Capability.LINKS, Capability.METRICS})
+    capabilities = frozenset(
+        {Capability.IDENTITY, Capability.LINKS, Capability.PREVIEWS, Capability.METRICS},
+    )
     requires = (
         Requirement(setting="sources.spotify.client_id", purpose="every lookup"),
         Requirement(setting="sources.spotify.client_secret", purpose="every lookup"),

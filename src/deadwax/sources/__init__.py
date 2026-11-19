@@ -1,5 +1,6 @@
 """Source adapters, HTTP stack and lookup composition."""
 
+from .client import Deadwax
 from .config import (
     DEFAULT_CONTACT,
     AlbumOfTheYearSettings,
@@ -57,6 +58,7 @@ __all__ = [
     "BoomkatSettings",
     "CacheSettings",
     "ClientSettings",
+    "Deadwax",
     "DeezerSettings",
     "DiscogsSettings",
     "Escalation",

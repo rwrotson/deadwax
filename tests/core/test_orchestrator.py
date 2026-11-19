@@ -536,3 +536,47 @@ async def test_url_lookup_traces_its_resolver_and_adopted_kind(traced: Traced) -
     assert traced("lookup.resolver") == [{"source": "bandcamp"}]
     assert traced("lookup.kind_adopted") == [{"kind": "album"}]
     assert [e["pass"] for e in traced("adapter.end")] == ["resolve"]
+
+
+async def test_facets_select_adapters_that_contribute_them() -> None:
+    musicbrainz = FakeAdapter("musicbrainz", Pass.IDENTITY, capabilities=frozenset())
+    lastfm = FakeAdapter("lastfm", capabilities=frozenset({Capability.TAGS}))
+    genius = FakeAdapter(
+        "genius",
+        capabilities=frozenset({Capability.IDENTITY, Capability.TEXTS}),
+        state=SourceState.MISSING_CREDENTIAL,
+    )
+    odesli = FakeAdapter("odesli", Pass.LINKS, capabilities=frozenset({Capability.LINKS}))
+    options = LookupOptions(facets=frozenset({Capability.IDENTITY, Capability.TAGS}))
+
+    errors = await lookup([musicbrainz, lastfm, genius, odesli], options=options)
+
+    assert (len(musicbrainz.calls), len(lastfm.calls), len(odesli.calls)) == (1, 1, 0)
+    assert errors == []
+    [(_, context)] = lastfm.calls
+    assert context.wants(Capability.TAGS)
+    assert not context.wants(Capability.LINKS)
+
+
+async def test_facets_keep_the_resolver_of_a_url_query() -> None:
+    query = Query(url="https://song.link/x")
+    odesli = FakeAdapter(
+        "odesli",
+        Pass.LINKS,
+        capabilities=frozenset({Capability.LINKS}),
+        resolves_urls=True,
+    )
+    options = LookupOptions(facets=frozenset({Capability.TAGS}))
+
+    await lookup([odesli], query, options)
+
+    assert len(odesli.calls) == 1
+
+
+async def test_without_facets_every_adapter_runs_and_wants_everything() -> None:
+    silent = FakeAdapter("silent", capabilities=frozenset())
+
+    await lookup([silent])
+
+    [(_, context)] = silent.calls
+    assert context.wants(Capability.METRICS)

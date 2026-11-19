@@ -11,8 +11,8 @@ Layers are listed from top to bottom. A layer may import any layer below it and 
 | Entry point | `deadwax/main.py` | `deadwax` console script; reports a missing `cli` extra | — | base |
 | CLI | `deadwax/cli/` | Composition root: loads `DEADWAX_*` settings, sets up logging, calls the library, renders output, maps errors to exit codes | Pydantic Settings, Typer, rich, platformdirs | `deadwax[cli]` |
 | Logging setup | `deadwax/logs/` | `LogSettings`, the opt-in `setup_logging()`, and the run journal (`run_journal()`) for applications | structlog | `deadwax[logs]` |
-| Sources | `deadwax/sources/` | Adapter packages and their registry, per-source settings (`LookupConfig`), service catalogue and URL queries (`parse_query`), HTTP stack (rate limits, retries, cache, escalation), `lookup()` | httpx, selectolax; curl_cffi, Patchright, Nodriver | base; `deadwax[stealth]`, `deadwax[browser]`, `deadwax[nodriver]` |
-| Core | `deadwax/core/` | Models, text queries and generic URL rules, normalization, matching, merge, adapter protocol, orchestrator, adapter deadline, trace events, `DeadwaxError` hierarchy | Pydantic | base |
+| Sources | `deadwax/sources/` | Adapter packages and their registry, per-source settings (`LookupConfig`), service catalogue and URL queries (`parse_query`), HTTP stack (rate limits, retries, cache, escalation), the `Deadwax` client and `lookup()` | httpx, selectolax; curl_cffi, Patchright, Nodriver | base; `deadwax[stealth]`, `deadwax[browser]`, `deadwax[nodriver]` |
+| Core | `deadwax/core/` | Models, text queries and generic URL rules, normalization, matching, merge, adapter protocol, orchestrator, requests and trimming to them, adapter deadline, trace events, `DeadwaxError` hierarchy | Pydantic | base |
 
 `deadwax/__init__.py` re-exports the supported names with `__all__` and attaches a `NullHandler` to the `deadwax` logger. `deadwax.logs` raises a `ModuleNotFoundError` that names the `logs` extra when structlog is missing.
 
@@ -45,7 +45,8 @@ import-linter enforces the rules marked *contract* with `uv run poe lint-imports
 From top to bottom:
 
 ```
-deadwax.sources.lookup                  composition: runs the orchestrator over the built adapters
+deadwax.sources.lookup                  `lookup()` with a client for one call; `describe_sources()`
+deadwax.sources.client                  `Deadwax`: shared HTTP resources, adapters built and run per lookup
 deadwax.sources.registry                `ADAPTERS` in resolver order and `build_adapters`
 deadwax.sources.adapters                one package per source
 deadwax.sources._search                 search keys, search hits, `SearchPageAdapter`, `track_on_release`
@@ -77,7 +78,8 @@ challenge | profiles | ratelimit | retry | messages
 From top to bottom:
 
 ```
-orchestrator
+orchestrator | select
+request
 adapter | merge
 matching
 versions
@@ -87,7 +89,7 @@ query
 errors | events | deadline
 ```
 
-`events` holds `TraceEvent`, `trace()`, and `trace_scope()`, which every other core module may use. An event name is a `TraceEvent` member; a new event is added to the enum and to the table in `docs/runs.md`. `deadline` holds the adapter time budget that the orchestrator sets and adapters read or pause.
+`events` holds `TraceEvent`, `trace()`, and `trace_scope()`, which every other core module may use. An event name is a `TraceEvent` member; a new event is added to the enum and to the table in `docs/runs.md`. `deadline` holds the adapter time budget that the orchestrator sets and adapters read or pause. `request` defines what an application asks for; `select` trims a merged dossier to it.
 
 A change to this order is recorded in the progress evidence of `DEADWAX_PLAN.md`.
 
@@ -126,11 +128,11 @@ Tests may import internal modules to test them; CLI tests go through `deadwax.cl
 
 ## Lookup flow
 
-1. `deadwax.lookup(query, config)` (`sources/lookup.py`) opens the cache and shared browser sessions, and `registry.build_adapters` constructs every adapter of `ADAPTERS` with its settings section and an `HttpClient` built from `LookupConfig.client_settings(name)`.
-2. The orchestrator (`core/orchestrator.py`) selects adapters from `include`, `exclude`, and the default set; disabled ones produce no error, adapters without a key or extra are `skipped`.
+1. A `Deadwax` client (`sources/client.py`) opens the cache, the per-host rate limiters, and the shared browser sessions for its whole life; `deadwax.lookup(request, config)` opens one for a single call. For each lookup, `registry.build_adapters` constructs every adapter of `ADAPTERS` with its settings section; each builds its `HttpClient` from `LookupConfig.client_settings(name)` on first use.
+2. The orchestrator (`core/orchestrator.py`) selects adapters from `include`, `exclude`, the default set, and the request's facets (see [Requests](requests.md)); disabled ones produce no error, adapters without a key or extra are `skipped`.
 3. For a URL query, the first adapter whose `resolves()` accepts it runs alone and its candidate becomes the reference; a URL whose kind only a request reveals takes the kind it found.
-4. The remaining adapters run pass by pass (`identity`, `enrichment`, `links`), concurrently within a pass up to `concurrency`, each under its time budget (`core/deadline.py`). Each pass receives a `LookupContext` with the identity, links, and review links of a merge of the earlier passes.
-5. `merge` passes every partial through the matching gate: a candidate of another version becomes an `other_version` relation and a `version` discrepancy; an unrelated candidate is a `no_match` error. The result is the `Dossier`; a `blocked` error gets the adapter's access description.
+4. The remaining adapters run pass by pass (`identity`, `enrich`, `links`), concurrently within a pass up to `concurrency`, each under its time budget (`core/deadline.py`). Each pass receives a `LookupContext` with the identity, links, and review links of a merge of the earlier passes.
+5. `merge` passes every partial through the matching gate: a candidate of another version becomes an `other_version` relation and a `version` discrepancy; an unrelated candidate is a `no_match` error. The result is the `Dossier`; a `blocked` error gets the adapter's access description, and `select.trim` keeps only the requested facts.
 
 Each step emits `TraceEvent` events through `trace()`; the run journal (`deadwax.logs.run_journal`) records them.
 

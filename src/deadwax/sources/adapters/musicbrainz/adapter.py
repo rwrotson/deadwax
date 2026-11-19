@@ -113,8 +113,8 @@ class MusicBrainzAdapter(HttpAdapter):
 
         kind, mbid = target
         if kind is EntityKind.TRACK:
-            return self._track_partial(await self._track_sources(mbid))
-        return await self._album(mbid)
+            return self._track_partial(await self._track_sources(mbid, context))
+        return await self._album(mbid, context)
 
     async def _find_by_ids(self, query: Query) -> Target | None:
         if recording := query.ids.get(IdKind.MUSICBRAINZ_RECORDING):
@@ -206,8 +206,12 @@ class MusicBrainzAdapter(HttpAdapter):
         _trace_ranked(query, len(found.release_groups), ranked)
         return (EntityKind.ALBUM, ranked[0].id) if ranked else None
 
-    async def _members(self, artist_credit: list[models.ArtistCredit]) -> list[Relation]:
-        if not artist_credit:
+    async def _members(
+        self,
+        artist_credit: list[models.ArtistCredit],
+        context: LookupContext,
+    ) -> list[Relation]:
+        if not artist_credit or not context.wants(Capability.RELATIONS):
             return []
         artist = await self._get(
             models.Artist,
@@ -216,7 +220,7 @@ class MusicBrainzAdapter(HttpAdapter):
         )
         return p.member_relations(artist)
 
-    async def _track_sources(self, mbid: str) -> _TrackSources:
+    async def _track_sources(self, mbid: str, context: LookupContext) -> _TrackSources:
         recording = await self._get(models.Recording, f"recording/{mbid}", inc=_RECORDING_INC)
         main = p.first_release(recording.releases)
         release = group = work = None
@@ -239,7 +243,7 @@ class MusicBrainzAdapter(HttpAdapter):
             group=group,
             work=work,
             is_cover=performance is not None and "cover" in performance.attributes,
-            members=await self._members(recording.artist_credit),
+            members=await self._members(recording.artist_credit, context),
         )
 
     def _track_partial(self, found: _TrackSources) -> Partial:
@@ -278,7 +282,7 @@ class MusicBrainzAdapter(HttpAdapter):
             review_links=review_links,
         )
 
-    async def _album(self, group_id: str) -> Partial:
+    async def _album(self, group_id: str, context: LookupContext) -> Partial:
         group = await self._get(models.ReleaseGroup, f"release-group/{group_id}", inc=_GROUP_INC)
         url = p.page("release-group", group_id)
         main = p.first_release(group.releases)
@@ -287,7 +291,7 @@ class MusicBrainzAdapter(HttpAdapter):
             release = await self._get(models.Release, f"release/{main.id}", inc=_ALBUM_RELEASE_INC)
 
         people = p.artist_credits(group.relations, Scope.RELEASE_GROUP, url)
-        relations = await self._members(group.artist_credit)
+        relations = await self._members(group.artist_credit, context)
         links = p.links(group.relations, LinkTarget.ALBUM, url)
         review_links = p.review_links(group.relations, url)
         if release is not None:

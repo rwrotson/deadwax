@@ -27,7 +27,9 @@ class DeezerAdapter(HttpAdapter):
     pass_ = Pass.ENRICH
     group = SourceGroup.CORE
     service = "deezer"
-    capabilities = frozenset({Capability.IDENTITY, Capability.LINKS, Capability.TAGS})
+    capabilities = frozenset(
+        {Capability.IDENTITY, Capability.LINKS, Capability.PREVIEWS, Capability.TAGS},
+    )
     profile = Profile.BROWSER
 
     def resolves(self, query: Query) -> bool:

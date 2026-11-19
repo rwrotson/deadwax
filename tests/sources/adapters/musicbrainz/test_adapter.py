@@ -4,6 +4,7 @@ import httpx
 import pytest
 
 from deadwax.core import (
+    Capability,
     EntityKind,
     Identity,
     IdKind,
@@ -57,11 +58,12 @@ async def lookup(
     query: Query,
     routes: dict[str, object],
     identity: Identity | None = None,
+    facets: frozenset[Capability] | None = None,
 ) -> Partial:
     resources = HttpResources(transport=httpx.MockTransport(respond(routes)))
     config = LookupConfig(sources=PerSourceSettings(musicbrainz=MusicBrainzSettings(rate=1000)))
     adapter = MusicBrainzAdapter(config, resources)
-    context = LookupContext(query=query, identity=identity or Identity())
+    context = LookupContext(query=query, identity=identity or Identity(), facets=facets)
     try:
         return await adapter.lookup(query, context)
     finally:
@@ -247,3 +249,18 @@ def test_resolves_musicbrainz_and_spotify_urls() -> None:
     assert adapter.resolves(parse_query("https://open.spotify.com/track/1"))
     assert adapter.resolves(parse_query(f"https://musicbrainz.org/recording/{RECORDING['id']}"))
     assert not adapter.resolves(parse_query("https://music.apple.com/us/song/x/1"))
+
+
+@pytest.mark.asyncio
+async def test_artist_relations_are_not_read_without_the_relations_facet() -> None:
+    query = parse_query(f"https://musicbrainz.org/recording/{RECORDING['id']}")
+
+    def refuse(request: httpx.Request) -> object:
+        raise AssertionError(f"unexpected request {request.url}")
+
+    routes = {f"recording/{RECORDING['id']}": RECORDING, f"artist/{ARTIST['id']}": refuse}
+
+    partial = await lookup(query, routes, facets=frozenset({Capability.TAGS}))
+
+    assert partial.candidate is not None
+    assert partial.relations == []

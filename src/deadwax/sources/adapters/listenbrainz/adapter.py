@@ -5,6 +5,7 @@ from deadwax.core import (
     EntityKind,
     IdKind,
     LookupContext,
+    Metric,
     NotFoundError,
     Partial,
     Pass,
@@ -51,12 +52,12 @@ class ListenBrainzAdapter(HttpAdapter):
         if (query.kind or context.identity.kind) is EntityKind.ALBUM:
             if group is None:
                 raise NotFoundError("no MusicBrainz release group from earlier sources")
-            return await self._album(group, artist)
+            return await self._album(group, artist, context)
 
         recording = context.id(IdKind.MUSICBRAINZ_RECORDING)
         if recording is None:
             raise NotFoundError("no MusicBrainz recording from earlier sources")
-        return await self._track(recording, group, artist)
+        return await self._track(recording, group, artist, context)
 
     async def _popularity(self, entity: str, mbid: str) -> list[models.Popularity]:
         body = json.dumps({f"{entity.replace('-', '_')}_mbids": [mbid]}).encode()
@@ -87,29 +88,43 @@ class ListenBrainzAdapter(HttpAdapter):
         )
         return p.reviews(models.ReviewList.model_validate_json(response.content).reviews, scope)
 
-    async def _track(self, recording: str, group: str | None, artist: str | None) -> Partial:
+    async def _track(
+        self,
+        recording: str,
+        group: str | None,
+        artist: str | None,
+        context: LookupContext,
+    ) -> Partial:
         url = p.page("track", recording)
-        popularity = await self._popularity("recording", recording)
-        response = await self.client.get(
-            f"{LABS}/similar-recordings/json",
-            params={"recording_mbids": recording, "algorithm": RECORDING_ALGORITHM},
-        )
-        similar = models.similar_recordings.validate_json(response.content)
-        return Partial(
-            source=self.name,
-            metrics=p.metrics(popularity, Scope.RECORDING, url),
-            relations=p.similar_recordings(similar, url, SIMILAR_RECORDINGS)
-            + await self._similar_artists(artist),
-            texts=await self._reviews("recording", recording, Scope.RECORDING)
-            + await self._reviews("release_group", group, Scope.RELEASE_GROUP),
-        )
+        metrics: list[Metric] = []
+        if context.wants(Capability.METRICS):
+            popularity = await self._popularity("recording", recording)
+            metrics = p.metrics(popularity, Scope.RECORDING, url)
+        relations: list[Relation] = []
+        if context.wants(Capability.RELATIONS):
+            response = await self.client.get(
+                f"{LABS}/similar-recordings/json",
+                params={"recording_mbids": recording, "algorithm": RECORDING_ALGORITHM},
+            )
+            similar = models.similar_recordings.validate_json(response.content)
+            relations = p.similar_recordings(similar, url, SIMILAR_RECORDINGS)
+            relations += await self._similar_artists(artist)
+        texts: list[Text] = []
+        if context.wants(Capability.TEXTS):
+            texts = await self._reviews("recording", recording, Scope.RECORDING)
+            texts += await self._reviews("release_group", group, Scope.RELEASE_GROUP)
+        return Partial(source=self.name, metrics=metrics, relations=relations, texts=texts)
 
-    async def _album(self, group: str, artist: str | None) -> Partial:
+    async def _album(self, group: str, artist: str | None, context: LookupContext) -> Partial:
         url = p.page("album", group)
-        popularity = await self._popularity("release-group", group)
-        return Partial(
-            source=self.name,
-            metrics=p.metrics(popularity, Scope.RELEASE_GROUP, url),
-            relations=await self._similar_artists(artist),
-            texts=await self._reviews("release_group", group, Scope.RELEASE_GROUP),
-        )
+        metrics: list[Metric] = []
+        if context.wants(Capability.METRICS):
+            popularity = await self._popularity("release-group", group)
+            metrics = p.metrics(popularity, Scope.RELEASE_GROUP, url)
+        relations: list[Relation] = []
+        if context.wants(Capability.RELATIONS):
+            relations = await self._similar_artists(artist)
+        texts: list[Text] = []
+        if context.wants(Capability.TEXTS):
+            texts = await self._reviews("release_group", group, Scope.RELEASE_GROUP)
+        return Partial(source=self.name, metrics=metrics, relations=relations, texts=texts)

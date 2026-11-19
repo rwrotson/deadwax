@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md). Closed v2 stages (8–17, 19, R-1–R-5), their evidence, and the v2 decision log are archived in [`plans/v2.md`](plans/v2.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1–R-6 done; Stage 20 is next.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1–R-6 done. Stages M-1–M-3 (2026-11-20, requests and data for the mixhound consumer) run before Stage 20; M-1 done, M-2 is next.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -19,6 +19,7 @@ This is the active specification and multi-session handoff for deadwax. deadwax 
 | Anti-bot | HTML sources: browser header profiles, HTTP/2, cookies, jitter, Retry-After, challenge detection, and the escalation ladder httpx → curl_cffi (`stealth`) → Playwright (`browser`). Official APIs: an honest `deadwax/<ver> (+contact)` User-Agent unless the source's `user_agent` setting says otherwise. |
 | Streaming links | MusicBrainz URL relations, iTunes Search, and Deezer in the first two passes; Odesli reads the song.link page in the links pass. |
 | Language | Code, docs, plan journal, commit messages in English. |
+| Requests | Applications ask for facets (`Capability`), not sources; configuration decides which sources may run. One `Deadwax` client shares cache, rate limiters, and browsers across lookups; adapters are built per lookup (2026-11-20, `docs/requests.md`). |
 | Git | No agent commits; stop after each stage with a Conventional Commit suggestion (AGENTS.md "Commit Handoff"). |
 
 ### Product contract
@@ -123,6 +124,9 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Sections of closed
 | R-4 | Done | Source defaults in settings, `LookupConfig` with a `sources` section shared by the CLI, resolved settings for `HttpClient`, registry. |
 | R-5 | Done | Core: `Facts` base, `deadline` module, access label out of the core, nested `SourceInfo.access`, shared formatters. |
 | R-6 | Done | Trace event names, repository cleanup, journal split, architecture docs. |
+| M-1 | Done | Requests by facets, the long-lived `Deadwax` client. |
+| M-2 | Not started | Leads: LB Radio, Last.fm similar artists for tracks, MusicBrainz associated artists. |
+| M-3 | Not started | Bandcamp stream previews, ISRC in queries. |
 | 20 | Not started | Qualification. |
 
 Common acceptance for source stages 9–19, in addition to each stage's own:
@@ -157,6 +161,26 @@ Agreed with the user on 2026-11-19 after a structure review. Goal: one source of
 - **R-5 (core).** `Facts` base shared by `Partial` and `Dossier`; adapter time budget in `core/deadline.py`; `SourceAccess.label` moves to CLI rendering; `SourceInfo.access` nested; shared text formatters for Markdown and rich output.
 - **R-6 (cleanup).** Trace event names as an enum used by sources and the run renderer; decide on `plans/phonica-search.patch` (referenced above); closed v2 stages archived to `plans/v2.md`; `docs/architecture.md` rewritten for the registry and adapter packages.
 
+### Stages M-1–M-3: requests and data for mixhound
+
+Agreed with the user on 2026-11-20. mixhound, an application that finds recordings similar to reference tracks, takes all its track data from deadwax: one lookup per track that names the data it needs, through one client for the whole process. Breaking changes carry `!`. Each stage passes `uv run poe check` and the strict docs build and ends with evidence and a commit suggestion. Design: `docs/requests.md`.
+
+- **M-1 (requests and client).**
+  - Add `Request(query, facets, tags_per_source, relations)` and `RelationLimit(kind, target, per_source)` in `core/request.py`, and `Capability.PREVIEWS` on iTunes, Spotify, Deezer, and Bandcamp.
+  - Select adapters by facet (the identity pass always runs), add `LookupContext.wants()`, and trim the dossier to the request (`core/select.py`).
+  - Add `Deadwax` (`sources/client.py`): cache, rate limiters, and browsers live as long as the client; adapters are built per lookup. `lookup()` becomes a one-call wrapper accepting a `Query` or a `Request`.
+  - Last.fm, ListenBrainz, MusicBrainz, and Bandcamp skip requests for facets that were not asked for.
+  - Add the CLI `--facet` option.
+- **M-2 (leads).**
+  - ListenBrainz LB Radio (`/1/lb-radio/artist/{mbid}`, `mode=easy`, 8 artists × 2 recordings, titles resolved through `/1/metadata/recording/`) → new `RelationKind.SIMILAR_ARTIST_RECORDING`.
+  - Last.fm `artist.getSimilar` also for tracks.
+  - MusicBrainz artist relations: `member of band` stays `member`/`project`; is person, collaboration, supporting / vocal / instrumental supporting musician, subgroup, founder, artist rename, tribute, and producer become new `RelationKind.ASSOCIATED` with the MusicBrainz type in `note`.
+- **M-3 (previews and ISRC).**
+  - The Bandcamp `mp3-128` stream URL from `data-tralbum` becomes the track link's `preview_url`; nothing is downloaded.
+  - `IdKind.ISRC` is accepted in `Query.ids` and used by the MusicBrainz ISRC lookup and the Spotify ISRC search; CLI `--isrc`.
+
+**Suggested messages:** `feat!: request dossiers by facets through a long-lived Deadwax client`; `feat(sources)!: add LB Radio, Last.fm similar artists for tracks, and MusicBrainz associated artists`; `feat!: expose Bandcamp stream previews and accept ISRC in queries`.
+
 ### Stage 20: qualification
 
 - [ ] README source tiers and docs pages for every v2 source.
@@ -190,6 +214,26 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 ## Progress evidence and decision log
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
+
+### 2026-11-20 — M-1 evidence (requests and client)
+
+Changed:
+- `core/request.py`: `Request(query, facets, tags_per_source, relations)` and `RelationLimit(kind, target, per_source)`; caps without their facet are rejected. `core/select.py`: `trim()` empties facets not requested, keeps only preview links for `previews` without `links`, caps tags per first source and relations per first source, kind, and target type. R5 contract: `orchestrator | select` above `request` above `adapter | merge`.
+- `Capability.PREVIEWS` on iTunes, Spotify, and Deezer (Bandcamp follows in M-3 with its stream URL).
+- Orchestrator: `LookupOptions.facets`; an adapter runs when it is in the identity pass, resolves the query URL, or contributes a requested facet other than `identity`; the trace event `lookup.selected` gains `facets`. `LookupContext.facets` and `wants()`.
+- `sources/client.py`: `Deadwax`, an async context manager holding the response cache and `HttpResources` (per-host limiters, browser sessions) for its life; adapters are built and closed per lookup. `lookup()` opens a client for one call and accepts a `Query` or a `Request`. R4 contract: `client` below `lookup`. Docstrings of `HttpResources` and `BrowserSessions` say they live as long as the client.
+- Last.fm skips top tags without `tags` and similar items without `relations`; ListenBrainz skips popularity, similar items, and reviews without `metrics`, `relations`, `texts`; MusicBrainz skips the artist-relations request and Bandcamp the label page without `relations`.
+- CLI `--facets` (comma-separated, like `--sources`); an unknown facet is a usage error.
+- Exports `Request`, `RelationLimit`, `Deadwax` (lazy). Docs: new `docs/requests.md` page, architecture layers and lookup flow, getting started, README, API reference index.
+
+Decisions:
+- (agent) Adapters are built per lookup rather than once per client: per-lookup state (Spotify token, escalation level, headed fallback of a client) stays valid without refresh logic, while limiters, cache, and browsers are shared. This replaces the planned Spotify token refresh. A browser session upgraded to headed stays headed for the client's life.
+- (agent) `include`/`exclude` stay arguments of `lookup()`, not `Request` fields: the request names data, the caller and configuration name sources.
+- (agent) Review links belong to the `texts` facet.
+
+Checks: `uv run poe check` passed (fmt-check, lint, lint-imports 16 contracts kept, mypy, 1098 tests, coverage 96.95%; `core/request.py`, `core/select.py`, `sources/client.py` fully covered); `uv run --group docs properdocs build --strict` passed. No live runs: the stage changes selection and composition, and replayed fixtures cover facet selection (`tests/sources/test_client.py`).
+
+**Suggested message:** `feat!: request dossiers by facets through a long-lived Deadwax client`.
 
 ### 2026-11-19 — R-6 evidence (cleanup)
 

@@ -26,6 +26,10 @@ class Capability(StrEnum):
 
     IDENTITY = "identity"
     LINKS = "links"
+
+    # Links that carry a playable preview URL.
+    PREVIEWS = "previews"
+
     TAGS = "tags"
     CREDITS = "credits"
     TEXTS = "texts"
@@ -98,6 +102,13 @@ class LookupContext(_Model):
     identity: Identity = Identity()
     links: list[Link] = []
     review_links: list[ReviewLink] = []
+
+    # Facets the request asked for; unset means all of them.
+    facets: frozenset[Capability] | None = None
+
+    def wants(self, facet: Capability) -> bool:
+        """Whether the request asked for a kind of facts, so an adapter may skip the rest."""
+        return self.facets is None or facet in self.facets
 
     def id(self, kind: IdKind) -> str | None:
         """Return the first known identifier of a kind, from the query or earlier passes."""

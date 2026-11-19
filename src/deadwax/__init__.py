@@ -30,6 +30,8 @@ from .core import (
     Rating,
     Relation,
     RelationKind,
+    RelationLimit,
+    Request,
     Requirement,
     ReviewLink,
     Scope,
@@ -53,6 +55,7 @@ from .core import (
 if TYPE_CHECKING:
     from .sources import (
         CacheSettings,
+        Deadwax,
         Escalation,
         HttpSettings,
         LookupConfig,
@@ -68,6 +71,7 @@ if TYPE_CHECKING:
 _SOURCES_NAMES = frozenset(
     {
         "CacheSettings",
+        "Deadwax",
         "Escalation",
         "HttpSettings",
         "LookupConfig",
@@ -98,6 +102,7 @@ __all__ = [
     "Capability",
     "ConfigurationError",
     "Credit",
+    "Deadwax",
     "DeadwaxError",
     "Discrepancy",
     "Dossier",
@@ -125,6 +130,8 @@ __all__ = [
     "Rating",
     "Relation",
     "RelationKind",
+    "RelationLimit",
+    "Request",
     "Requirement",
     "ReviewLink",
     "Scope",

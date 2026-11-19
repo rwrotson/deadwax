@@ -86,7 +86,10 @@ class BandcampAdapter(HttpAdapter):
         if details is not None:
             record = p.with_details(record, details)
         record = p.own_facts(record)
-        return p.partial(record, await self._label_releases(record))
+        label_releases = []
+        if context.wants(Capability.RELATIONS):
+            label_releases = await self._label_releases(record)
+        return p.partial(record, label_releases)
 
     async def _find(
         self,

@@ -7,6 +7,7 @@ import pytest
 
 from deadwax.core import (
     BlockedError,
+    Capability,
     EntityKind,
     IdKind,
     Link,
@@ -307,6 +308,19 @@ async def test_label_account_lists_label_releases() -> None:
 
     releases = [r for r in partial.relations if r.kind is RelationKind.LABEL_RELEASE]
     assert [r.target.name for r in releases] == ["Other"]
+
+
+@pytest.mark.asyncio
+async def test_label_page_is_not_read_without_the_relations_facet() -> None:
+    query = parse_query(ALBUM)
+    seen: list[str] = []
+    found = adapter({ALBUM: (200, ALBUM_PAGE), MOBILE_API: (200, details(1, "a", "Band"))}, seen)
+    wanted = LookupContext(query=query, facets=frozenset({Capability.TAGS}))
+
+    partial = await found.lookup(query, wanted)
+
+    assert partial.candidate is not None
+    assert "GET https://band.bandcamp.com/music" not in seen
 
 
 @pytest.mark.asyncio

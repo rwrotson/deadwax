@@ -4,11 +4,13 @@ import httpx
 import pytest
 
 from deadwax.core import (
+    Capability,
     EntityKind,
     Identity,
     LookupContext,
     NotFoundError,
     Provenance,
+    Query,
     Scope,
     Sourced,
     SourceState,
@@ -154,3 +156,29 @@ def test_status_needs_the_key() -> None:
 )
 def test_artist_page(url: str | None, artist: str | None) -> None:
     assert _artist_page(url) == artist
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("query", "facet", "methods"),
+    [
+        (TRACK, Capability.TAGS, {"track.getInfo", "track.getTopTags", "artist.getTopTags"}),
+        (TRACK, Capability.RELATIONS, {"track.getInfo", "track.getSimilar"}),
+        (TRACK, Capability.TEXTS, {"track.getInfo"}),
+        (ALBUM, Capability.TAGS, {"album.getInfo", "album.getTopTags", "artist.getTopTags"}),
+        (ALBUM, Capability.RELATIONS, {"album.getInfo", "artist.getSimilar"}),
+    ],
+)
+async def test_asks_only_for_wanted_facets(
+    query: Query,
+    facet: Capability,
+    methods: set[str],
+) -> None:
+    seen: list[httpx.Request] = []
+    adapter = make(seen=seen)
+
+    partial = await adapter.lookup(query, LookupContext(query=query, facets=frozenset({facet})))
+    await adapter.aclose()
+
+    assert partial.candidate is not None
+    assert {request.url.params["method"] for request in seen} == methods

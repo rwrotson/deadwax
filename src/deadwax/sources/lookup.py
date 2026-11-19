@@ -2,16 +2,9 @@ from collections.abc import Collection
 
 import httpx
 
-from deadwax.core import (
-    Dossier,
-    ErrorKind,
-    LookupOptions,
-    Query,
-    SourceInfo,
-    expand_names,
-    run,
-)
-from deadwax.sources._http import HttpResources, open_cache
+from deadwax.core import Dossier, Query, Request, SourceInfo, expand_names
+from deadwax.sources._http import HttpResources
+from deadwax.sources.client import Deadwax
 from deadwax.sources.config import LookupConfig
 from deadwax.sources.registry import build_adapters
 
@@ -40,43 +33,18 @@ def describe_sources(config: LookupConfig | None = None) -> list[SourceInfo]:
 
 
 async def lookup(
-    query: Query,
+    request: Request | Query,
     config: LookupConfig | None = None,
     *,
     include: Collection[str] | None = None,
     exclude: Collection[str] = (),
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> Dossier:
-    """Collect what the sources know about the queried record.
+    """Collect what the sources know about the queried record, with a client for one call.
 
-    `include` and `exclude` take source and group names; without `include` the sources of
-    `config.default_sources` run. `transport` replaces the network, for tests and recorded
-    responses.
+    A bare query asks for every facet. `include` and `exclude` take source and group names;
+    without `include` the sources of `config.default_sources` run. `transport` replaces the
+    network, for tests and recorded responses.
     """
-    config = config or LookupConfig()
-    cache = open_cache(config.cache)
-    resources = HttpResources(cache=cache, transport=transport)
-    adapters = build_adapters(config, resources)
-    options = LookupOptions(
-        adapter_timeout=config.adapter_timeout,
-        include=frozenset(include if include is not None else config.default_sources),
-        exclude=frozenset(exclude),
-        concurrency=config.concurrency,
-    )
-
-    try:
-        dossier = await run(query, adapters, options)
-        by_name = {adapter.name: adapter for adapter in adapters}
-        errors = [
-            error.model_copy(update={"access": by_name[error.source].access()})
-            if error.kind is ErrorKind.BLOCKED
-            else error
-            for error in dossier.errors
-        ]
-        return dossier.model_copy(update={"errors": errors})
-    finally:
-        for adapter in adapters:
-            await adapter.aclose()
-        await resources.sessions.aclose()
-        if cache is not None:
-            cache.close()
+    async with Deadwax(config, transport=transport) as client:
+        return await client.lookup(request, include=include, exclude=exclude)

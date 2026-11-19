@@ -9,6 +9,7 @@ import pytest
 from typer.testing import CliRunner
 
 from deadwax import (
+    Capability,
     ConfigurationError,
     Dossier,
     EntityKind,
@@ -16,6 +17,7 @@ from deadwax import (
     Identity,
     LookupConfig,
     Query,
+    Request,
 )
 from deadwax.cli import app as app_module
 from deadwax.cli.app import EXIT_NOTHING_MATCHED, EXIT_USAGE, app, select_runs
@@ -33,16 +35,18 @@ class FakeLookup:
     calls: list[tuple[Query, LookupConfig, Collection[str] | None, Collection[str]]] = field(
         default_factory=list,
     )
+    requests: list[Request] = field(default_factory=list)
 
     async def __call__(
         self,
-        query: Query,
+        request: Request,
         config: LookupConfig,
         *,
         include: Collection[str] | None = None,
         exclude: Collection[str] = (),
     ) -> Dossier:
-        self.calls.append((query, config, include, exclude))
+        self.requests.append(request)
+        self.calls.append((request.query, config, include, exclude))
         if self.error is not None:
             raise self.error
         return self.dossier
@@ -106,6 +110,32 @@ def test_options_reach_the_lookup(fake: FakeLookup, tmp_path: Path) -> None:
     assert query.kind is EntityKind.ALBUM
     assert (config.cache.enabled, config.adapter_timeout) == (False, 5)
     assert (include, exclude) == (["musicbrainz", "itunes"], ["deezer"])
+
+
+def test_facets_option_reaches_the_request(fake: FakeLookup) -> None:
+    result = runner.invoke(
+        app,
+        ["--track", "Radiohead - Reckoner", "--facets", "tags, previews"],
+    )
+
+    assert result.exit_code == 0, result.output
+    [request] = fake.requests
+    assert request.facets == frozenset({Capability.TAGS, Capability.PREVIEWS})
+
+
+def test_without_facets_option_every_facet_is_requested(fake: FakeLookup) -> None:
+    result = runner.invoke(app, ["--track", "Radiohead - Reckoner"])
+
+    assert result.exit_code == 0, result.output
+    assert fake.requests[0].facets is None
+
+
+def test_unknown_facet_is_a_usage_error(fake: FakeLookup) -> None:
+    result = runner.invoke(app, ["--track", "Radiohead - Reckoner", "--facets", "tags,lyrics"])
+
+    assert result.exit_code == EXIT_USAGE
+    assert "unknown facets: lyrics" in result.stderr
+    assert not fake.calls
 
 
 def test_all_sources_option_reaches_lookup(fake: FakeLookup) -> None:

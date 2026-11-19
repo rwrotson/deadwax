@@ -9,7 +9,7 @@ from deadwax.sources.config import Escalation, HttpSettings
 
 type FetcherFactory = Callable[[HttpSettings, str | None], Fetcher]
 
-# Transports that launch a browser shared by the adapters of one lookup.
+# Transports that launch a browser shared by the adapters of a client's lookups.
 BROWSER_STEPS = frozenset({Escalation.BROWSER, Escalation.NODRIVER})
 
 
@@ -76,7 +76,7 @@ class _Session:
 
 
 class BrowserSessions:
-    """Browsers shared by the clients of one lookup.
+    """Browsers shared by the HTTP clients of one `Deadwax` client, across its lookups.
 
     A session opens headless or headed as first requested. A headed request upgrades a
     headless session once its pages finish; a headed session also serves headless requests.

@@ -144,7 +144,7 @@ def redact(url: str, secret_params: Collection[str]) -> str:
 
 @dataclass(slots=True)
 class HttpResources:
-    """Objects shared by the clients of one lookup; tests replace transports and time."""
+    """Objects shared across the lookups of one client; tests replace transports and time."""
 
     limiters: HostLimiters = field(default_factory=HostLimiters)
     cache: ResponseCache | None = None

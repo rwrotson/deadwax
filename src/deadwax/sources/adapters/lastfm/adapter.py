@@ -7,6 +7,7 @@ from deadwax.core import (
     Pass,
     Query,
     RecordKey,
+    Relation,
     Requirement,
     Scope,
     SourceGroup,
@@ -64,8 +65,8 @@ class LastfmAdapter(HttpAdapter):
         if key is None:
             raise NotFoundError("neither the query nor earlier sources name the record")
         if key.kind is EntityKind.ALBUM:
-            return await self._album(key)
-        return await self._track(key)
+            return await self._album(key, context)
+        return await self._track(key, context)
 
     async def _artist_tags(self, artist: str, page: str | None) -> list[Tag]:
         found = await self._call(
@@ -76,48 +77,60 @@ class LastfmAdapter(HttpAdapter):
         )
         return p.tags(found.toptags.tag, Scope.ARTIST, page, p.ARTIST_TAGS_LIMIT)
 
-    async def _track(self, key: RecordKey) -> Partial:
+    async def _track(self, key: RecordKey, context: LookupContext) -> Partial:
         names = {"artist": key.artist, "track": key.title, "autocorrect": "1"}
         track = (await self._call(models.TrackInfoResponse, "track.getInfo", **names)).track
 
         names = {"artist": track.artist.name, "track": track.name}
-        top = await self._call(models.TopTagsResponse, "track.getTopTags", **names)
-        similar = await self._call(
-            models.SimilarTracksResponse,
-            "track.getSimilar",
-            **names,
-            limit=SIMILAR_TRACKS,
-        )
-
         artist_page = track.artist.url or _artist_page(track.url)
+        tags: list[Tag] = []
+        if context.wants(Capability.TAGS):
+            top = await self._call(models.TopTagsResponse, "track.getTopTags", **names)
+            tags = p.tags(top.toptags.tag, Scope.RECORDING, track.url)
+            tags += await self._artist_tags(track.artist.name, artist_page)
+        relations: list[Relation] = []
+        if context.wants(Capability.RELATIONS):
+            similar = await self._call(
+                models.SimilarTracksResponse,
+                "track.getSimilar",
+                **names,
+                limit=SIMILAR_TRACKS,
+            )
+            relations = p.similar_tracks(similar.similartracks.track, track.url)
+
         return Partial(
             source=self.name,
             candidate=p.track_candidate(track),
-            tags=p.tags(top.toptags.tag, Scope.RECORDING, track.url)
-            + await self._artist_tags(track.artist.name, artist_page),
+            tags=tags,
             texts=p.wiki_texts(track.wiki, Scope.RECORDING, track.url),
-            relations=p.similar_tracks(similar.similartracks.track, track.url),
+            relations=relations,
         )
 
-    async def _album(self, key: RecordKey) -> Partial:
+    async def _album(self, key: RecordKey, context: LookupContext) -> Partial:
         names = {"artist": key.artist, "album": key.title, "autocorrect": "1"}
         album = (await self._call(models.AlbumInfoResponse, "album.getInfo", **names)).album
 
         names = {"artist": album.artist, "album": album.name}
-        top = await self._call(models.TopTagsResponse, "album.getTopTags", **names)
-        similar = await self._call(
-            models.SimilarArtistsResponse,
-            "artist.getSimilar",
-            artist=album.artist,
-            limit=SIMILAR_ARTISTS,
-        )
-
         artist_page = _artist_page(album.url)
+        tags: list[Tag] = []
+        if context.wants(Capability.TAGS):
+            top = await self._call(models.TopTagsResponse, "album.getTopTags", **names)
+            tags = p.tags(top.toptags.tag, Scope.RELEASE_GROUP, album.url)
+            tags += await self._artist_tags(album.artist, artist_page)
+        relations: list[Relation] = []
+        if context.wants(Capability.RELATIONS):
+            similar = await self._call(
+                models.SimilarArtistsResponse,
+                "artist.getSimilar",
+                artist=album.artist,
+                limit=SIMILAR_ARTISTS,
+            )
+            relations = p.similar_artists(similar.similar.artist, artist_page)
+
         return Partial(
             source=self.name,
             candidate=p.album_candidate(album),
-            tags=p.tags(top.toptags.tag, Scope.RELEASE_GROUP, album.url)
-            + await self._artist_tags(album.artist, artist_page),
+            tags=tags,
             texts=p.wiki_texts(album.wiki, Scope.RELEASE_GROUP, album.url),
-            relations=p.similar_artists(similar.similar.artist, artist_page),
+            relations=relations,
         )

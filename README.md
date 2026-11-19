@@ -22,7 +22,7 @@ deadwax sources
 deadwax runs --failed
 ```
 
-A text query must state `--album` or `--track`; a URL implies its kind. `--sources` and `--exclude` take source and group names (`core`, `shops`, `press`, `catalogues`, `radio`, `streaming`, `samples`), or `all` for every source; without `--sources`, the sources of `DEADWAX_DEFAULT_SOURCES` (default `musicbrainz,itunes,odesli,bandcamp,wikipedia,lastfm,discogs,listenbrainz,secondhandsongs,kexp,spotify,youtube,genius`) run. `deadwax sources` shows configured API or HTML access, including ordered HTML transports and the headed or headless mode of Patchright and Nodriver (`headless → headed` when a challenged headless page is retried in a window). Other options: `--exclude`, `--format pretty|json|markdown`, `--no-cache`, `--timeout`, `--config`, `--verbose` (or `--debug`) for diagnostic stderr logs. Normal runs print the dossier and its error summary without logs, except the prompt to solve a challenge in a visible browser window. Exit codes: 0 found, 1 unexpected error, 2 usage or configuration error, 3 nothing matched.
+A text query must state `--album` or `--track`; a URL implies its kind. `--sources` and `--exclude` take source and group names (`core`, `shops`, `press`, `catalogues`, `radio`, `streaming`, `samples`), or `all` for every source; without `--sources`, the sources of `DEADWAX_DEFAULT_SOURCES` (default `musicbrainz,itunes,odesli,bandcamp,wikipedia,lastfm,discogs,listenbrainz,secondhandsongs,kexp,spotify,youtube,genius`) run. `deadwax sources` shows configured API or HTML access, including ordered HTML transports and the headed or headless mode of Patchright and Nodriver (`headless → headed` when a challenged headless page is retried in a window). `--facets` limits the lookup to kinds of facts (`identity`, `links`, `previews`, `tags`, `credits`, `texts`, `relations`, `metrics`): only sources that contribute them run, and the dossier keeps only them. Other options: `--exclude`, `--format pretty|json|markdown`, `--no-cache`, `--timeout`, `--config`, `--verbose` (or `--debug`) for diagnostic stderr logs. Normal runs print the dossier and its error summary without logs, except the prompt to solve a challenge in a visible browser window. Exit codes: 0 found, 1 unexpected error, 2 usage or configuration error, 3 nothing matched.
 
 `blocked` errors show the source's access configuration for that lookup in terminal and Markdown tables, and as structured data in JSON.
 
@@ -38,6 +38,8 @@ dossier = asyncio.run(
 )
 print(dossier.model_dump_json(indent=2))
 ```
+
+An application that looks up many records keeps one `Deadwax` client, which shares the cache, rate limits, and browsers across concurrent lookups, and asks for facets with a `Request`; see [Requests](https://rwrotson.github.io/deadwax/requests/).
 
 ## Installation
 

@@ -4,6 +4,7 @@ import httpx
 import pytest
 
 from deadwax.core import (
+    Capability,
     EntityKind,
     ExternalId,
     Identity,
@@ -144,3 +145,39 @@ def test_published_dates() -> None:
     assert published(None) is None
     assert published("not a date") is None
     assert published("Fri, 25 Jan 2008 00:00:00 GMT") == "2008-01-25"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("kind", "facet", "paths"),
+    [
+        (EntityKind.TRACK, Capability.METRICS, {"/1/popularity/recording"}),
+        (
+            EntityKind.TRACK,
+            Capability.RELATIONS,
+            {"/similar-recordings/json", "/similar-artists/json"},
+        ),
+        (EntityKind.TRACK, Capability.TEXTS, {"/ws/1/review/"}),
+        (EntityKind.ALBUM, Capability.METRICS, {"/1/popularity/release-group"}),
+        (EntityKind.ALBUM, Capability.RELATIONS, {"/similar-artists/json"}),
+        (EntityKind.ALBUM, Capability.TEXTS, {"/ws/1/review/"}),
+    ],
+)
+async def test_asks_only_for_wanted_facets(
+    kind: EntityKind,
+    facet: Capability,
+    paths: set[str],
+) -> None:
+    seen: list[httpx.Request] = []
+    adapter = make(seen)
+    found = context(
+        kind,
+        (IdKind.MUSICBRAINZ_RECORDING, RECORDING),
+        (IdKind.MUSICBRAINZ_RELEASE_GROUP, GROUP),
+        (IdKind.MUSICBRAINZ_ARTIST, ARTIST),
+    ).model_copy(update={"facets": frozenset({facet})})
+
+    await adapter.lookup(found.query, found)
+    await adapter.aclose()
+
+    assert {request.url.path for request in seen} == paths

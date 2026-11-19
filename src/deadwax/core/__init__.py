@@ -72,6 +72,8 @@ from .normalize import (
 )
 from .orchestrator import LookupOptions, expand_names, run
 from .query import EntityKind, IdKind, Query, UrlRule, recognize_url, text_query
+from .request import RelationLimit, Request
+from .select import trim
 from .versions import ParsedTitle, classify_marker, parse_title
 
 __all__ = [
@@ -118,6 +120,8 @@ __all__ = [
     "RecordKey",
     "Relation",
     "RelationKind",
+    "RelationLimit",
+    "Request",
     "Requirement",
     "ReviewLink",
     "Scope",
@@ -162,4 +166,5 @@ __all__ = [
     "trace",
     "trace_fields",
     "trace_scope",
+    "trim",
 ]

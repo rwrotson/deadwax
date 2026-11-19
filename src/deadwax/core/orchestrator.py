@@ -7,7 +7,14 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from deadwax.core.adapter import Adapter, LookupContext, Pass, SourceGroup, SourceState
+from deadwax.core.adapter import (
+    Adapter,
+    Capability,
+    LookupContext,
+    Pass,
+    SourceGroup,
+    SourceState,
+)
 from deadwax.core.deadline import adapter_deadline
 from deadwax.core.errors import (
     BlockedError,
@@ -126,6 +133,10 @@ class LookupOptions(BaseModel):
         ge=1,
         description="Adapters run at once; unlimited when unset",
     )
+    facets: frozenset[Capability] | None = Field(
+        default=None,
+        description="Kinds of facts wanted; adapters contributing none of them do not run",
+    )
 
     def timeout_for(self, source: str) -> float:
         """Return the timeout of one adapter."""
@@ -149,9 +160,19 @@ def expand_names(names: Collection[str], adapters: Sequence[Adapter]) -> frozens
     )
 
 
+def _needed(adapter: Adapter, query: Query, facets: frozenset[Capability] | None) -> bool:
+    """Whether an adapter contributes a wanted facet, finds identifiers, or reads the query URL."""
+    if facets is None or adapter.pass_ is Pass.IDENTITY:
+        return True
+    if query.url is not None and adapter.resolves(query):
+        return True
+    return bool(adapter.capabilities & (facets - {Capability.IDENTITY}))
+
+
 def _select(
     adapters: Sequence[Adapter],
     options: LookupOptions,
+    query: Query,
 ) -> tuple[list[Adapter], list[AdapterError]]:
     include = expand_names(options.include, adapters) if options.include is not None else None
     exclude = expand_names(options.exclude, adapters)
@@ -160,6 +181,8 @@ def _select(
     skipped: list[AdapterError] = []
     for adapter in adapters:
         if adapter.name in exclude or (include is not None and adapter.name not in include):
+            continue
+        if not _needed(adapter, query, options.facets):
             continue
         status = adapter.status()
         if status.state is SourceState.READY:
@@ -173,6 +196,7 @@ def _select(
         TraceEvent.LOOKUP_SELECTED,
         include=None if options.include is None else sorted(options.include),
         exclude=sorted(options.exclude),
+        facets=None if options.facets is None else sorted(options.facets),
         ready=[adapter.name for adapter in ready],
         skipped={error.source: error.reason for error in skipped},
         not_selected=sorted(
@@ -200,6 +224,7 @@ class _Run:
             identity=dossier.identity,
             links=dossier.links,
             review_links=dossier.review_links,
+            facets=self.options.facets,
         )
 
     async def run(self, adapters: Sequence[Adapter], pass_: str) -> None:
@@ -259,7 +284,7 @@ async def run(
 ) -> Dossier:
     """Look the query up with adapters pass by pass and merge their results into a dossier."""
     options = options or LookupOptions()
-    ready, skipped = _select(adapters, options)
+    ready, skipped = _select(adapters, options, query)
     lookup = _Run(query, options, now)
 
     resolver = None

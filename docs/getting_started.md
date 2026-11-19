@@ -56,6 +56,8 @@ dossier = asyncio.run(lookup(query, LookupConfig()))
 print(dossier.model_dump_json(indent=2))
 ```
 
+For many lookups, keep one `Deadwax` client and ask for the facts you need with a `Request`; see [Requests](requests.md).
+
 The library never reads the environment and caches nothing unless `LookupConfig.cache.path` is set. A failing source never raises out of `lookup()`; it appears in `dossier.errors`. Library errors derive from `DeadwaxError`.
 
 A base install (`pip install deadwax`) depends on Pydantic, httpx, and selectolax. Optional extras add application features:

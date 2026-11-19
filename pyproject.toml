@@ -287,7 +287,8 @@ name = "R5: core modules"
 type = "layers"
 containers = ["deadwax.core"]
 layers = [
-    "orchestrator",
+    "orchestrator | select",
+    "request",
     "adapter | merge",
     "matching", "versions", "normalize", "models", "query", "errors | events | deadline"]
 
@@ -297,6 +298,7 @@ type = "layers"
 containers = ["deadwax.sources"]
 layers = [
     "lookup",
+    "client",
     "registry",
     "adapters",
     "_search",

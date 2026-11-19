@@ -13,10 +13,13 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.core.matching` | Compare a candidate with the queried record and its version |
 | `deadwax.core.merge` | Combine adapter results into a dossier with discrepancies |
 | `deadwax.core.adapter` | Define the adapter protocol, source status, and lookup context |
+| `deadwax.core.request` | Define a request: the record and the facts wanted about it |
+| `deadwax.core.select` | Trim a dossier to the facts a request asked for |
 | `deadwax.core.deadline` | Give each adapter call a time budget it can read and pause |
 | `deadwax.core.orchestrator` | Run adapters pass by pass and merge their results |
 | `deadwax.sources.config` | Define the lookup configuration: HTTP, cache, and each source's settings with its defaults |
-| `deadwax.sources.lookup` | Describe the sources and look a query up |
+| `deadwax.sources.client` | Keep HTTP resources across lookups and run each requested lookup |
+| `deadwax.sources.lookup` | Describe the sources and look a query up with a client for one call |
 | `deadwax.sources.registry` | List the adapters in resolver order and build them |
 | `deadwax.sources.services` | Service catalogue of hosts and URL rules; parse record page URLs into queries |
 | `deadwax.sources.adapters.musicbrainz.adapter` | Find recordings and release groups in MusicBrainz |
