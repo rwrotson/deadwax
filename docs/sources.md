@@ -37,7 +37,7 @@ The README lists sources planned for later versions and those deadwax will not u
 
 - **Access:** WS/2 JSON API, keyless, 1 request a second, with the `deadwax/<version> (+contact)` User-Agent that the API requires.
 - **Pass:** identity.
-- **Finds the record by:** MusicBrainz IDs in the query; any URL through `ws/2/url`; an ISRC; or a search. Track searches look at official album, EP and single releases first, then a plain search, then the base title. DJ-mix excerpts and videos are excluded.
+- **Finds the record by:** MusicBrainz IDs in the query; any URL through `ws/2/url`; the query's ISRC (`ws/2/isrc`, ranked through the matching gate); or a search. Track searches look at official album, EP and single releases first, then a plain search, then the base title. DJ-mix excerpts and videos are excluded.
 - **Contributes:** artist, title, version, date, ISRCs, labels and catalog numbers, barcode; credits (producer, engineer, instruments, vocals, remixer, writers from the work); tags and genres with vote weights; members and projects of the first credited artist, and its other artist relations (is person, collaboration, supporting musicians, subgroup, founder, rename, tribute, producer) as `associated` with the type in the note; covers, remixes, samples, mixes, appearances on releases and compilations; streaming and shop links; Discogs, Wikidata and Bandcamp IDs.
 - **Limits:** the public server answers "503 server busy" under load. Retries use `http.retry_base` and usually recover.
 
@@ -75,8 +75,8 @@ The README lists sources planned for later versions and those deadwax will not u
 
 - **Access:** no API. The album or track page (`data-tralbum`, `data-embed`, JSON-LD), the mobile `tralbum_details` API, and the search endpoint are read with the browser profile and the escalation ladder.
 - **Finds the record by:** the query URL, a Bandcamp link from MusicBrainz, else a search. The HTML search page is tried when the search endpoint fails. If both search routes fail, a direct artist-subdomain URL is accepted only after its page confirms the requested artist, title, and kind.
-- **Contributes:** tags, About and Credits texts, simple credits, fan comments, recommendations as `similar`, the label from the mobile API, and the label's other releases when the label is the selling account.
-- **Limits:** a track found on another artist's album (a compilation or third-party upload) contributes only its identity, links, own notes, and a `compilation` relation.
+- **Contributes:** tags, About and Credits texts, simple credits, fan comments, recommendations as `similar`, the label from the mobile API, and the label's other releases when the label is the selling account; for a track page whose track can be played, the `mp3-128` stream as the track link's `preview_url` (an `https` URL on `bcbits.com`; nothing is downloaded).
+- **Limits:** a track found on another artist's album (a compilation or third-party upload) contributes only its identity, links, own notes, stream, and a `compilation` relation. The stream URL is signed and expires about 24 hours after the page was fetched; pages are cached for 12 hours (`DEADWAX_SOURCES__BANDCAMP__TTL`), so a returned URL stays valid for at least about 12 hours. Fetch a new dossier to play it later. Album pages give no preview.
 
 ## Last.fm
 
@@ -149,7 +149,7 @@ The README lists sources planned for later versions and those deadwax will not u
 
 - **Group:** `streaming`; in the default set.
 - **Access:** Web API with the client credentials of a Spotify app (`DEADWAX_SOURCES__SPOTIFY__CLIENT_ID`, `DEADWAX_SOURCES__SPOTIFY__CLIENT_SECRET`); without both the source is `skipped`. The access token is fetched once per lookup and never written to the cache.
-- **Finds the record by:** a Spotify URL in the query or from an earlier source; an ISRC or barcode from the identity pass; or a search of at most 10 results through the matching gate.
+- **Finds the record by:** a Spotify URL in the query or from an earlier source; the query's ISRC, else an ISRC or barcode from the identity pass; or a search of at most 10 results through the matching gate.
 - **Contributes:** artist, title, release date, ISRC or barcode, ℗ and © lines of the album, the Spotify ID; track, album and artist links. Audio features are never used. Label, popularity (0–100, a metric), and previews are read when Spotify gives them, but it leaves them out for apps in development mode (checked 2026-11-13); such a field stays empty. Search returns at most 10 results.
 
 ## YouTube

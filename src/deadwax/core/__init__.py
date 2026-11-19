@@ -64,14 +64,23 @@ from .normalize import (
     fold,
     normalize_artist,
     normalize_barcode,
-    normalize_code,
     normalize_copyright,
     normalize_key,
     normalize_text,
     split_featuring,
 )
 from .orchestrator import LookupOptions, expand_names, run
-from .query import EntityKind, IdKind, Query, UrlRule, recognize_url, text_query
+from .query import (
+    EntityKind,
+    IdKind,
+    Query,
+    UrlRule,
+    isrc_code,
+    isrc_ids,
+    normalize_code,
+    recognize_url,
+    text_query,
+)
 from .request import RelationLimit, Request
 from .select import trim
 from .versions import ParsedTitle, classify_marker, parse_title
@@ -149,6 +158,8 @@ __all__ = [
     "compare",
     "expand_names",
     "fold",
+    "isrc_code",
+    "isrc_ids",
     "merge",
     "normalize_artist",
     "normalize_barcode",

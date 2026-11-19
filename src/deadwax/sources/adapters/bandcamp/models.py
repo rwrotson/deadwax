@@ -28,6 +28,10 @@ class TrackInfo(ApiModel):
     artist: str | None = None
     title_link: str | None = None
     track_num: int | None = None
+    file: dict[str, str] | None = Field(
+        default=None,
+        description="Stream URLs by encoding; a signed URL that expires",
+    )
 
 
 class Tralbum(ApiModel):

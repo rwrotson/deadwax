@@ -33,7 +33,7 @@ deadwax sources                                          # what each source cont
 deadwax runs                                             # journaled runs; deadwax runs ID shows one run's timeline
 ```
 
-A text query must state `--album` or `--track`; a URL implies its kind. Options: `--sources` and `--exclude` (comma-separated names), `--format pretty|json|markdown`, `--no-cache`, `--timeout SECONDS` per source, `--config PATH` (TOML), `--verbose` or `--debug` for diagnostic stderr logs. Normal runs print the dossier and its error summary without logs. Settings come from flags, `DEADWAX_*` variables, `.env`, and a TOML file, in that order of precedence; see [Configuration](configuration.md).
+A text query must state `--album` or `--track`; a URL implies its kind. Options: `--sources` and `--exclude` (comma-separated names), `--facets` (kinds of facts), `--isrc CODE` (the track's ISRC), `--format pretty|json|markdown`, `--no-cache`, `--timeout SECONDS` per source, `--config PATH` (TOML), `--verbose` or `--debug` for diagnostic stderr logs. Normal runs print the dossier and its error summary without logs. Settings come from flags, `DEADWAX_*` variables, `.env`, and a TOML file, in that order of precedence; see [Configuration](configuration.md).
 
 [Sources](sources.md) describes what each source contributes and needs; [Output](output.md) describes the dossier and its errors.
 

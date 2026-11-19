@@ -198,3 +198,33 @@ def test_text_query_is_split() -> None:
     query = parse_query("  Burial - Archangel ", EntityKind.TRACK)
 
     assert (query.artist, query.title, query.url) == ("Burial", "Archangel", None)
+
+
+def test_text_query_takes_an_isrc() -> None:
+    query = parse_query("Radiohead - Paranoid Android", EntityKind.TRACK, isrc=" gb-aye 97 01376")
+
+    assert query.ids == {IdKind.ISRC: "GBAYE9701376"}
+
+
+def test_url_query_keeps_its_ids_and_adds_the_isrc() -> None:
+    query = parse_query("https://open.spotify.com/track/1", isrc="GBAYE9701376")
+
+    assert query.ids == {IdKind.SPOTIFY: "1", IdKind.ISRC: "GBAYE9701376"}
+
+
+@pytest.mark.parametrize(
+    ("text", "kind", "isrc", "message"),
+    [
+        ("Radiohead - Paranoid Android", EntityKind.TRACK, "GBAYE97", "not an ISRC"),
+        ("Radiohead - OK Computer", EntityKind.ALBUM, "GBAYE9701376", "identifies a track"),
+        ("https://open.spotify.com/album/1", None, "GBAYE9701376", "identifies a track"),
+    ],
+)
+def test_bad_isrc_is_an_invalid_query(
+    text: str,
+    kind: EntityKind | None,
+    isrc: str,
+    message: str,
+) -> None:
+    with pytest.raises(InvalidQueryError, match=message):
+        parse_query(text, kind, isrc=isrc)

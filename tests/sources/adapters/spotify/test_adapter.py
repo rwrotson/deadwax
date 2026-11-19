@@ -374,3 +374,18 @@ def test_search_items_may_be_null() -> None:
     body = json.dumps({"tracks": {"items": [None]}})
 
     assert track_hits(SearchResults.model_validate_json(body)) == []
+
+
+@pytest.mark.asyncio
+async def test_isrc_of_the_query_finds_the_track() -> None:
+    server = Server()
+    adapter = make(server)
+    query = parse_query("Radiohead - Paranoid Android", EntityKind.TRACK, isrc="GBAYE9701376")
+
+    partial = await adapter.lookup(query, LookupContext(query=query))
+    await adapter.aclose()
+
+    searches = [r.url.params["q"] for r in server.requests if r.url.path == "/v1/search"]
+    assert searches == ["isrc:GBAYE9701376"]
+    assert partial.candidate is not None
+    assert partial.candidate.ids == {IdKind.SPOTIFY: "t1"}

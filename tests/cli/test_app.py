@@ -15,6 +15,7 @@ from deadwax import (
     EntityKind,
     Escalation,
     Identity,
+    IdKind,
     LookupConfig,
     Query,
     Request,
@@ -135,6 +136,35 @@ def test_unknown_facet_is_a_usage_error(fake: FakeLookup) -> None:
 
     assert result.exit_code == EXIT_USAGE
     assert "unknown facets: lyrics" in result.stderr
+    assert not fake.calls
+
+
+def test_isrc_option_reaches_the_query(fake: FakeLookup) -> None:
+    result = runner.invoke(
+        app,
+        ["--track", "Radiohead - Paranoid Android", "--isrc", "gb-aye-97-01376"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert fake.requests[0].query.ids == {IdKind.ISRC: "GBAYE9701376"}
+
+
+@pytest.mark.parametrize(
+    ("arguments", "message"),
+    [
+        (["--track", "--isrc", "GBAYE97"], "not an ISRC"),
+        (["--album", "--isrc", "GBAYE9701376"], "an ISRC identifies a track"),
+    ],
+)
+def test_bad_isrc_is_a_usage_error(
+    fake: FakeLookup,
+    arguments: list[str],
+    message: str,
+) -> None:
+    result = runner.invoke(app, ["Radiohead - Paranoid Android", *arguments])
+
+    assert result.exit_code == EXIT_USAGE
+    assert message in result.stderr
     assert not fake.calls
 
 

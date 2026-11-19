@@ -106,6 +106,10 @@ def test_ttl_uses_cache_default_unless_overridden() -> None:
     assert config.client_settings("discogs").blocked_ttl == config.cache.blocked_ttl
 
 
+def test_bandcamp_pages_expire_before_their_stream_urls() -> None:
+    assert LookupConfig().client_settings("bandcamp").ttl == 12 * 3600
+
+
 def test_credentials_are_hidden() -> None:
     config = LookupConfig(
         sources=PerSourceSettings(

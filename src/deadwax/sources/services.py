@@ -9,6 +9,7 @@ from deadwax.core import (
     LinkTarget,
     Query,
     UrlRule,
+    isrc_ids,
     recognize_url,
     text_query,
 )
@@ -275,19 +276,25 @@ def link_target(url: str, default: LinkTarget) -> LinkTarget:
     return default
 
 
-def _url_query(url: str, kind: EntityKind | None) -> Query:
+def _url_query(url: str, kind: EntityKind | None, isrc: str | None) -> Query:
     parts = urlsplit(url)
     if parts.scheme not in {"http", "https"} or not parts.netloc:
         raise InvalidQueryError(f"not an HTTP(S) URL: {url}")
     url_kind, ids = recognize(url)
     if kind is not None and url_kind is not None and kind != url_kind:
         raise InvalidQueryError(f"the URL points to a {url_kind}, but a {kind} was requested")
-    return Query(kind=kind or url_kind, url=url, ids=ids)
+    kind = kind or url_kind
+    return Query(kind=kind, url=url, ids=ids | isrc_ids(isrc, kind))
 
 
-def parse_query(text: str, kind: EntityKind | None = None) -> Query:
-    """Build a query from 'Artist - Title' text or a record page URL."""
+def parse_query(
+    text: str,
+    kind: EntityKind | None = None,
+    *,
+    isrc: str | None = None,
+) -> Query:
+    """Build a query from 'Artist - Title' text or a record page URL, and an optional ISRC."""
     text = text.strip()
     if re.match(r"^[a-z][a-z0-9+.-]*://", text, re.IGNORECASE):
-        return _url_query(text, kind)
-    return text_query(text, kind)
+        return _url_query(text, kind, isrc)
+    return text_query(text, kind, isrc=isrc)

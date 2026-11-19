@@ -133,8 +133,8 @@ class MusicBrainzAdapter(HttpAdapter):
             return None
         if reference.kind is EntityKind.ALBUM:
             return await self._search_album(reference)
-        for isrc in context.identity.isrcs:
-            if (found := await self._by_isrc(isrc.value, reference)) is not None:
+        for isrc in context.isrcs():
+            if (found := await self._by_isrc(isrc, reference)) is not None:
                 return found
         return await self._search_track(reference)
 

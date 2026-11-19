@@ -159,15 +159,18 @@ class SpotifyAdapter(HttpAdapter):
         key: RecordKey | None,
         context: LookupContext,
     ) -> str | None:
-        """API URL of the record found by an ISRC or barcode from earlier passes."""
-        codes = context.identity.isrcs if kind is EntityKind.TRACK else context.identity.upcs
+        """API URL of the record found by an ISRC from the query or earlier passes, or a barcode."""
+        if kind is EntityKind.TRACK:
+            codes = context.isrcs()
+        else:
+            codes = [upc.value for upc in context.identity.upcs]
         if not codes:
             return None
         field = "isrc" if kind is EntityKind.TRACK else "upc"
         results = await self._get(
             models.SearchResults,
             f"{API}search",
-            q=f"{field}:{codes[0].value}",
+            q=f"{field}:{codes[0]}",
             type=str(kind),
             limit=SEARCH_LIMIT,
         )

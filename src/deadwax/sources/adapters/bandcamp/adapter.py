@@ -34,7 +34,7 @@ MOBILE_API = "https://bandcamp.com/api/mobile/24/tralbum_details"
 
 
 class BandcampAdapter(HttpAdapter):
-    """Tags, notes, credits, fan texts, and recommendations from Bandcamp release pages."""
+    """Tags, notes, credits, fan texts, recommendations, and previews from Bandcamp pages."""
 
     name = "bandcamp"
     pass_ = Pass.ENRICH
@@ -44,6 +44,7 @@ class BandcampAdapter(HttpAdapter):
         {
             Capability.IDENTITY,
             Capability.LINKS,
+            Capability.PREVIEWS,
             Capability.TAGS,
             Capability.CREDITS,
             Capability.TEXTS,

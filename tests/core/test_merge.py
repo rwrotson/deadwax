@@ -668,3 +668,40 @@ def test_review_score_merges_and_rejected_links_do_not_leak() -> None:
     assert len(dossier.texts) == 1
     assert {item.source for item in dossier.texts[0].sources} == {"wikipedia", "allmusic"}
     assert dossier.review_links == []
+
+
+def test_same_link_keeps_a_preview_that_a_later_source_gives() -> None:
+    url = "https://artist.bandcamp.com/track/missing"
+    preview = "https://t4.bcbits.com/stream/x/mp3-128/1"
+    partials = [
+        partial(
+            "musicbrainz",
+            candidate(),
+            links=[
+                Link(
+                    service="bandcamp",
+                    url=url,
+                    target=LinkTarget.TRACK,
+                    sources=provenance("musicbrainz"),
+                ),
+            ],
+        ),
+        partial(
+            "bandcamp",
+            candidate(),
+            links=[
+                Link(
+                    service="bandcamp",
+                    url=url + "/",
+                    target=LinkTarget.TRACK,
+                    preview_url=preview,
+                    sources=provenance("bandcamp"),
+                ),
+            ],
+        ),
+    ]
+
+    [link] = merge(TRACK, partials, generated_at=NOW).links
+
+    assert link.preview_url == preview
+    assert [source.source for source in link.sources] == ["musicbrainz", "bandcamp"]

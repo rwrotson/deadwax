@@ -23,12 +23,12 @@ request = Request(
 
 | Field | Meaning |
 |-------|---------|
-| `query` | The record, as for `lookup()` |
+| `query` | The record, as for `lookup()`; `parse_query(text, kind, isrc=...)` adds a known ISRC to `Query.ids` |
 | `facets` | Kinds of facts wanted (`Capability`); unset means all of them |
 | `tags_per_source` | At most this many tags from each source, in merge order; unset means no cap |
 | `relations` | Relation kinds wanted, each with an optional target type and a cap per source; unset means every kind without a cap, an empty tuple means none |
 
-Facets are the adapter capabilities: `identity`, `links`, `previews`, `tags`, `credits`, `texts`, `relations`, `metrics`. `previews` are links with a `preview_url` (iTunes, Spotify, Deezer). On the command line, `--facets tags,previews` sets `Request.facets`.
+Facets are the adapter capabilities: `identity`, `links`, `previews`, `tags`, `credits`, `texts`, `relations`, `metrics`. `previews` are links with a `preview_url` (iTunes, Spotify, Deezer, Bandcamp). Bandcamp's preview is a signed stream URL that expires about a day after the page was fetched; use it soon after the lookup. On the command line, `--facets tags,previews` sets `Request.facets`.
 
 ### Which sources run
 
@@ -40,7 +40,11 @@ The configuration (`default_sources`, `include`, `exclude`) decides which source
 
 ### What the dossier keeps
 
-After the merge the dossier is trimmed to the request. `identity`, `errors`, and `query` are always kept. A facet that was not requested leaves its list empty. With `previews` but not `links`, only links that have a `preview_url` stay. Relations not listed in `relations` are dropped; a listed kind keeps at most `per_source` relations per source, target type, and kind, in merge order. A relation confirmed by several sources counts against the cap of its first source.
+After the merge the dossier is trimmed to the request. `identity`, `errors`, and `query` are always kept. A facet that was not requested leaves its list empty. With `previews` but not `links`, only links that have a `preview_url` stay. Relations not listed in `relations` are dropped; a listed kind keeps at most `per_source` relations per source, target type, and kind, in merge order. A relation confirmed by several sources counts against the cap of its first source. Links that several sources give are merged by URL; a `preview_url` from any of them is kept.
+
+### ISRC
+
+A track query may carry the ISRC the caller knows (`IdKind.ISRC` in `Query.ids`, normalized to 12 uppercase characters; a malformed one, or one on an album query, is rejected). MusicBrainz looks it up before searching, and Spotify searches by it. It is input, not a fact: the dossier's `identity.isrcs` lists only ISRCs that sources report.
 
 ## Client
 

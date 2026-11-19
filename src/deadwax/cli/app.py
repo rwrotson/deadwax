@@ -250,6 +250,10 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
             ),
         ),
     ] = None,
+    isrc: Annotated[
+        str | None,
+        typer.Option("--isrc", help="ISRC of the queried track, which sources use to find it."),
+    ] = None,
     output: FormatOption = OutputFormat.PRETTY,
     no_cache: Annotated[bool, typer.Option("--no-cache", help="Bypass the cache.")] = False,
     timeout: Annotated[
@@ -285,7 +289,7 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
             raise _usage_error("--album and --track are mutually exclusive")
         kind = EntityKind.ALBUM if album else EntityKind.TRACK if track else None
         try:
-            parsed = parse_query(query, kind)
+            parsed = parse_query(query, kind, isrc=isrc)
             request = Request(query=parsed, facets=_facets(facets))
             journal.event(TraceEvent.QUERY_PARSED, query=parsed.model_dump(mode="json"))
             dossier: Dossier = asyncio.run(

@@ -177,6 +177,25 @@ async def test_isrc_from_an_earlier_pass_finds_the_recording() -> None:
 
 
 @pytest.mark.asyncio
+async def test_isrc_of_the_query_finds_the_recording_without_a_search() -> None:
+    query = parse_query(
+        "Everything but the Girl - Missing",
+        EntityKind.TRACK,
+        isrc="GB-AAA-00-00002",
+    )
+    routes = {
+        "isrc/GBAAA0000002": {"isrc": "GBAAA0000002", "recordings": [REMIX, RECORDING]},
+        f"recording/{RECORDING['id']}": RECORDING,
+        **artist_route(),
+    }
+
+    partial = await lookup(query, routes)
+
+    assert partial.candidate is not None
+    assert partial.candidate.ids[IdKind.MUSICBRAINZ_RECORDING] == RECORDING["id"]
+
+
+@pytest.mark.asyncio
 async def test_version_only_in_the_comment_is_found_with_the_base_title() -> None:
     query = parse_query("Everything but the Girl - Missing (Todd Terry Remix)", EntityKind.TRACK)
 

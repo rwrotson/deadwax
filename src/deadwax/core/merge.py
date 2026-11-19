@@ -18,6 +18,7 @@ from deadwax.core.models import (
     Facts,
     Identity,
     LabelRef,
+    Link,
     LinkTarget,
     Metric,
     Partial,
@@ -35,14 +36,13 @@ from deadwax.core.models import (
 from deadwax.core.normalize import (
     normalize_artist,
     normalize_barcode,
-    normalize_code,
     normalize_copyright,
     normalize_key,
     normalize_text,
     shingle_overlap,
     strip_ellipsis,
 )
-from deadwax.core.query import EntityKind, Query
+from deadwax.core.query import EntityKind, Query, normalize_code
 from deadwax.core.versions import parse_title
 
 logger = logging.getLogger(__name__)
@@ -368,6 +368,13 @@ def _combine_tags(kept: Tag, other: Tag) -> Tag:
     return _combine(kept, other).model_copy(update={"weight": max(weights, default=None)})
 
 
+def _combine_links(kept: Link, other: Link) -> Link:
+    """Union the sources and keep a preview that only the other link has."""
+    return _combine(kept, other).model_copy(
+        update={"preview_url": kept.preview_url or other.preview_url},
+    )
+
+
 def _combine_relations(kept: Relation, other: Relation) -> Relation:
     """Union the sources and fill what the kept target lacks from the other one."""
     target = kept.target.model_copy(
@@ -597,7 +604,11 @@ def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Parti
     relations = _dedupe((*found_relations, *version_relations), _relation_key, _combine_relations)
     metrics = _dedupe((metric for p in accepted for metric in p.metrics), _metric_key)
 
-    links = _dedupe((link for p in accepted for link in p.links), lambda link: _url_key(link.url))
+    links = _dedupe(
+        (link for p in accepted for link in p.links),
+        lambda link: _url_key(link.url),
+        _combine_links,
+    )
     review_links = _dedupe(
         (link for p in accepted for link in p.review_links),
         lambda link: _url_key(link.url),

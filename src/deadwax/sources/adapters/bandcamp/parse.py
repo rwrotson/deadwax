@@ -48,6 +48,8 @@ logger = logging.getLogger(__name__)
 
 SOURCE = "bandcamp"
 LABEL_RELEASES_LIMIT = 12
+STREAM_ENCODING = "mp3-128"
+STREAM_HOST = ".bcbits.com"
 
 # Artist similarity from which a track's and its album's artists count as the same.
 SAME_ARTIST = 0.85
@@ -121,6 +123,7 @@ class Record:
     comments: tuple[Text, ...] = ()
     recommendations: tuple[Relation, ...] = ()
     tracks: tuple[models.TrackInfo, ...] = ()
+    stream: str | None = None
 
 
 def page_url(url: str) -> str:
@@ -256,6 +259,26 @@ def _album_of(ld: JsonObject, url: str, tralbum: models.Tralbum | None) -> Entit
     )
 
 
+def stream_url(
+    kind: EntityKind,
+    item_id: int | None,
+    tracks: Sequence[models.TrackInfo],
+) -> str | None:
+    """Return the signed MP3 stream of a track page's track; album pages give none."""
+    if kind is not EntityKind.TRACK:
+        return None
+    track = next((t for t in tracks if item_id is not None and t.id == item_id), None)
+    if track is None and len(tracks) == 1:
+        track = tracks[0]
+    url = (track.file or {}).get(STREAM_ENCODING) if track is not None else None
+    if not url:
+        return None
+    parts = urlsplit(url)
+    if parts.scheme != "https" or not (parts.hostname or "").endswith(STREAM_HOST):
+        return None
+    return url
+
+
 def page_record(page: Page) -> Record | None:
     """Combine what the page's data attributes and JSON-LD say about the release or track."""
     if not page.found:
@@ -282,13 +305,16 @@ def page_record(page: Page) -> Record | None:
         (tralbum.url if tralbum is not None else None) or _string(ld.get("@id")) or page.url,
     )
 
+    kind = EntityKind.TRACK if is_track else EntityKind.ALBUM
+    tracks = tuple(tralbum.trackinfo) if tralbum is not None else ()
+    item_id = tralbum.id if tralbum is not None else None
     publisher = ld.get("publisher")
     return Record(
-        kind=EntityKind.TRACK if is_track else EntityKind.ALBUM,
+        kind=kind,
         artist=artist,
         title=title,
         url=url,
-        id=tralbum.id if tralbum is not None else None,
+        id=item_id,
         band_id=current.band_id,
         date=page_date(current.release_date)
         or page_date(tralbum.album_release_date if tralbum is not None else None)
@@ -303,7 +329,8 @@ def page_record(page: Page) -> Record | None:
         tags=_keywords(ld.get("keywords")),
         comments=_comments(ld),
         recommendations=tuple(page.recommendations),
-        tracks=tuple(tralbum.trackinfo) if tralbum is not None else (),
+        tracks=tracks,
+        stream=stream_url(kind, item_id, tracks),
     )
 
 
@@ -430,6 +457,7 @@ def partial(record: Record, label_releases: Sequence[Relation] = ()) -> Partial:
             service=SOURCE,
             url=record.url,
             target=LinkTarget.TRACK if record.kind is EntityKind.TRACK else LinkTarget.ALBUM,
+            preview_url=record.stream,
             sources=sources,
         ),
     ]

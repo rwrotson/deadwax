@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md). Closed v2 stages (8–17, 19, R-1–R-5), their evidence, and the v2 decision log are archived in [`plans/v2.md`](plans/v2.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1–R-6 done. Stages M-1–M-3 (2026-11-20, requests and data for the mixhound consumer) run before Stage 20; M-1 and M-2 done, M-3 is next.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1–R-6 done. Stages M-1–M-3 (2026-11-20, requests and data for the mixhound consumer) run before Stage 20; M-1–M-3 done. Stage 20 is next.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -126,7 +126,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Sections of closed
 | R-6 | Done | Trace event names, repository cleanup, journal split, architecture docs. |
 | M-1 | Done | Requests by facets, the long-lived `Deadwax` client. |
 | M-2 | Done | Leads: LB Radio, Last.fm similar artists for tracks, MusicBrainz associated artists. |
-| M-3 | Not started | Bandcamp stream previews, ISRC in queries. |
+| M-3 | Done | Bandcamp stream previews, ISRC in queries. |
 | 20 | Not started | Qualification. |
 
 Common acceptance for source stages 9–19, in addition to each stage's own:
@@ -214,6 +214,39 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 ## Progress evidence and decision log
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
+
+### 2026-11-20 — M-3 evidence (previews and ISRC)
+
+Changed:
+- Bandcamp: `TrackInfo.file`; `parse.stream_url()` takes the `mp3-128` stream of a track page's track (the trackinfo with the page's id, else the only one), only `https` on a `.bcbits.com` host, and puts it on the track link's `preview_url`. Album pages give none; a compilation track keeps its stream. `Capability.PREVIEWS` on the adapter. No new requests; nothing is downloaded.
+- `BandcampSettings.ttl` defaults to 43 200 s (12 h); `.env.example` updated.
+- Merge: links with the same URL keep a `preview_url` that a later source gives (`_combine_links`). Before, the first link won, so a MusicBrainz link without a preview hid the preview of iTunes, Spotify, Deezer, or Bandcamp for the same URL.
+- `IdKind.ISRC`. `normalize_code` moved from `core/normalize.py` to `core/query.py` (R5 puts `query` below `normalize`); the public name is unchanged. New `isrc_code()` (normalize, then `^[A-Z]{2}[A-Z0-9]{3}\d{7}$`, else `InvalidQueryError`) and `isrc_ids()` in `deadwax.core`. `Query` normalizes `ids[isrc]` and rejects an ISRC on an album query. `text_query(..., isrc=)`, `parse_query(..., isrc=)` for text and URL queries.
+- `LookupContext.isrcs()`: the query's ISRC first, then the identity's, without repeats. MusicBrainz `_find_by_text` and Spotify `_find_by_code` (tracks) use it.
+- CLI `--isrc CODE`; a malformed code or `--album --isrc` is a usage error.
+- Docs: `requests.md` (Bandcamp previews and expiry, merged previews, ISRC section), `sources.md` (Bandcamp, MusicBrainz, Spotify), `getting_started.md`, README options and source table.
+- Tests:
+  - ISRC normalization and rejection: `isrc_code`, `Query`, `text_query`, `parse_query`, CLI.
+  - `isrcs()` order and dedupe.
+  - The query ISRC finds the MusicBrainz recording without a search, and Spotify searches `isrc:`.
+  - Same-URL links keep the later preview.
+  - `stream_url` cases; the `missing_remix` and `paranoid_android` pages.
+  - A `previews`-only request replays `missing_remix` through the client with Bandcamp's stream on its track link.
+  - The Bandcamp TTL default.
+
+Decisions:
+- (agent) The Bandcamp TTL is 12 hours. In `missing_remix` the stream URL's `ts` (also the `token` prefix) is the fetch time + 86 398 s, so the URL expires about a day after the fetch. A 12-hour page cache leaves a returned URL at least about 12 hours of life. Consumers that play later need a new lookup.
+- (agent) The ISRC check is the full ISRC form, not only the length. The query ISRC is input: it is not copied into `identity.isrcs`, which lists only what sources report.
+- (agent) `parse_query` raises `InvalidQueryError`; constructing `Query` directly raises Pydantic's `ValidationError` (both are `ValueError`).
+- (agent) No fixtures were re-recorded: no new URL is requested.
+
+Observations:
+- Of the Bandcamp fixtures, only `missing_remix` (track page) and the Huerco S. album page carry streams. The Radiohead track pages have `file: null`, and the Kino track has an empty `file`. The `bandcamp.com/stream_redirect` URLs in the fixtures belong to recommendations, not to `data-tralbum`.
+- MusicBrainz runs in the identity pass, so before M-3 `identity.isrcs` was always empty there; the query's ISRC is the first input that reaches its `isrc/` lookup.
+
+Checks: `uv sync --all-groups --locked`; `uv run poe check` passed (fmt-check, lint, lint-imports 16 contracts kept, mypy, 1143 tests, coverage 96.99%; the touched core modules, `services.py`, and the CLI are fully covered). `uv run --group docs properdocs build --strict` passed. `uv build`; wheel smoke: the base install imports `Deadwax` and builds an ISRC query, and the `cli` extra shows `--isrc`. `uv run poe audit`: no known vulnerabilities. Mock-tested only (no live runs): Bandcamp streams, ISRC lookups, preview merging.
+
+**Suggested message:** `feat!: expose Bandcamp stream previews and accept ISRC in queries`.
 
 ### 2026-11-20 — M-2 evidence (leads)
 

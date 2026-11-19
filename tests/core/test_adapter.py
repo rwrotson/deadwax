@@ -1,4 +1,5 @@
 from deadwax.core import (
+    EntityKind,
     ExternalId,
     Identity,
     IdKind,
@@ -7,8 +8,10 @@ from deadwax.core import (
     LookupContext,
     Provenance,
     Query,
+    Sourced,
     SourceState,
     SourceStatus,
+    text_query,
 )
 
 SOURCES = [Provenance(source="musicbrainz")]
@@ -46,3 +49,20 @@ def test_context_lists_links_of_a_service() -> None:
 def test_status_is_ready_only_in_the_ready_state() -> None:
     assert SourceStatus(source="a", state=SourceState.READY).ready
     assert not SourceStatus(source="a", state=SourceState.MISSING_CREDENTIAL).ready
+
+
+def test_context_lists_the_query_isrc_first_without_repeats() -> None:
+    query = text_query("Radiohead - Paranoid Android", EntityKind.TRACK, isrc="GBAYE9701376")
+    identity = Identity(
+        isrcs=[
+            Sourced(value="GB-AYE-97-01376", sources=SOURCES),
+            Sourced(value="GBAYE9700001", sources=SOURCES),
+        ],
+    )
+
+    assert LookupContext(query=query, identity=identity).isrcs() == [
+        "GBAYE9701376",
+        "GBAYE9700001",
+    ]
+    assert LookupContext(query=query).isrcs() == ["GBAYE9701376"]
+    assert LookupContext(query=Query(url="https://s/1")).isrcs() == []

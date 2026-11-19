@@ -297,3 +297,60 @@ def test_keywords_and_names_of_odd_shapes() -> None:
 
     assert record is not None
     assert (record.artist, record.tags, record.seller_url) == ("E", (), None)
+
+
+def test_track_page_gives_its_stream(recorded: Recorded) -> None:
+    url = "https://euphoriaaetheria.bandcamp.com/track/missing-todd-terry-club-remix"
+
+    record = p.page_record(p.read_page(recorded("missing_remix", f"GET {url}"), url))
+
+    assert record is not None
+    assert record.stream is not None
+    assert record.stream.startswith("https://t4.bcbits.com/stream/")
+    [link, *_] = p.partial(record).links
+    assert link.preview_url == record.stream
+
+
+def test_pages_without_a_track_stream(recorded: Recorded, album: p.Record) -> None:
+    url = "https://radiohead.bandcamp.com/track/paranoid-android"
+
+    record = p.page_record(p.read_page(recorded("paranoid_android", f"GET {url}"), url))
+
+    assert record is not None
+    assert record.stream is None
+    assert album.stream is None
+    assert all(link.preview_url is None for link in p.partial(album).links)
+
+
+STREAM = "https://t4.bcbits.com/stream/abc/mp3-128/1?p=0&ts=1&t=x&token=1_y"
+
+
+def track(track_id: int, stream: str | None = STREAM) -> models.TrackInfo:
+    files = {"mp3-128": stream} if stream is not None else None
+    return models.TrackInfo(id=track_id, title=f"Track {track_id}", file=files)
+
+
+@pytest.mark.parametrize(
+    ("item_id", "tracks", "expected"),
+    [
+        (2, [track(1, "https://t4.bcbits.com/other"), track(2)], STREAM),
+        (9, [track(1)], STREAM),
+        (9, [track(1), track(2)], None),
+        (None, [track(1)], STREAM),
+        (1, [track(1, None)], None),
+        (1, [track(1, "")], None),
+        (1, [track(1, STREAM.replace("https", "http"))], None),
+        (1, [track(1, "https://evil.example/bcbits.com/stream")], None),
+        (1, [], None),
+    ],
+)
+def test_stream_url(
+    item_id: int | None,
+    tracks: list[models.TrackInfo],
+    expected: str | None,
+) -> None:
+    assert p.stream_url(EntityKind.TRACK, item_id, tracks) == expected
+
+
+def test_album_has_no_stream() -> None:
+    assert p.stream_url(EntityKind.ALBUM, 1, [track(1)]) is None

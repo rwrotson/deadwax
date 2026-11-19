@@ -300,6 +300,13 @@ class BandcampSettings(SourceSettings):
 
     rate: float = _rate(0.5)
 
+    # Stream URLs on the pages expire about 24 hours after the fetch.
+    ttl: float | None = Field(
+        default=12 * 3600,
+        ge=0,
+        description="Cache lifetime in seconds; short, because page stream URLs expire in a day",
+    )
+
 
 class LastfmSettings(SourceSettings):
     """Settings of the Last.fm source."""

@@ -4,7 +4,7 @@ from typing import Protocol
 from pydantic import BaseModel, ConfigDict
 
 from deadwax.core.models import Identity, Link, Partial, ReviewLink, SourceAccess
-from deadwax.core.query import IdKind, Query
+from deadwax.core.query import IdKind, Query, normalize_code
 
 
 class _Model(BaseModel):
@@ -115,6 +115,15 @@ class LookupContext(_Model):
         if kind in self.query.ids:
             return self.query.ids[kind]
         return next((i.value for i in self.identity.external_ids if i.kind is kind), None)
+
+    def isrcs(self) -> list[str]:
+        """Return the known ISRCs: the query's first, then those of earlier passes."""
+        codes = [self.query.ids[IdKind.ISRC]] if IdKind.ISRC in self.query.ids else []
+        codes += [isrc.value for isrc in self.identity.isrcs]
+        unique: dict[str, str] = {}
+        for code in codes:
+            unique.setdefault(normalize_code(code), code)
+        return list(unique.values())
 
     def urls(self, service: str) -> list[str]:
         """Return the known link URLs of a service."""

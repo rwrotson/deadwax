@@ -10,6 +10,7 @@ from deadwax import (
     Capability,
     Deadwax,
     EntityKind,
+    LinkTarget,
     LookupConfig,
     Request,
     lookup,
@@ -107,3 +108,16 @@ async def test_request_trims_the_dossier_to_its_facets(
     contributors = {source.source for source in dossier.identity.title.sources}
     assert "odesli" not in contributors
     assert {"musicbrainz", "lastfm"} <= contributors
+
+
+async def test_previews_keep_the_bandcamp_stream(replay: Replay, config: LookupConfig) -> None:
+    query = parse_query("Everything but the Girl - Missing (Todd Terry Remix)", EntityKind.TRACK)
+    request = Request(query=query, facets=frozenset({Capability.PREVIEWS}))
+
+    dossier = await lookup(request, config, transport=replay("missing_remix"))
+
+    bandcamp = [link for link in dossier.links if link.service == "bandcamp"]
+    assert [link.target for link in bandcamp] == [LinkTarget.TRACK]
+    assert bandcamp[0].preview_url is not None
+    assert bandcamp[0].preview_url.startswith("https://t4.bcbits.com/stream/")
+    assert all(link.preview_url for link in dossier.links)

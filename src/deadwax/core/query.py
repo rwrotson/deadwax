@@ -1,11 +1,12 @@
 import re
+import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Self
 from urllib.parse import parse_qs, urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from deadwax.core.errors import InvalidQueryError
 
@@ -39,6 +40,7 @@ class IdKind(StrEnum):
     SOUNDCLOUD = "soundcloud"
     BEATPORT_TRACK = "beatport_track"
     BEATPORT_RELEASE = "beatport_release"
+    ISRC = "isrc"
 
 
 class Query(BaseModel):
@@ -55,8 +57,15 @@ class Query(BaseModel):
     url: str | None = None
     ids: dict[IdKind, str] = Field(
         default_factory=dict,
-        description="Identifiers recognized in the URL",
+        description="Identifiers recognized in the URL, and an ISRC the caller knows",
     )
+
+    @field_validator("ids")
+    @classmethod
+    def _normalize_isrc(cls, ids: dict[IdKind, str]) -> dict[IdKind, str]:
+        if IdKind.ISRC in ids:
+            return ids | {IdKind.ISRC: isrc_code(ids[IdKind.ISRC])}
+        return ids
 
     @model_validator(mode="after")
     def _require_target(self) -> Self:
@@ -65,6 +74,8 @@ class Query(BaseModel):
                 raise ValueError("a query needs an artist and a title, or a URL")
             if self.kind is None:
                 raise ValueError("a text query must state whether it is an album or a track")
+        if IdKind.ISRC in self.ids and self.kind is EntityKind.ALBUM:
+            raise ValueError("an ISRC identifies a track, not an album")
         return self
 
 
@@ -89,6 +100,22 @@ DASHES = "-\u2010\u2011\u2012\u2013\u2014\u2015\u2212"
 QUOTES = "\"'\u201c\u201d\u2018\u2019\u00ab\u00bb\u201e"
 
 _ARTIST_TITLE_SEPARATOR = re.compile(rf"\s+[{DASHES}]\s+")
+
+# Country, registrant, year, and designation code.
+_ISRC = re.compile(r"^[A-Z]{2}[A-Z0-9]{3}\d{7}$")
+
+
+def normalize_code(code: str) -> str:
+    """Normalize an ISRC or catalog number: uppercase without spaces, dots, or hyphens."""
+    return re.sub(r"[\s.\-]", "", unicodedata.normalize("NFKC", code)).upper()
+
+
+def isrc_code(code: str) -> str:
+    """Normalize an ISRC and check its form; a malformed one is an `InvalidQueryError`."""
+    normalized = normalize_code(code)
+    if _ISRC.match(normalized) is None:
+        raise InvalidQueryError(f"not an ISRC: {code!r}")
+    return normalized
 
 
 def recognize_url(
@@ -128,12 +155,21 @@ def _split_artist_title(text: str) -> tuple[str, str]:
     return artist, title
 
 
-def text_query(text: str, kind: EntityKind | None) -> Query:
-    """Build a query from 'Artist - Title' text."""
+def isrc_ids(isrc: str | None, kind: EntityKind | None) -> dict[IdKind, str]:
+    """Identifiers of a query from an ISRC the caller gives, checked against the query kind."""
+    if isrc is None:
+        return {}
+    if kind is EntityKind.ALBUM:
+        raise InvalidQueryError("an ISRC identifies a track, not an album")
+    return {IdKind.ISRC: isrc_code(isrc)}
+
+
+def text_query(text: str, kind: EntityKind | None, *, isrc: str | None = None) -> Query:
+    """Build a query from 'Artist - Title' text and, optionally, the track's ISRC."""
     text = text.strip()
     if not text:
         raise InvalidQueryError("the query is empty")
     artist, title = _split_artist_title(text)
     if kind is None:
         raise InvalidQueryError("state whether the query is an album or a track")
-    return Query(kind=kind, artist=artist, title=title)
+    return Query(kind=kind, artist=artist, title=title, ids=isrc_ids(isrc, kind))

@@ -100,11 +100,6 @@ def split_artists(key: str) -> list[str]:
     return [part for part in _ARTIST_SEPARATOR.split(key) if part]
 
 
-def normalize_code(code: str) -> str:
-    """Normalize an ISRC or catalog number: uppercase without spaces, dots, or hyphens."""
-    return re.sub(r"[\s.\-]", "", unicodedata.normalize("NFKC", code)).upper()
-
-
 def normalize_barcode(code: str) -> str:
     """Normalize a UPC or EAN so that the 12- and 13-digit forms compare equal."""
     return "".join(char for char in code if char.isdigit()).lstrip("0")
