@@ -19,7 +19,7 @@ from deadwax.core import (
     TextKind,
     normalize_text,
 )
-from deadwax.sources._html import Node, attribute, parse_html, text_of
+from deadwax.sources._html import Node, attribute, parse_html, prose, text_of
 from deadwax.sources._search import SearchHit, track_on_release
 
 SOURCE = "juno"
@@ -39,11 +39,6 @@ _LENGTH = re.compile(r"\s*\(\d+:\d{2}\)$")
 
 def _first_text(nodes: list[Node]) -> str | None:
     return next((text for node in nodes if (text := text_of(node))), None)
-
-
-def _prose(node: Node | None) -> str | None:
-    """Text of a node without spaces added around inline markup."""
-    return " ".join(node.text(deep=True).split()) or None if node is not None else None
 
 
 def search_hits(content: bytes) -> list[SearchHit]:
@@ -151,7 +146,7 @@ def page_partial(content: bytes, url: str, key: RecordKey | None) -> Partial:
         if name:
             tag = Tag(name=name, kind=kind, scope=Scope.RELEASE, sources=[provenance])
             tags.setdefault(normalize_text(name), tag)
-    body = _prose(page.css_first('[itemprop="reviewBody"]'))
+    body = prose(page.css_first('[itemprop="reviewBody"]'))
     return Partial(
         source=SOURCE,
         candidate=candidate,

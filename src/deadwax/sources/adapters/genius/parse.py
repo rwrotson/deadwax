@@ -1,52 +1,30 @@
-from collections.abc import Mapping
-
 from deadwax.core import (
     EntityKind,
     RecordCandidate,
 )
 from deadwax.sources._html import parse_html
+from deadwax.sources.adapters.genius.models import RichText, Song
 
 API = "https://api.genius.com"
 MAX_ANNOTATION_PAGES = 3
 
 
-def plain_text(value: object) -> str:
+def plain_text(value: RichText) -> str:
     """Plain-text rendering of a Genius rich-text field."""
-    if not isinstance(value, Mapping):
-        return ""
-    plain = value.get("plain")
-    return plain.strip() if isinstance(plain, str) else ""
+    return (value.plain or "").strip()
 
 
-def as_song(value: object) -> Mapping[str, object]:
-    """The value as a JSON object, or an empty one."""
-    return value if isinstance(value, Mapping) else {}
-
-
-def as_list(value: object) -> list[object]:
-    """The value as a JSON list, or an empty one."""
-    return value if isinstance(value, list) else []
-
-
-def name_of(value: object) -> str:
-    """Name of a Genius artist object."""
-    name = as_song(value).get("name")
-    return name if isinstance(name, str) else ""
-
-
-def url_of(song: Mapping[str, object]) -> str:
-    """Page URL of a Genius song."""
-    value = song.get("url")
-    return value if isinstance(value, str) else ""
-
-
-def candidate(song: Mapping[str, object]) -> RecordCandidate | None:
+def candidate(song: Song) -> RecordCandidate | None:
     """Describe a Genius song as a record candidate."""
-    title = song.get("title")
-    artist = name_of(song.get("primary_artist"))
-    if not isinstance(title, str) or not artist:
+    artist = song.primary_artist.name
+    if song.title is None or not artist:
         return None
-    return RecordCandidate(kind=EntityKind.TRACK, artist=artist, title=title, url=url_of(song))
+    return RecordCandidate(
+        kind=EntityKind.TRACK,
+        artist=artist,
+        title=song.title,
+        url=song.url or "",
+    )
 
 
 def lyrics(content: bytes) -> str:

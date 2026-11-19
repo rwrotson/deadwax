@@ -16,6 +16,7 @@ from deadwax import (
 from deadwax.core import BlockedError, LookupContext, RecordKey
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.ra import ResidentAdvisorAdapter
+from deadwax.sources.adapters.ra.models import Review
 from deadwax.sources.adapters.ra.parse import extract, review_id
 
 
@@ -32,7 +33,7 @@ def test_review_link_and_graphql_record() -> None:
     }
     key = RecordKey(kind=EntityKind.ALBUM, artist="Burial", title="Untrue")
 
-    result = extract(record, key, "https://ra.co/reviews/4920")
+    result = extract(Review.model_validate(record), key, "https://ra.co/reviews/4920")
 
     assert result is not None
     candidate, texts = result
@@ -52,7 +53,7 @@ def test_other_version_and_other_host_are_rejected() -> None:
         "artists": [{"name": "Burial"}],
     }
 
-    assert extract(record, key, "https://ra.co/reviews/4920") is None
+    assert extract(Review.model_validate(record), key, "https://ra.co/reviews/4920") is None
 
 
 @pytest.mark.asyncio

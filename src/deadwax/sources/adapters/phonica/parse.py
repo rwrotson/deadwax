@@ -27,7 +27,7 @@ from deadwax.core import (
     normalize_text,
     parse_title,
 )
-from deadwax.sources._html import Node, attribute, parse_html, text_of
+from deadwax.sources._html import Node, attribute, parse_html, prose, text_of
 from deadwax.sources._search import SearchHit, track_on_release
 from deadwax.sources.adapters.phonica import models
 
@@ -119,18 +119,13 @@ def search_hits(content: bytes, url: str) -> list[SearchHit]:
     return hits
 
 
-def _prose(node: Node) -> str:
-    """Text of a node without spaces added around inline markup."""
-    return " ".join(node.text(deep=True).split())
-
-
 def _description(page: Node) -> str | None:
     """The shop text, its paragraphs kept apart."""
     node = page.css_first(".single-description")
     if node is None:
         return None
-    paragraphs = [_prose(p) for p in node.css("p")] or [
-        _prose(parse_html(chunk).body or node) for chunk in _BREAKS.split(node.html or "")
+    paragraphs = [prose(p) for p in node.css("p")] or [
+        prose(parse_html(chunk).body or node) for chunk in _BREAKS.split(node.html or "")
     ]
     return "\n\n".join(text for text in paragraphs if text) or None
 

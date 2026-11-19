@@ -26,7 +26,7 @@ from deadwax.core import (
     compare,
     normalize_text,
 )
-from deadwax.sources._html import Node, parse_html, text_of
+from deadwax.sources._html import Node, parse_html, prose, text_of
 from deadwax.sources.adapters.wikipedia import models
 
 SOURCE = "wikipedia"
@@ -513,17 +513,12 @@ def _quoted(node: Node, root: Node) -> bool:
     return False
 
 
-def _paragraph(node: Node) -> str | None:
-    # Text nodes are joined as written: a separator would put spaces before punctuation after links.
-    return " ".join(node.text(separator="").split()) or None
-
-
 def _prose(nodes: Sequence[Node]) -> str | None:
     paragraphs = []
     for node in nodes:
         found = [node] if node.tag in {"p", "blockquote"} else node.css("p, blockquote")
         paragraphs += [
-            text for p in found if not _quoted(p, node) and (text := _paragraph(p)) is not None
+            text for p in found if not _quoted(p, node) and (text := prose(p)) is not None
         ]
     return "\n\n".join(paragraphs) or None
 

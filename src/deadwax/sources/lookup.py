@@ -7,13 +7,12 @@ from deadwax.core import (
     ErrorKind,
     LookupOptions,
     Query,
-    SourceAccess,
     SourceInfo,
     expand_names,
     run,
 )
 from deadwax.sources._adapter import HttpAdapter
-from deadwax.sources._http import HttpResources, Profile, open_cache
+from deadwax.sources._http import HttpResources, open_cache
 from deadwax.sources.adapters.albumoftheyear import AlbumOfTheYearAdapter
 from deadwax.sources.adapters.allmusic import AllMusicAdapter
 from deadwax.sources.adapters.bandcamp import BandcampAdapter
@@ -93,23 +92,6 @@ def build_adapters(config: SourcesConfig, resources: HttpResources) -> list[Http
     return [adapter(config, resources) for adapter in ADAPTERS]
 
 
-def _access(adapter: HttpAdapter, config: SourcesConfig) -> SourceAccess:
-    html = Profile.BROWSER in (adapter.profile, *adapter.additional_profiles)
-    return SourceAccess(
-        api=Profile.API in (adapter.profile, *adapter.additional_profiles),
-        html_transports=(
-            [
-                "patchright" if step.value == "browser" else step.value
-                for step in config.html_transports(adapter.name)
-            ]
-            if html
-            else []
-        ),
-        browser_headless=config.browser_headless(adapter.name) if html else None,
-        headed_fallback=html and config.http.headed_fallback,
-    )
-
-
 def describe_sources(config: SourcesConfig | None = None) -> list[SourceInfo]:
     """List the sources with their group, pass, capabilities, requirements, and status.
 
@@ -127,7 +109,7 @@ def describe_sources(config: SourcesConfig | None = None) -> list[SourceInfo]:
             capabilities=sorted(adapter.capabilities),
             requires=list(adapter.requires),
             status=adapter.status(),
-            **_access(adapter, config).model_dump(),
+            **adapter.access().model_dump(),
         )
         for adapter in adapters
     ]
@@ -162,7 +144,7 @@ async def lookup(
         dossier = await run(query, adapters, options)
         by_name = {adapter.name: adapter for adapter in adapters}
         errors = [
-            error.model_copy(update={"access": _access(by_name[error.source], config)})
+            error.model_copy(update={"access": by_name[error.source].access()})
             if error.kind is ErrorKind.BLOCKED
             else error
             for error in dossier.errors

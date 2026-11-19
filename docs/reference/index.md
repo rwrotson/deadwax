@@ -53,6 +53,7 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.sources.adapters.kexp.models` | Model KEXP API responses |
 | `deadwax.sources.adapters.nts.adapter` | Read NTS episodes and their tracklists |
 | `deadwax.sources.adapters.nts.parse` | Turn NTS responses into identity and facts |
+| `deadwax.sources.adapters.nts.models` | Model NTS API responses |
 | `deadwax.sources.adapters.wfmu.adapter` | Read WFMU playlists and DJ comments |
 | `deadwax.sources.adapters.wfmu.parse` | Turn WFMU responses into identity and facts |
 | `deadwax.sources.adapters.spotify.adapter` | Read tracks and albums from the Spotify Web API (client credentials) |
@@ -63,6 +64,7 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.sources.adapters.youtube.models` | Model YouTube Data API responses |
 | `deadwax.sources.adapters.genius.adapter` | Read Genius song descriptions, annotations, credits, relations, and lyrics |
 | `deadwax.sources.adapters.genius.parse` | Turn Genius responses into identity and facts |
+| `deadwax.sources.adapters.genius.models` | Model Genius API responses |
 | `deadwax.sources.adapters.allmusic.adapter` | Read AllMusic reviews, tags, credits, and similar albums |
 | `deadwax.sources.adapters.allmusic.parse` | Turn AllMusic responses into identity and facts |
 | `deadwax.sources.adapters.albumoftheyear.adapter` | Read Album of the Year scores, genres, and review links |
@@ -77,6 +79,7 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.sources.adapters.pressreviews.parse` | Turn press review responses into identity and facts |
 | `deadwax.sources.adapters.ra.adapter` | Read linked Resident Advisor reviews and biographies |
 | `deadwax.sources.adapters.ra.parse` | Turn Resident Advisor responses into identity and facts |
+| `deadwax.sources.adapters.ra.models` | Model Resident Advisor GraphQL responses |
 | `deadwax.sources.adapters.soundcloud.adapter` | Read uploads and their reposters from SoundCloud (client ID) |
 | `deadwax.sources.adapters.soundcloud.parse` | Turn SoundCloud uploads into identity, tags, texts, metrics, relations, and links |
 | `deadwax.sources.adapters.soundcloud.models` | Model SoundCloud API responses |

@@ -26,6 +26,15 @@ def text_of(node: Node | None) -> str | None:
     return text or None
 
 
+def prose(node: Node | None) -> str | None:
+    """Return the text of a node with collapsed whitespace, without spaces around inline markup."""
+    if node is None:
+        return None
+
+    # Text nodes are joined as written: a separator would put spaces before punctuation after links.
+    return " ".join(node.text(separator="").split()) or None
+
+
 def attribute(node: Node | None, name: str) -> str | None:
     """Return a non-empty attribute value."""
     if node is None:

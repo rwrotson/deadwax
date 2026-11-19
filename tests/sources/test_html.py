@@ -1,4 +1,4 @@
-from deadwax.sources._html import attribute, attribute_json, json_ld, parse_html, text_of
+from deadwax.sources._html import attribute, attribute_json, json_ld, parse_html, prose, text_of
 
 
 def test_text_and_attributes() -> None:
@@ -10,6 +10,14 @@ def test_text_and_attributes() -> None:
     assert attribute(document.css_first("p"), "data-x") == "1"
     assert attribute(document.css_first("i"), "data-y") is None
     assert attribute(None, "data-x") is None
+
+
+def test_prose_keeps_inline_markup_without_spaces() -> None:
+    document = parse_html(b"<p> a <a>link</a>, b\n c </p><b> </b>")
+
+    assert prose(document.css_first("p")) == "a link, b c"
+    assert prose(document.css_first("b")) is None
+    assert prose(None) is None
 
 
 def test_attribute_json() -> None:

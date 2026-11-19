@@ -1,5 +1,3 @@
-import json
-
 from deadwax.core import (
     Capability,
     Entity,
@@ -23,7 +21,7 @@ from deadwax.core import (
 from deadwax.sources._adapter import HttpAdapter
 from deadwax.sources._http import Profile
 from deadwax.sources._search import search_key
-from deadwax.sources.adapters.nts import parse
+from deadwax.sources.adapters.nts import models, parse
 
 
 class NtsAdapter(HttpAdapter):
@@ -35,34 +33,27 @@ class NtsAdapter(HttpAdapter):
     profile = Profile.API
     capabilities = frozenset({Capability.RELATIONS, Capability.TAGS})
 
-    async def _episode(self, hit: dict[str, object], key: RecordKey) -> Partial | None:
-        episode = parse.as_object(hit.get("article"))
-        url = parse.episode_url(episode)
+    async def _episode(self, hit: models.Hit, key: RecordKey) -> Partial | None:
+        url = parse.episode_url(hit.article)
         if not url or "/shows/" not in url or "/episodes/" not in url:
             return None
         path = url.split("/shows/", 1)[1]
         detail = await self.client.get(f"{parse.API}/shows/{path}")
-        data = parse.as_object(json.loads(detail.content))
-        tracklist = parse.as_objects(
-            parse.as_object(parse.as_object(data.get("embeds")).get("tracklist")).get("results"),
-        )
+        episode = models.Episode.model_validate_json(detail.content)
+        tracklist = episode.embeds.tracklist.results
         positions = parse.matching_positions(tracklist, key)
         if not positions:
             return None
         matched = tracklist[positions[0]]
         candidate = RecordCandidate(
             kind=EntityKind.TRACK,
-            artist=parse.as_text(matched.get("artist")) or key.artist,
-            title=parse.as_text(matched.get("title")) or key.title,
+            artist=matched.artist or key.artist,
+            title=matched.title or key.title,
             url=url,
         )
         source = [Provenance(source=self.name, url=url)]
-        date = (
-            parse.as_text(data.get("broadcast"))
-            or parse.as_text(data.get("broadcast_date"))
-            or parse.as_text(data.get("date"))
-        )
-        name = parse.as_text(data.get("name")) or parse.as_text(episode.get("name")) or "NTS"
+        date = episode.broadcast or episode.broadcast_date or episode.date
+        name = episode.name or hit.article.name or "NTS"
         relations: list[Relation] = []
         tags: list[Tag] = []
         relations.append(
@@ -79,8 +70,8 @@ class NtsAdapter(HttpAdapter):
             ),
         )
         relations.extend(parse.neighbours(tracklist, positions, source))
-        for genre in parse.as_objects(data.get("genres")):
-            label = parse.as_text(genre.get("value")) or parse.as_text(genre.get("name"))
+        for genre in episode.genres:
+            label = genre.value or genre.name
             if label:
                 tags.append(
                     Tag(
@@ -108,7 +99,7 @@ class NtsAdapter(HttpAdapter):
                 "types[]": "track",
             },
         )
-        hits = parse.as_objects(parse.as_object(json.loads(response.content)).get("results"))
+        hits = models.Search.model_validate_json(response.content).results
         matching = [hit for hit in hits if parse.hit_matches(hit, key)]
         partials = [p for hit in matching[:10] if (p := await self._episode(hit, key)) is not None]
         if not partials:

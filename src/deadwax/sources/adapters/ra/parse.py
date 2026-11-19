@@ -13,6 +13,7 @@ from deadwax.core import (
     compare,
 )
 from deadwax.sources._html import parse_html, text_of
+from deadwax.sources.adapters.ra.models import Review
 
 _REVIEW_ID = re.compile(r"^/reviews/(\d+)/?$")
 QUERY = """query DEADWAX_REVIEW($id: ID!) {
@@ -30,20 +31,8 @@ SEARCH_QUERY = """query DEADWAX_SEARCH($term: String!) {
 }"""
 
 
-def as_object(value: object) -> dict[str, object]:
-    """The value as a JSON object, or an empty one."""
-    return value if isinstance(value, dict) else {}
-
-
-def as_text(value: object) -> str | None:
-    """The value if it is non-blank text."""
-    return value if isinstance(value, str) and value.strip() else None
-
-
-def _html_text(value: object) -> str | None:
-    if not isinstance(value, str):
-        return None
-    return text_of(parse_html(value).body)
+def _html_text(value: str | None) -> str | None:
+    return text_of(parse_html(value).body) if value is not None else None
 
 
 def review_id(url: str) -> str | None:
@@ -54,19 +43,20 @@ def review_id(url: str) -> str | None:
 
 
 def extract(
-    record: dict[str, object],
+    record: Review,
     key: RecordKey,
     url: str,
 ) -> tuple[RecordCandidate, list[Text]] | None:
     """Read the reviewed record and its texts if it matches the record."""
-    artists = record.get("artists")
-    first_artist = as_object(artists[0]) if isinstance(artists, list) and artists else {}
-    artist = as_text(first_artist.get("name"))
-    title = as_text(record.get("title"))
+    if not record.artists:
+        return None
+    first_artist = record.artists[0]
+    artist = first_artist.name
+    title = record.title
     if not artist or not title:
         return None
     title = title.removeprefix(f"{artist} - ").strip()
-    kind = EntityKind.ALBUM if record.get("type") == "ALBUM" else EntityKind.TRACK
+    kind = EntityKind.ALBUM if record.type == "ALBUM" else EntityKind.TRACK
     found_key = RecordKey(artist=artist, title=title, kind=kind)
     if compare(key, found_key).verdict is not Verdict.MATCH:
         return None
@@ -74,20 +64,20 @@ def extract(
     provenance = Provenance(source="ra", url=url)
     scope = Scope.RELEASE_GROUP if kind is EntityKind.ALBUM else Scope.RECORDING
     texts = []
-    body = _html_text(record.get("content"))
+    body = _html_text(record.content)
     if body:
         texts.append(
             Text(
                 kind=TextKind.REVIEW,
                 body=body,
-                author=as_text(as_object(record.get("author")).get("name")),
+                author=record.author.name,
                 publication="Resident Advisor",
-                date=as_text(record.get("date")),
+                date=record.date,
                 scope=scope,
                 sources=[provenance],
             ),
         )
-    biography = _html_text(as_object(first_artist.get("biography")).get("blurb"))
+    biography = _html_text(first_artist.biography.blurb)
     if biography:
         texts.append(
             Text(
@@ -99,16 +89,14 @@ def extract(
                 sources=[provenance],
             ),
         )
-    labels = record.get("labels")
-    for label_value in labels if isinstance(labels, list) else []:
-        label = as_object(label_value)
-        label_body = _html_text(label.get("blurb"))
+    for label in record.labels:
+        label_body = _html_text(label.blurb)
         if label_body:
             texts.append(
                 Text(
                     kind=TextKind.EDITORIAL,
                     body=label_body,
-                    title=as_text(label.get("name")),
+                    title=label.name,
                     publication="Resident Advisor",
                     scope=Scope.LABEL,
                     sources=[provenance],

@@ -1,4 +1,3 @@
-import json
 from collections.abc import Mapping
 
 from deadwax.core import (
@@ -31,7 +30,7 @@ from deadwax.core import (
 from deadwax.sources._adapter import HttpAdapter
 from deadwax.sources._http import ClientSpec, HttpClient, HttpResources, Profile
 from deadwax.sources._search import SearchHit, pick_hit, search_key
-from deadwax.sources.adapters.genius import parse
+from deadwax.sources.adapters.genius import models, parse
 from deadwax.sources.config import SourcesConfig
 
 
@@ -84,20 +83,19 @@ class GeniusAdapter(HttpAdapter):
             await self._page_client.aclose()
             self._page_client = None
 
-    async def _get(self, path: str, **params: str) -> Mapping[str, object]:
+    async def _get[M: models.ApiModel](self, model: type[M], path: str, **params: str) -> M:
         response = await self.client.get(f"{parse.API}{path}", params=params or None)
-        payload = json.loads(response.content)
-        return parse.as_song(parse.as_song(payload).get("response"))
+        return model.model_validate(models.Envelope.model_validate_json(response.content).response)
 
     async def _find(self, key: RecordKey) -> int:
-        results = await self._get("/search", q=f"{key.artist} {key.title}")
+        results = await self._get(models.Search, "/search", q=f"{key.artist} {key.title}")
         hits: list[SearchHit] = []
         ids: dict[str, int] = {}
-        for item in parse.as_list(results.get("hits")):
-            song = parse.as_song(parse.as_song(item).get("result"))
+        for found in results.hits:
+            song = found.result
             candidate = parse.candidate(song)
-            song_id = song.get("id")
-            if candidate is not None and isinstance(song_id, int) and candidate.url:
+            song_id = song.id
+            if candidate is not None and song_id is not None and candidate.url:
                 hits.append(
                     SearchHit(
                         key=RecordKey(
@@ -119,24 +117,18 @@ class GeniusAdapter(HttpAdapter):
         page = 1
         while page <= parse.MAX_ANNOTATION_PAGES:
             referents = await self._get(
+                models.Referents,
                 "/referents",
                 song_id=str(song_id),
                 page=str(page),
                 per_page="20",
                 text_format="plain",
             )
-            for referent in parse.as_list(referents.get("referents")):
-                for annotation in parse.as_list(parse.as_song(referent).get("annotations")):
-                    note = parse.as_song(annotation)
-                    body = parse.plain_text(note.get("body"))
+            for referent in referents.referents:
+                for note in referent.annotations:
+                    body = parse.plain_text(note.body)
                     if body:
-                        note_url = note.get("url")
-                        note_source = [
-                            Provenance(
-                                source=self.name,
-                                url=note_url if isinstance(note_url, str) else url,
-                            ),
-                        ]
+                        note_source = [Provenance(source=self.name, url=note.url or url)]
                         texts.append(
                             Text(
                                 kind=TextKind.USER,
@@ -145,12 +137,12 @@ class GeniusAdapter(HttpAdapter):
                                 sources=note_source,
                             ),
                         )
-            if not referents.get("next_page"):
+            if not referents.next_page:
                 break
             page += 1
         return texts
 
-    def _relations(self, song: Mapping[str, object], source: list[Provenance]) -> list[Relation]:
+    def _relations(self, song: models.Song, source: list[Provenance]) -> list[Relation]:
         relations: list[Relation] = []
         kinds = {
             "samples": RelationKind.SAMPLES,
@@ -162,24 +154,21 @@ class GeniusAdapter(HttpAdapter):
             "interpolates": RelationKind.INTERPOLATES,
             "interpolated_by": RelationKind.INTERPOLATED_BY,
         }
-        for relationship in parse.as_list(song.get("song_relationships")):
-            data = parse.as_song(relationship)
-            relationship_type = data.get("relationship_type")
-            kind = kinds.get(relationship_type) if isinstance(relationship_type, str) else None
+        for relationship in song.song_relationships:
+            kind = kinds.get(relationship.relationship_type or "")
             if kind is None:
                 continue
-            for item in parse.as_list(data.get("songs")):
-                related = parse.as_song(item)
-                title = related.get("title")
-                if isinstance(title, str):
+            for related in relationship.songs:
+                title = related.title
+                if title is not None:
                     relations.append(
                         Relation(
                             kind=kind,
                             target=Entity(
                                 type=EntityType.RECORDING,
                                 name=title,
-                                artist=parse.name_of(related.get("primary_artist")) or None,
-                                url=parse.url_of(related) or None,
+                                artist=related.primary_artist.name,
+                                url=related.url,
                             ),
                             scope=Scope.WORK,
                             sources=source,
@@ -187,11 +176,11 @@ class GeniusAdapter(HttpAdapter):
                     )
         return relations
 
-    def _credits(self, song: Mapping[str, object], source: list[Provenance]) -> list[Credit]:
+    def _credits(self, song: models.Song, source: list[Provenance]) -> list[Credit]:
         found: list[Credit] = []
-        for field, role in (("writer_artists", "writer"), ("producer_artists", "producer")):
-            for item in parse.as_list(song.get(field)):
-                name = parse.name_of(item)
+        for artists, role in ((song.writer_artists, "writer"), (song.producer_artists, "producer")):
+            for artist in artists:
+                name = artist.name
                 if name:
                     found.append(Credit(role=role, name=name, scope=Scope.WORK, sources=source))
         return found
@@ -224,14 +213,14 @@ class GeniusAdapter(HttpAdapter):
         if key.kind is EntityKind.ALBUM:
             return Partial(source=self.name)
         song_id = await self._find(key)
-        song = parse.as_song((await self._get(f"/songs/{song_id}")).get("song"))
+        song = (await self._get(models.SongData, f"/songs/{song_id}")).song
         candidate = parse.candidate(song)
         if candidate is None:
             raise SourceError("Genius returned a song without artist or title")
-        url = parse.url_of(song)
+        url = song.url or ""
         source = [Provenance(source=self.name, url=url)]
         texts: list[Text] = []
-        description = parse.plain_text(song.get("description"))
+        description = parse.plain_text(song.description)
         if description:
             texts.append(
                 Text(kind=TextKind.EDITORIAL, body=description, scope=Scope.WORK, sources=source),

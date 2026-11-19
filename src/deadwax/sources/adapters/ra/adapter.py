@@ -17,7 +17,7 @@ from deadwax.core import (
 from deadwax.sources._adapter import HttpAdapter
 from deadwax.sources._http import Profile
 from deadwax.sources._search import search_key
-from deadwax.sources.adapters.ra import parse
+from deadwax.sources.adapters.ra import models, parse
 
 
 class ResidentAdvisorAdapter(HttpAdapter):
@@ -34,7 +34,7 @@ class ResidentAdvisorAdapter(HttpAdapter):
         operation: str,
         variables: dict[str, str],
         query: str,
-    ) -> dict[str, object]:
+    ) -> models.Data:
         payload = json.dumps(
             {
                 "operationName": operation,
@@ -49,15 +49,15 @@ class ResidentAdvisorAdapter(HttpAdapter):
             body=payload,
         )
         try:
-            root = parse.as_object(json.loads(response.content))
-        except (ValueError, UnicodeDecodeError) as error:
+            root = models.Response.model_validate_json(response.content)
+        except ValueError as error:
             raise SourceError(
                 "invalid Resident Advisor GraphQL response",
                 url=response.url,
             ) from error
-        if root.get("errors"):
+        if root.errors:
             raise SourceError("Resident Advisor GraphQL returned errors", url=response.url)
-        return parse.as_object(root.get("data"))
+        return root.data
 
     async def _search_url(self, key: RecordKey) -> str | None:
         data = await self._graphql(
@@ -65,11 +65,9 @@ class ResidentAdvisorAdapter(HttpAdapter):
             {"term": f"{key.artist} {key.title}"},
             parse.SEARCH_QUERY,
         )
-        results = data.get("search")
-        for value in results if isinstance(results, list) else []:
-            hit = parse.as_object(value)
-            name = parse.as_text(hit.get("value"))
-            path = parse.as_text(hit.get("contentUrl"))
+        for hit in data.search:
+            name = hit.value
+            path = hit.content_url
             if not name or not path or parse.review_id(f"https://ra.co{path}") is None:
                 continue
             artist, separator, title = name.partition(" - ")
@@ -95,11 +93,7 @@ class ResidentAdvisorAdapter(HttpAdapter):
             review_id = parse.review_id(url)
             if review_id is None:
                 continue
-            record = parse.as_object(
-                (await self._graphql("DEADWAX_REVIEW", {"id": review_id}, parse.QUERY)).get(
-                    "review",
-                ),
-            )
+            record = (await self._graphql("DEADWAX_REVIEW", {"id": review_id}, parse.QUERY)).review
             extracted = parse.extract(record, key, url)
             if extracted is None:
                 continue

@@ -8,6 +8,7 @@ from deadwax.core import (
     Pass,
     Query,
     Requirement,
+    SourceAccess,
     SourceGroup,
     SourceState,
     SourceStatus,
@@ -42,6 +43,27 @@ class HttpAdapter(ABC):
         settings: SourceSettings = getattr(self.config, self.name)
         return settings
 
+    @property
+    def _reads_html(self) -> bool:
+        return Profile.BROWSER in (self.profile, *self.additional_profiles)
+
+    def access(self) -> SourceAccess:
+        """Describe the configured routes to this source in their attempt order."""
+        html = self._reads_html
+        return SourceAccess(
+            api=Profile.API in (self.profile, *self.additional_profiles),
+            html_transports=(
+                [
+                    "patchright" if step.value == "browser" else step.value
+                    for step in self.config.html_transports(self.name)
+                ]
+                if html
+                else []
+            ),
+            browser_headless=self.config.browser_headless(self.name) if html else None,
+            headed_fallback=html and self.config.http.headed_fallback,
+        )
+
     def missing_credential(self) -> str | None:
         """Describe a missing credential the adapter cannot run without, if any."""
         return None
@@ -50,12 +72,7 @@ class HttpAdapter(ABC):
         """Report whether the adapter is enabled and has what it needs."""
         if not self.settings.enabled:
             return SourceStatus(source=self.name, state=SourceState.DISABLED)
-        if Profile.BROWSER in (
-            self.profile,
-            *self.additional_profiles,
-        ) and not self.config.html_transports(
-            self.name,
-        ):
+        if self._reads_html and not self.config.html_transports(self.name):
             return SourceStatus(
                 source=self.name,
                 state=SourceState.DISABLED,

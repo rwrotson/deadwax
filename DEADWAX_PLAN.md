@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1 done, R-2 is next.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1 and R-2 done, R-3 is next.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -117,7 +117,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 18 | Deferred (RYM access blocked) | Provisional Rate Your Music adapter and browser-first fetching; parser and live results unverified. |
 | 19 | Done (WhoSampled access intermittent) | 1001Tracklists, WhoSampled. |
 | R-1 | Done | Layout: adapters in `sources/adapters/`, one package per adapter, tests per source, `_base` split, source `ra`, fixtures `tracklists`. |
-| R-2 | Not started | Shared helpers: `prose()`, JSON through models, adapter access description. |
+| R-2 | Done | Shared helpers: `prose()`, JSON through models, adapter access description. |
 | R-3 | Not started | Service catalogue in `sources/services.py`; `service` and default `resolves()` on every adapter; URL rules leave the core. |
 | R-4 | Not started | Source defaults in settings, `LookupConfig` with a `sources` section shared by the CLI, resolved settings for `HttpClient`, registry. |
 | R-5 | Not started | Core: `Facts` base, `deadline` module, access label out of the core, nested `SourceInfo.access`, shared formatters. |
@@ -279,6 +279,24 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 ## Progress evidence and decision log
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
+
+### 2026-11-19 — R-2 evidence (shared helpers)
+
+Changed:
+- `prose()` in `sources/_html.py` (text joined as written, whitespace collapsed, `None` when empty) replaces the copies in Juno, Phonica, Soundohm (`_prose`) and Wikipedia (`_paragraph`).
+- NTS, Resident Advisor, and Genius read their JSON through Pydantic models in new `models.py` modules; the `as_object`/`as_objects`/`as_text`/`as_song`/`as_list`/`name_of`/`url_of` helpers are gone. Each models base ignores unknown fields and reads `null` as absent; blank text reads as absent (NTS strips text as before, RA and Genius keep it as sent). Genius `_get` takes the model, as Last.fm's `_call` does. RA still reports an undecodable or invalid GraphQL answer as `SourceError("invalid Resident Advisor GraphQL response")`.
+- `HttpAdapter.access()` replaces `lookup._access`; `status()` and `access()` share `_reads_html`.
+- RA parse tests pass `Review` models to `extract`; `test_html.py` covers `prose`; `docs/reference/index.md` lists the three models modules.
+
+Decisions:
+- (agent) A field of the wrong JSON type in an NTS, RA, or Genius answer now fails the adapter (`failed`) instead of being skipped silently, as for every other model-based adapter.
+- (agent) AllMusic, Bleep, and the press adapter still read paragraphs with `text_of`, which adds spaces around inline markup; switching them to `prose()` would change output text and is left for a behaviour change.
+
+Observed: an untracked `src/deadwax/sources/junodownload/` holding only `__pycache__` remains from the dropped adapter; left for R-6 cleanup.
+
+Checks: `uv run poe check` passed (fmt-check, lint, lint-imports 16 contracts kept, mypy, 1000 tests, coverage 96.76%); `uv run --group docs properdocs build --strict` passed; `deadwax sources` runs. No live runs (refactor only).
+
+**Suggested message:** `refactor(sources): share prose(), read NTS, RA and Genius JSON through models, and describe access on adapters`.
 
 ### 2026-11-19 — R-1 evidence (layout)
 

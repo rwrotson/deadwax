@@ -16,7 +16,7 @@ from deadwax.core import (
     Text,
     TextKind,
 )
-from deadwax.sources._html import Node, attribute, json_ld, parse_html, text_of
+from deadwax.sources._html import Node, attribute, json_ld, parse_html, prose, text_of
 from deadwax.sources._search import SearchHit
 
 SOURCE = "soundohm"
@@ -61,17 +61,12 @@ def _facts(info: Node) -> dict[str, str]:
     return facts
 
 
-def _prose(node: Node) -> str:
-    """Text of a node without spaces added around inline markup."""
-    return " ".join(node.text(deep=True).split())
-
-
 def _description(page: Node) -> str | None:
     node = page.css_first(".product-page__description")
     if node is None:
         return None
-    paragraphs = [text for p in node.css("p") if (text := _prose(p))]
-    return "\n\n".join(paragraphs) if paragraphs else _prose(node) or None
+    paragraphs = [text for p in node.css("p") if (text := prose(p))]
+    return "\n\n".join(paragraphs) if paragraphs else prose(node)
 
 
 def _genre(content: bytes) -> str | None:
