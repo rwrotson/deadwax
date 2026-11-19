@@ -250,6 +250,19 @@ async def test_a_headless_source_served_headed_neither_falls_back_nor_counts_tim
 
 
 @pytest.mark.asyncio
+async def test_a_refusal_of_the_address_opens_no_headed_browser() -> None:
+    setup = Setup(Server([httpx.Response(403, content=CHALLENGE)]), headed_fallback=True)
+    akamai = page(403, b"<a href='https://errors.edgesuite.net/x'>Access Denied</a>")
+    setup.fetchers = {Escalation.BROWSER: FakeFetcher("browser", [akamai])}
+
+    async with setup.client(Profile.BROWSER, escalation=Escalation.BROWSER) as client:
+        with pytest.raises(BlockedError, match=r"Akamai block \(tried httpx, browser\)$"):
+            await client.get(URL)
+
+    assert setup.headless == [True]
+
+
+@pytest.mark.asyncio
 async def test_a_headed_fallback_that_meets_a_challenge_is_blocked() -> None:
     setup = Setup(Server([httpx.Response(403, content=CHALLENGE)]), headed_fallback=True)
     setup.fetchers = {Escalation.BROWSER: FakeFetcher("browser", [page(200, CHALLENGE)])}

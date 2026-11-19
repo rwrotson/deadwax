@@ -1,7 +1,10 @@
+from collections.abc import Callable
+
 import httpx
 import pytest
 
 from deadwax import EntityKind, ErrorKind, HttpSettings, Query, RelationKind, SourcesConfig, lookup
+from deadwax.sources import wfmu as wfmu_module
 
 EPISODE = "https://www.nts.live/shows/example/episodes/example-2026"
 PLAYLIST = "https://wfmu.org/playlists/shows/12345"
@@ -119,6 +122,49 @@ async def test_wfmu_playlist_comment() -> None:
     assert [text.body for text in dossier.texts] == ["Host note."]
     assert dossier.texts[0].author == "DJ Ada"
     assert dossier.texts[0].publication == "WFMU: Example with DJ Ada"
+
+
+@pytest.mark.asyncio
+async def test_wfmu_returns_the_playlists_read_before_its_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+    traced: Callable[[str], list[dict[str, object]]],
+) -> None:
+    playlists: list[str] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("artistbrowser.php"):
+            if request.method == "GET":
+                return httpx.Response(200, text='<button name="id" value="1">Burial</button>')
+            rows = "".join(
+                '<tr><td class="show">Burial</td><td class="show">Archangel</td>'
+                f'<td class="show">Example</td><td class="date">'
+                f'<a href="/playlists/shows/{show}">Nov 15 2026</a></td></tr>'
+                for show in (1, 2, 3)
+            )
+            return httpx.Response(200, text=f"<table>{rows}</table>")
+        playlists.append(request.url.path)
+        return httpx.Response(
+            200,
+            text=(
+                "<title>WFMU: Example with DJ Ada: Playlist from Nov 15 2026</title>"
+                '<table><tr><td class="col_artist"><font>Burial</font></td>'
+                '<td class="col_song_title"><font>Archangel</font></td></tr></table>'
+            ),
+        )
+
+    monkeypatch.setattr(wfmu_module, "adapter_time_left", lambda: 1.0)
+
+    dossier = await lookup(
+        Query(kind=EntityKind.TRACK, artist="Burial", title="Archangel"),
+        SourcesConfig(http=HttpSettings(escalation=())),
+        include=("wfmu",),
+        transport=httpx.MockTransport(respond),
+    )
+
+    assert playlists == ["/playlists/shows/1"]
+    assert len(dossier.relations) == 1
+    [event] = traced("wfmu.truncated")
+    assert (event["read"], event["remaining"]) == (1, 2)
 
 
 @pytest.mark.asyncio

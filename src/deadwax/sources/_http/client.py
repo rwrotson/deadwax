@@ -26,7 +26,7 @@ from deadwax.core import (
 )
 from deadwax.sources._http.browser import BrowserFetcher
 from deadwax.sources._http.cache import ResponseCache, cache_key
-from deadwax.sources._http.challenge import detect_challenge
+from deadwax.sources._http.challenge import SOLVABLE_CHALLENGES, detect_challenge
 from deadwax.sources._http.impersonate import ImpersonateFetcher
 from deadwax.sources._http.messages import Fetcher, Request, Response, TransportError
 from deadwax.sources._http.nodriver import NodriverFetcher
@@ -413,9 +413,17 @@ class HttpClient:
             return f"{step}[headed]"
         return str(step)
 
-    def _falls_back(self, step: Escalation) -> bool:
-        """Whether a challenge in this headless browser step is retried headed."""
-        return step in BROWSER_STEPS and not self._headed and self._settings.headed_fallback
+    def _falls_back(self, step: Escalation, challenge: str) -> bool:
+        """Whether a challenge in this headless browser step is retried headed.
+
+        A refusal of the address, such as an Akamai block, is the same with a window.
+        """
+        return (
+            step in BROWSER_STEPS
+            and challenge in SOLVABLE_CHALLENGES
+            and not self._headed
+            and self._settings.headed_fallback
+        )
 
     async def _fetch(self, request: Request, exchange: _Exchange) -> Response:
         safe_url = redact(request.full_url, self.spec.secret_params)
@@ -448,7 +456,7 @@ class HttpClient:
                 return response
             reason, challenge = problem
             challenged = challenged or challenge
-            if challenge and self._falls_back(step):
+            if challenge and self._falls_back(step, reason):
                 self._headed = True
                 trace(logger, "http.headed_fallback", url=safe_url, fetcher=label)
                 continue

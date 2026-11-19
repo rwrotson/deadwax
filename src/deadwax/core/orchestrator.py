@@ -48,6 +48,14 @@ def _milliseconds(start: float) -> int:
     return round((time.monotonic() - start) * 1000)
 
 
+def adapter_time_left() -> float | None:
+    """Return the seconds left before the current adapter times out, or None without a limit."""
+    timeout = _adapter_deadline.get()
+    if timeout is None or (deadline := timeout.when()) is None:
+        return None
+    return max(deadline - asyncio.get_running_loop().time(), 0.0)
+
+
 @contextlib.asynccontextmanager
 async def pause_adapter_timeout() -> AsyncIterator[None]:
     """Exclude a shared-resource queue wait from the current adapter timeout."""

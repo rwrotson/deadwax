@@ -1,4 +1,5 @@
 import logging
+import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from enum import StrEnum
@@ -21,6 +22,18 @@ _DETAIL_THRESHOLD = 0.6
 
 # Words that make one remixer's version another cut of it, such as 'Extended Remix'.
 _CUTS = frozenset({"extended", "radio", "dub", "instrumental", "intro"})
+
+# A trailing bracket left after version markers, such as an alternative title.
+_TRAILING_BRACKET = re.compile(r"^(?P<title>.*\S)\s*[\(\[](?P<inner>[^()\[\]]+)[\)\]]\s*$")
+
+# Shorter bracket text is more often an unmarked mix name, such as 'Tee Beat', than a title.
+_ALTERNATIVE_TITLE_WORDS = 3
+
+# Bracket words that tell recordings apart, so the bracket stays part of the title.
+_DISTINCT_BRACKET = re.compile(
+    r"\b(?:part|pt|no|vol|volume|chapter|movement|act|op|reprise|interlude|intro|outro|"
+    r"prelude|version|mix|take|session|recording|demo|\d+|[ivx]+)\b",
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,11 +102,23 @@ def artist_similarity(left: str, right: str) -> float:
     return score
 
 
+def _title_keys(title: str) -> set[str]:
+    """Return the title key, and the key without a trailing alternative title in brackets."""
+    base = parse_title(title).base
+    keys = {normalize_text(base)}
+    if (bracket := _TRAILING_BRACKET.match(base)) is not None:
+        inner = normalize_text(bracket["inner"])
+        if len(inner.split()) >= _ALTERNATIVE_TITLE_WORDS and not _DISTINCT_BRACKET.search(inner):
+            keys.add(normalize_text(bracket["title"]))
+    return keys
+
+
 def title_similarity(left: str, right: str) -> float:
-    """Compare titles without version markers and featured artists."""
-    return key_similarity(
-        normalize_text(parse_title(left).base),
-        normalize_text(parse_title(right).base),
+    """Compare titles without version markers, featured artists, and alternative titles."""
+    return max(
+        key_similarity(left_key, right_key)
+        for left_key in _title_keys(left)
+        for right_key in _title_keys(right)
     )
 
 

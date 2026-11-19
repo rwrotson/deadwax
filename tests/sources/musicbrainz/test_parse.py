@@ -98,6 +98,37 @@ def test_ranking_prefers_official_main_releases_then_year_then_release_count() -
     assert [r.id for r in ranked] == ["many", "few", "partial-date"]
 
 
+def test_ranking_reads_an_alternative_title_in_brackets() -> None:
+    album = {"id": "rg1", "primary-type": "Album"}
+    compilation = {"id": "rg2", "primary-type": "Album", "secondary-types": ["Compilation"]}
+    official = {"status": "Official"}
+    candidates = [
+        recording(
+            "compilation",
+            title="There There",
+            **{
+                "first-release-date": "2003-08-18",
+                "releases": [official | {"id": "1", "release-group": compilation}],
+            },
+        ),
+        recording(
+            "album",
+            title="There There. (The Boney King of Nowhere.)",
+            **{
+                "first-release-date": "2003-05-19",
+                "releases": [official | {"id": "2", "release-group": album}],
+            },
+        ),
+    ]
+
+    ranked = p.rank_recordings(
+        RecordKey("Everything but the Girl", "There There", EntityKind.TRACK),
+        candidates,
+    )
+
+    assert [r.id for r in ranked] == ["album", "compilation"]
+
+
 def test_first_release_prefers_official_main_releases() -> None:
     releases = [
         models.ReleaseRef.model_validate({"id": "bootleg", "status": "Bootleg", "date": "1990"}),

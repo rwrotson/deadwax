@@ -69,7 +69,13 @@ from .normalize import (
     normalize_text,
     split_featuring,
 )
-from .orchestrator import LookupOptions, expand_names, pause_adapter_timeout, run
+from .orchestrator import (
+    LookupOptions,
+    adapter_time_left,
+    expand_names,
+    pause_adapter_timeout,
+    run,
+)
 from .query import EntityKind, IdKind, Query, parse_query, recognize_url
 from .versions import ParsedTitle, classify_marker, parse_title
 
@@ -134,6 +140,7 @@ __all__ = [
     "Verdict",
     "VersionInfo",
     "VersionKind",
+    "adapter_time_left",
     "artist_similarity",
     "build_identity",
     "classify_marker",

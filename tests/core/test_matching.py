@@ -71,6 +71,28 @@ def test_mix_names_tell_versions_apart(reference: str, candidate: str, verdict: 
     assert compare(track("Artist", reference), track("Artist", candidate)).verdict is verdict
 
 
+@pytest.mark.parametrize(
+    ("reference", "candidate", "verdict"),
+    [
+        ("There There", "There There. (The Boney King of Nowhere.)", Verdict.MATCH),
+        ("There There. (The Boney King of Nowhere.)", "There There", Verdict.MATCH),
+        ("Gimme! Gimme! Gimme!", "Gimme! Gimme! Gimme! (A Man After Midnight)", Verdict.MATCH),
+        ("Song", "Song [Another Name for It]", Verdict.MATCH),
+        ("Missing", "Missing (Tee Beat)", Verdict.NO_MATCH),
+        ("Love Story", "Love Story (Taylor's Version)", Verdict.NO_MATCH),
+        ("Song", "Song (Part 2)", Verdict.NO_MATCH),
+        ("Song", "Song (Pt. II)", Verdict.NO_MATCH),
+        ("Song", "Song (Reprise)", Verdict.NO_MATCH),
+        ("Song", "Song (Interlude)", Verdict.NO_MATCH),
+        ("Song", "Song (2011)", Verdict.NO_MATCH),
+        ("Song", "Song (No. 3)", Verdict.NO_MATCH),
+        ("There There (Live)", "There There. (The Boney King of Nowhere.)", Verdict.OTHER_VERSION),
+    ],
+)
+def test_alternative_titles_in_brackets(reference: str, candidate: str, verdict: Verdict) -> None:
+    assert compare(track("Radiohead", reference), track("Radiohead", candidate)).verdict is verdict
+
+
 def test_explicit_candidate_version_overrides_title() -> None:
     reference = track("Radiohead", "Paranoid Android")
     live = track("Radiohead", "Paranoid Android", VersionInfo(kind=VersionKind.LIVE))

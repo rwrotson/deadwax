@@ -263,6 +263,17 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
 
+### 2026-11-19 — Alternative titles, refusals without fallback, WFMU deadline (Stage 20 partial)
+
+Run `20261119T125334Z-f0e2c9` (`radiohead - there there`) after `7a5ede9`: Beatport succeeded. Remaining causes from its journal and decisions (user):
+- Alternative title in brackets. The Hail to the Thief recording `04207ca7` and SecondHandSongs performance 277084 are titled `There There. (The Boney King of Nowhere.)`; `title_similarity` was 0.458, so MusicBrainz chose the compilation-only recording `bb4dcf01`, which led AllMusic to the compilation page and KEXP to the wrong recording. `title_similarity` now also compares titles without a trailing bracket of at least three words that names no distinguishing word (part, number, Roman numeral, reprise, interlude, intro, outro, prelude, version, mix, take, session, recording, demo, …). The three-word minimum came from a regression in the Juno fixture: `Missing (Tee Beat)` is an unmarked mix name, and it still does not match `Missing`.
+- Deezer's Akamai block opened a headed fallback (26 s) with the same result. The fallback now applies only to `SOLVABLE_CHALLENGES`. The block itself depends on the route (`DEADWAX_DEEZER__PROXY=direct`).
+- WFMU read playlists one after another until the 30 s timeout and lost what it had found. The core exports `adapter_time_left()`; WFMU stops before another playlist when fewer than 5 s remain and one playlist with the track has been read, tracing `wfmu.truncated`.
+- Album of the Year: a track query rejects the single *There, There* on kind. The fix waits for a real single page as a fixture (the existing fixture has no tracklist).
+- Not changed: Forced Exposure HTTP 403, RYM Cloudflare 403, Boomkat (album search for tracks not chosen).
+
+Verification: `uv run poe check` passed (995 offline tests, 96.77% coverage); `uv run --group docs properdocs build --strict` passed. Live behaviour unverified.
+
 ### 2026-11-19 — Loaded documents, refusals, and the There There identity (Stage 20 partial)
 
 Run `20261119T124341Z-631257` (`radiohead - there there`, 103 s) after `75beef9`: Discogs and Genius succeeded through the headed browser; WhoSampled reported `not_found`; RYM `blocked` (Cloudflare HTTP 503). Remaining:

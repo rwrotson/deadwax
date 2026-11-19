@@ -32,6 +32,7 @@ from deadwax.core import (
     SourceState,
     SourceStatus,
     Tag,
+    adapter_time_left,
     expand_names,
     parse_query,
     pause_adapter_timeout,
@@ -371,6 +372,25 @@ async def test_shared_resource_wait_does_not_consume_adapter_timeout() -> None:
         )
 
     assert result.result() == []
+
+
+async def test_adapter_time_left_counts_down_inside_an_adapter() -> None:
+    seen: list[float | None] = []
+
+    async def measure(query: Query, context: LookupContext) -> Partial:
+        seen.append(adapter_time_left())
+        return found("measuring")
+
+    errors = await lookup(
+        [FakeAdapter("measuring", behaviour=measure)],
+        options=LookupOptions(adapter_timeout=30),
+    )
+
+    assert errors == []
+    [left] = seen
+    assert left is not None
+    assert 0 < left <= 30
+    assert adapter_time_left() is None
 
 
 async def test_a_group_in_exclude_removes_its_members() -> None:

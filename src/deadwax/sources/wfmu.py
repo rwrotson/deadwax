@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from urllib.parse import urlencode, urljoin
 
@@ -21,8 +22,10 @@ from deadwax.core import (
     Text,
     TextKind,
     Verdict,
+    adapter_time_left,
     compare,
     normalize_artist,
+    trace,
 )
 from deadwax.sources._base import HttpAdapter, search_key
 from deadwax.sources._html import parse_html, text_of
@@ -32,6 +35,11 @@ ARTISTS = "https://wfmu.org/artistbrowser.php"
 MIN_CELLS = 2
 MIN_INDEX_CELLS = 4
 MAX_PLAYLISTS = 10
+
+# Seconds kept for one more playlist; with less, the playlists already read are returned.
+PLAYLIST_RESERVE = 5.0
+
+logger = logging.getLogger(__name__)
 
 
 def _date(value: str | None) -> str | None:
@@ -158,12 +166,15 @@ class WfmuAdapter(HttpAdapter):
             headers={"content-type": "application/x-www-form-urlencoded"},
             body=urlencode({"id": artist_id}).encode(),
         )
-        plays = _plays(response.content, key)
-        partials = [
-            p
-            for url, date in plays[:MAX_PLAYLISTS]
-            if (p := await self._playlist(url, key, date)) is not None
-        ]
+        plays = _plays(response.content, key)[:MAX_PLAYLISTS]
+        partials: list[Partial] = []
+        for read, (url, date) in enumerate(plays):
+            left = adapter_time_left()
+            if partials and left is not None and left < PLAYLIST_RESERVE:
+                trace(logger, "wfmu.truncated", read=read, remaining=len(plays) - read)
+                break
+            if (partial := await self._playlist(url, key, date)) is not None:
+                partials.append(partial)
         if not partials:
             raise NotFoundError("no WFMU playlist with this recording", url=response.url)
         return Partial(
