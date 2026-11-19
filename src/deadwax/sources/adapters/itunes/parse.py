@@ -16,9 +16,9 @@ from deadwax.core import (
     TagKind,
     Verdict,
     compare,
-    recognize_url,
 )
 from deadwax.sources.adapters.itunes.models import Item
+from deadwax.sources.services import recognize
 
 SOURCE = "itunes"
 API = "https://itunes.apple.com/"
@@ -107,7 +107,7 @@ def linked_id(query: Query, context: LookupContext) -> str | None:
     """Apple Music ID of the record from a link an earlier source curated, such as MusicBrainz."""
     kind = query.kind or context.identity.kind
     for url in context.urls(SERVICE):
-        url_kind, ids = recognize_url(url)
+        url_kind, ids = recognize(url)
         if url_kind is kind and IdKind.APPLE_MUSIC in ids:
             return ids[IdKind.APPLE_MUSIC]
     return None

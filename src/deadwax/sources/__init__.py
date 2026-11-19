@@ -17,6 +17,7 @@ from .config import (
     YouTubeSettings,
 )
 from .lookup import build_adapters, describe_sources, lookup
+from .services import parse_query
 
 __all__ = [
     "DEFAULT_CONTACT",
@@ -36,4 +37,5 @@ __all__ = [
     "build_adapters",
     "describe_sources",
     "lookup",
+    "parse_query",
 ]

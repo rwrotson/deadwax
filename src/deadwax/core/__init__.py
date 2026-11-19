@@ -76,7 +76,7 @@ from .orchestrator import (
     pause_adapter_timeout,
     run,
 )
-from .query import EntityKind, IdKind, Query, parse_query, recognize_url
+from .query import EntityKind, IdKind, Query, UrlRule, recognize_url, text_query
 from .versions import ParsedTitle, classify_marker, parse_title
 
 __all__ = [
@@ -137,6 +137,7 @@ __all__ = [
     "Text",
     "TextKind",
     "TraceFilter",
+    "UrlRule",
     "Verdict",
     "VersionInfo",
     "VersionKind",
@@ -154,12 +155,12 @@ __all__ = [
     "normalize_copyright",
     "normalize_key",
     "normalize_text",
-    "parse_query",
     "parse_title",
     "pause_adapter_timeout",
     "recognize_url",
     "run",
     "split_featuring",
+    "text_query",
     "title_similarity",
     "to_markdown",
     "trace",

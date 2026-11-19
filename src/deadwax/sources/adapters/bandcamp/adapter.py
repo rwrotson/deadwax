@@ -17,7 +17,6 @@ from deadwax.core import (
     SourceGroup,
     Verdict,
     compare,
-    recognize_url,
 )
 from deadwax.sources._adapter import HttpAdapter
 from deadwax.sources._http import HttpClient, HttpResources, Profile
@@ -25,7 +24,7 @@ from deadwax.sources._search import search_key
 from deadwax.sources.adapters.bandcamp import models
 from deadwax.sources.adapters.bandcamp import parse as p
 from deadwax.sources.config import SourcesConfig
-from deadwax.sources.services import service_for_url
+from deadwax.sources.services import recognize
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +39,7 @@ class BandcampAdapter(HttpAdapter):
     name = "bandcamp"
     pass_ = Pass.ENRICH
     group = SourceGroup.CORE
+    service = "bandcamp"
     capabilities = frozenset(
         {
             Capability.IDENTITY,
@@ -74,10 +74,6 @@ class BandcampAdapter(HttpAdapter):
         if self._api_client is not None:
             await self._api_client.aclose()
             self._api_client = None
-
-    def resolves(self, query: Query) -> bool:
-        """Album and track pages on bandcamp.com subdomains; custom domains are not recognized."""
-        return query.url is not None and service_for_url(query.url) == "bandcamp"
 
     async def lookup(self, query: Query, context: LookupContext) -> Partial:
         """Read the page from the query, an earlier pass, or a search, then its label's page."""
@@ -240,8 +236,8 @@ class BandcampAdapter(HttpAdapter):
 
 def _known_pages(context: LookupContext, kind: EntityKind | None) -> list[str]:
     """Bandcamp pages earlier passes found, the queried kind first."""
-    pages = [url for url in context.urls("bandcamp") if recognize_url(url)[0] is not None]
-    return sorted(pages, key=lambda url: recognize_url(url)[0] is not kind)
+    pages = [url for url in context.urls("bandcamp") if recognize(url)[0] is not None]
+    return sorted(pages, key=lambda url: recognize(url)[0] is not kind)
 
 
 def _direct_url(key: RecordKey) -> str | None:

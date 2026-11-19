@@ -12,9 +12,8 @@ from deadwax.core import (
     Scope,
     Sourced,
     SourceState,
-    parse_query,
 )
-from deadwax.sources import SourcesConfig
+from deadwax.sources import SourcesConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.lastfm import LastfmAdapter
 from deadwax.sources.adapters.lastfm.adapter import API, _artist_page

@@ -32,11 +32,11 @@ from deadwax.core import (
     VersionInfo,
     VersionKind,
     merge,
-    parse_query,
+    text_query,
 )
 
 NOW = datetime(2026, 11, 12, tzinfo=UTC)
-TRACK = parse_query("Everything but the Girl - Missing", EntityKind.TRACK)
+TRACK = text_query("Everything but the Girl - Missing", EntityKind.TRACK)
 
 
 def provenance(source: str) -> list[Provenance]:
@@ -124,7 +124,7 @@ def test_version_discrepancy_without_matching_title_cites_the_query() -> None:
 
 
 def test_album_other_version_becomes_release_relation() -> None:
-    query = parse_query("Burial - Untrue", EntityKind.ALBUM)
+    query = text_query("Burial - Untrue", EntityKind.ALBUM)
     deluxe = RecordCandidate(
         artist="Burial",
         title="Untrue (Deluxe Edition)",
@@ -172,7 +172,7 @@ def test_disagreements_are_recorded_not_smoothed() -> None:
 
 
 def test_artist_spelling_conflict_is_a_discrepancy() -> None:
-    query = parse_query("Kino - Gruppa krovi", EntityKind.TRACK)
+    query = text_query("Kino - Gruppa krovi", EntityKind.TRACK)
     partials = [
         partial("a", RecordCandidate(artist="Kino", title="Gruppa krovi")),
         partial("b", RecordCandidate(artist="Kino", title="Gruppa krovi")),
@@ -188,7 +188,10 @@ def test_artist_spelling_conflict_is_a_discrepancy() -> None:
 
 
 def test_url_query_uses_first_candidate_as_reference() -> None:
-    query = parse_query("https://everythingbutthegirl.bandcamp.com/track/missing")
+    query = Query(
+        kind=EntityKind.TRACK,
+        url="https://everythingbutthegirl.bandcamp.com/track/missing",
+    )
     partials = [
         partial("bandcamp", candidate(kind=EntityKind.TRACK)),
         partial("musicbrainz", candidate("Missing (Live)")),
@@ -213,7 +216,7 @@ def test_url_query_without_candidates_keeps_facts() -> None:
 
 
 def test_explicit_version_is_used_for_identity() -> None:
-    query = parse_query("Radiohead - Paranoid Android", EntityKind.TRACK)
+    query = text_query("Radiohead - Paranoid Android", EntityKind.TRACK)
     live = VersionInfo(kind=VersionKind.LIVE, detail="Glastonbury 1997")
     partials = [
         partial("a", RecordCandidate(artist="Radiohead", title="Paranoid Android")),
@@ -271,7 +274,7 @@ def test_labels_codes_and_kind_are_combined() -> None:
 
 
 def test_facts_are_deduplicated_and_ordered_by_scope() -> None:
-    query = parse_query("Burial - Untrue", EntityKind.ALBUM)
+    query = text_query("Burial - Untrue", EntityKind.ALBUM)
     record = RecordCandidate(artist="Burial", title="Untrue")
     target = Entity(type=EntityType.ARTIST, name="Kode9")
     facts_a = {
@@ -368,7 +371,7 @@ def test_adapter_errors_are_passed_through() -> None:
 
 @pytest.mark.parametrize("kind", [EntityKind.TRACK, EntityKind.ALBUM])
 def test_empty_merge(kind: EntityKind) -> None:
-    query = parse_query("A - B", kind)
+    query = text_query("A - B", kind)
 
     dossier = merge(query, [], generated_at=NOW)
 
@@ -526,7 +529,7 @@ def test_unknown_key_notation_is_kept_as_text() -> None:
 
 
 def test_extended_mix_is_not_merged_into_the_original_mix() -> None:
-    query = parse_query("Artist - Track (Original Mix)", EntityKind.TRACK)
+    query = text_query("Artist - Track (Original Mix)", EntityKind.TRACK)
     original = RecordCandidate(artist="Artist", title="Track", bpm=124)
     extended = RecordCandidate(
         artist="Artist",

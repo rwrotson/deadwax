@@ -30,6 +30,7 @@ class NtsAdapter(HttpAdapter):
     name = "nts"
     group = SourceGroup.RADIO
     pass_ = Pass.ENRICH
+    service = None
     profile = Profile.API
     capabilities = frozenset({Capability.RELATIONS, Capability.TAGS})
 

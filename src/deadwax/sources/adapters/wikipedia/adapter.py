@@ -33,6 +33,7 @@ class WikipediaAdapter(HttpAdapter):
     name = "wikipedia"
     pass_ = Pass.ENRICH
     group = SourceGroup.CORE
+    service = None
     capabilities = frozenset(
         {
             Capability.IDENTITY,

@@ -27,6 +27,7 @@ class SecondHandSongsAdapter(HttpAdapter):
     name = "secondhandsongs"
     pass_ = Pass.ENRICH
     group = SourceGroup.CATALOGUES
+    service = None
     capabilities = frozenset({Capability.IDENTITY, Capability.CREDITS, Capability.RELATIONS})
 
     def headers(self) -> Mapping[str, str]:

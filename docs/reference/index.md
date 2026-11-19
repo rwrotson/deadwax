@@ -6,7 +6,7 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 |--------|---------|
 | `deadwax.core.errors` | Define the library error hierarchy |
 | `deadwax.core.events` | Emit structured trace events with fields bound by scope |
-| `deadwax.core.query` | Parse 'Artist - Title' text and record page URLs into a query |
+| `deadwax.core.query` | Parse 'Artist - Title' text into a query and match URLs against service rules |
 | `deadwax.core.models` | Define the dossier, its facts, provenance, and adapter results |
 | `deadwax.core.normalize` | Build comparison keys for names, titles, and codes |
 | `deadwax.core.versions` | Detect remix, live, demo, remaster, and other versions in titles |
@@ -17,7 +17,7 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.core.orchestrator` | Run adapters pass by pass and merge their results |
 | `deadwax.sources.config` | Define HTTP, cache, and per-source settings |
 | `deadwax.sources.lookup` | Build the adapters and look a query up |
-| `deadwax.sources.services` | Name the streaming and store service of a URL and what it opens |
+| `deadwax.sources.services` | Service catalogue of hosts and URL rules; parse record page URLs into queries |
 | `deadwax.sources.adapters.musicbrainz.adapter` | Find recordings and release groups in MusicBrainz |
 | `deadwax.sources.adapters.musicbrainz.parse` | Turn MusicBrainz responses into identity and facts |
 | `deadwax.sources.adapters.musicbrainz.models` | Model MusicBrainz web service responses |

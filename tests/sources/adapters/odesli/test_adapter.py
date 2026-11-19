@@ -14,9 +14,8 @@ from deadwax.core import (
     Provenance,
     SourceError,
     SourceState,
-    parse_query,
 )
-from deadwax.sources import SourcesConfig
+from deadwax.sources import SourcesConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.odesli import OdesliAdapter
 from deadwax.sources.adapters.odesli.models import PageData

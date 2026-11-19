@@ -24,10 +24,9 @@ from deadwax.core import (
     classify_marker,
     compare,
     parse_title,
-    recognize_url,
 )
 from deadwax.sources.adapters.musicbrainz import models
-from deadwax.sources.services import link_target, service_for_url
+from deadwax.sources.services import link_target, recognize, service_for_url
 
 SOURCE = "musicbrainz"
 SITE = "https://musicbrainz.org"
@@ -359,7 +358,7 @@ def url_ids(relations: Iterable[models.Relation]) -> dict[IdKind, str]:
         if wikidata:
             ids.setdefault(IdKind.WIKIDATA, wikidata[1])
             continue
-        _, found = recognize_url(resource)
+        _, found = recognize(resource)
         for kind in (IdKind.DISCOGS_MASTER, IdKind.DISCOGS_RELEASE):
             if kind in found:
                 ids.setdefault(kind, found[kind])

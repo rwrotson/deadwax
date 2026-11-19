@@ -17,9 +17,8 @@ from deadwax.core import (
     Query,
     RelationKind,
     SourceError,
-    parse_query,
 )
-from deadwax.sources import SourcesConfig
+from deadwax.sources import SourcesConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.bandcamp import BandcampAdapter
 from deadwax.sources.adapters.bandcamp.adapter import MOBILE_API, SEARCH_API, SEARCH_PAGE

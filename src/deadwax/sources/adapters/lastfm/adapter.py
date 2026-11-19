@@ -36,6 +36,7 @@ class LastfmAdapter(HttpAdapter):
     name = "lastfm"
     pass_ = Pass.ENRICH
     group = SourceGroup.CORE
+    service = None
     capabilities = frozenset(
         {Capability.IDENTITY, Capability.TAGS, Capability.TEXTS, Capability.RELATIONS},
     )

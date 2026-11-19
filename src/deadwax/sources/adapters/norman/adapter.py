@@ -10,7 +10,6 @@ from deadwax.core import (
 from deadwax.sources._adapter import HttpAdapter
 from deadwax.sources._http import Profile
 from deadwax.sources.adapters.norman import parse
-from deadwax.sources.services import service_for_url
 
 
 class NormanAdapter(HttpAdapter):
@@ -19,15 +18,12 @@ class NormanAdapter(HttpAdapter):
     name = "norman"
     group = SourceGroup.SHOPS
     pass_ = Pass.ENRICH
+    service = "norman"
     profile = Profile.BROWSER
     capabilities = frozenset(
         {Capability.IDENTITY, Capability.TAGS, Capability.LINKS},
     )
     required_marker = b"<h1"
-
-    def resolves(self, query: Query) -> bool:
-        """Resolve Norman Records product URLs."""
-        return query.url is not None and service_for_url(query.url) == self.name
 
     async def lookup(self, query: Query, context: LookupContext) -> Partial:
         """Read a named Norman Records product without searching the site."""

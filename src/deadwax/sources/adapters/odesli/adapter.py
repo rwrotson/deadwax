@@ -21,6 +21,7 @@ class OdesliAdapter(HttpAdapter):
     name = parse.SOURCE
     pass_ = Pass.LINKS
     group = SourceGroup.CORE
+    service = None
     capabilities = frozenset({Capability.LINKS})
     profile = Profile.BROWSER
 

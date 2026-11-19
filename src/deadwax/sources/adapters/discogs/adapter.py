@@ -52,6 +52,7 @@ class DiscogsAdapter(HttpAdapter):
     name = "discogs"
     pass_ = Pass.ENRICH
     group = SourceGroup.CORE
+    service = "discogs"
     additional_profiles = (Profile.BROWSER,)
     capabilities = frozenset(
         {

@@ -20,9 +20,8 @@ from deadwax.core import (
     SourceGroup,
     VersionInfo,
     VersionKind,
-    parse_query,
 )
-from deadwax.sources import SourcesConfig, SourceSettings
+from deadwax.sources import SourcesConfig, SourceSettings, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources._search import SearchHit, SearchPageAdapter, pick_hit, search_key
 

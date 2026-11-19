@@ -4,8 +4,8 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from deadwax.core import EntityKind, LookupContext, RelationKind, TextKind, parse_query
-from deadwax.sources import GeniusSettings, SourcesConfig
+from deadwax.core import EntityKind, LookupContext, RelationKind, TextKind
+from deadwax.sources import GeniusSettings, SourcesConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.genius import GeniusAdapter
 from deadwax.sources.adapters.genius.parse import lyrics

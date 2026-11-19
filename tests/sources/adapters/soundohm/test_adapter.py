@@ -19,9 +19,8 @@ from deadwax.core import (
     TagKind,
     TextKind,
     merge,
-    parse_query,
 )
-from deadwax.sources import SourcesConfig
+from deadwax.sources import SourcesConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.soundohm import SoundohmAdapter
 

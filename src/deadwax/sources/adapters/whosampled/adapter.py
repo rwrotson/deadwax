@@ -34,12 +34,9 @@ class WhoSampledAdapter(HttpAdapter):
     name = "whosampled"
     group = SourceGroup.SAMPLES
     pass_ = Pass.ENRICH
+    service = "whosampled"
     profile = Profile.BROWSER
     capabilities = frozenset({Capability.RELATIONS})
-
-    def resolves(self, query: Query) -> bool:
-        """Read a WhoSampled recording URL directly."""
-        return query.url is not None and "whosampled.com" in query.url
 
     async def _section_relations(self, section: Node, kind: RelationKind) -> list[Relation]:
         rows = section.css("tr")

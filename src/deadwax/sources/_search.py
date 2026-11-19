@@ -24,7 +24,6 @@ from deadwax.core import (
 )
 from deadwax.sources._adapter import HttpAdapter
 from deadwax.sources._http import HttpClient, Profile
-from deadwax.sources.services import service_for_url
 
 # Search results listed in a `search.pick` or `search.ranked` event.
 TRACED_HITS = 25
@@ -127,17 +126,6 @@ class SearchPageAdapter(HttpAdapter):
     def search_client(self) -> HttpClient:
         """Client used for search; sources with JSON feeds may override it."""
         return self.client
-
-    # Service name of the source's pages, as `service_for_url` gives it.
-    service: str | None = None
-
-    def resolves(self, query: Query) -> bool:
-        """Pages of the source's own service."""
-        return (
-            self.service is not None
-            and query.url is not None
-            and service_for_url(query.url) == self.service
-        )
 
     async def lookup(self, query: Query, context: LookupContext) -> Partial:
         """Find the record's page and read it."""

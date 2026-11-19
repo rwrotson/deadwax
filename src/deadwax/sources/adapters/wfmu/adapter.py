@@ -40,6 +40,7 @@ class WfmuAdapter(HttpAdapter):
     name = "wfmu"
     group = SourceGroup.RADIO
     pass_ = Pass.ENRICH
+    service = None
     profile = Profile.BROWSER
     capabilities = frozenset({Capability.RELATIONS, Capability.TEXTS})
 

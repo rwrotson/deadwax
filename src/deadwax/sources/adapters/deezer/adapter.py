@@ -26,6 +26,7 @@ class DeezerAdapter(HttpAdapter):
     name = parse.SOURCE
     pass_ = Pass.ENRICH
     group = SourceGroup.CORE
+    service = "deezer"
     capabilities = frozenset({Capability.IDENTITY, Capability.LINKS, Capability.TAGS})
     profile = Profile.BROWSER
 

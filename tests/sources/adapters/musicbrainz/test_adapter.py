@@ -14,9 +14,8 @@ from deadwax.core import (
     Query,
     Sourced,
     VersionKind,
-    parse_query,
 )
-from deadwax.sources import SourcesConfig, SourceSettings
+from deadwax.sources import SourcesConfig, SourceSettings, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.musicbrainz import MusicBrainzAdapter
 

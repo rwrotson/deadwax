@@ -17,7 +17,6 @@ from deadwax.core import (
     Requirement,
     SourceError,
     SourceGroup,
-    recognize_url,
 )
 from deadwax.sources._adapter import HttpAdapter
 from deadwax.sources._http import HttpClient, HttpResources
@@ -25,6 +24,7 @@ from deadwax.sources._search import pick_hit, search_key
 from deadwax.sources.adapters.spotify import models
 from deadwax.sources.adapters.spotify import parse as p
 from deadwax.sources.config import SourcesConfig
+from deadwax.sources.services import recognize
 
 API = "https://api.spotify.com/v1/"
 ACCOUNTS = "https://accounts.spotify.com/api/"
@@ -43,6 +43,7 @@ class SpotifyAdapter(HttpAdapter):
     name = "spotify"
     pass_ = Pass.ENRICH
     group = SourceGroup.STREAMING
+    service = "spotify"
     capabilities = frozenset({Capability.IDENTITY, Capability.LINKS, Capability.METRICS})
     requires = (
         Requirement(setting="spotify.client_id", purpose="every lookup"),
@@ -132,7 +133,7 @@ class SpotifyAdapter(HttpAdapter):
     def _known_id(self, context: LookupContext, kind: EntityKind) -> str | None:
         """Spotify ID of the record from a link an earlier source found."""
         for url in context.urls(p.SERVICE):
-            url_kind, ids = recognize_url(url)
+            url_kind, ids = recognize(url)
             if url_kind is kind and IdKind.SPOTIFY in ids:
                 return ids[IdKind.SPOTIFY]
         return None

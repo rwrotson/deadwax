@@ -15,6 +15,7 @@ from deadwax.core import (
 )
 from deadwax.sources._http import ClientSpec, HttpClient, HttpResources, Profile
 from deadwax.sources.config import SourcesConfig, SourceSettings
+from deadwax.sources.services import service_of
 
 
 class HttpAdapter(ABC):
@@ -24,6 +25,10 @@ class HttpAdapter(ABC):
     group: SourceGroup
     pass_: Pass
     capabilities: frozenset[Capability]
+
+    # Name in `services.SERVICES` of the service whose pages the adapter reads, or None.
+    service: str | None
+
     requires: tuple[Requirement, ...] = ()
     profile: Profile = Profile.API
     additional_profiles: tuple[Profile, ...] = ()
@@ -87,9 +92,12 @@ class HttpAdapter(ABC):
             )
         return SourceStatus(source=self.name, state=SourceState.READY)
 
-    def resolves(self, query: Query) -> bool:  # noqa: ARG002 -- the protocol's signature
-        """Whether this adapter reads the page behind the query URL; none by default."""
-        return False
+    def resolves(self, query: Query) -> bool:
+        """Whether the query URL is a page of the adapter's service."""
+        if self.service is None or query.url is None:
+            return False
+        service = service_of(query.url)
+        return service is not None and service.name == self.service
 
     def headers(self) -> Mapping[str, str]:
         """Extra headers for every request, such as authorization."""

@@ -11,9 +11,8 @@ from deadwax.core import (
     NotFoundError,
     Query,
     SourceError,
-    parse_query,
 )
-from deadwax.sources import SourcesConfig
+from deadwax.sources import SourcesConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.deezer import DeezerAdapter
 

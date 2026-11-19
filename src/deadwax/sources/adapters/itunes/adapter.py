@@ -22,6 +22,7 @@ class ItunesAdapter(HttpAdapter):
     name = parse.SOURCE
     pass_ = Pass.ENRICH
     group = SourceGroup.CORE
+    service = "apple_music"
     capabilities = frozenset({Capability.IDENTITY, Capability.LINKS, Capability.TAGS})
 
     def resolves(self, query: Query) -> bool:

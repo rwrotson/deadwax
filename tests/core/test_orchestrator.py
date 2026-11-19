@@ -34,15 +34,15 @@ from deadwax.core import (
     Tag,
     adapter_time_left,
     expand_names,
-    parse_query,
     pause_adapter_timeout,
     run,
+    text_query,
 )
 
 pytestmark = pytest.mark.asyncio
 
 NOW = datetime(2026, 11, 12, tzinfo=UTC)
-TRACK = parse_query("Everything but the Girl - Missing", EntityKind.TRACK)
+TRACK = text_query("Everything but the Girl - Missing", EntityKind.TRACK)
 
 type Behaviour = Callable[[Query, LookupContext], Awaitable[Partial]]
 

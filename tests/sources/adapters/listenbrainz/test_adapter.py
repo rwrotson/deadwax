@@ -15,9 +15,8 @@ from deadwax.core import (
     RelationKind,
     Scope,
     TextKind,
-    parse_query,
 )
-from deadwax.sources import SourcesConfig
+from deadwax.sources import SourcesConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.listenbrainz import ListenBrainzAdapter
 from deadwax.sources.adapters.listenbrainz.parse import published

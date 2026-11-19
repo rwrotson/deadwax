@@ -12,9 +12,8 @@ from deadwax.core import (
     RelationKind,
     Scope,
     merge,
-    parse_query,
 )
-from deadwax.sources import SourcesConfig
+from deadwax.sources import SourcesConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.secondhandsongs import SecondHandSongsAdapter
 from deadwax.sources.adapters.secondhandsongs.parse import website

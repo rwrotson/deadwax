@@ -25,7 +25,7 @@ from deadwax.core import (
     Text,
     TextKind,
     merge,
-    parse_query,
+    text_query,
     to_markdown,
 )
 
@@ -34,7 +34,7 @@ SOURCE = [Provenance(source="bandcamp", url="https://burial.bandcamp.com/album/u
 
 
 def untrue_dossier() -> str:
-    query = parse_query("Burial - Untrue (Deluxe)", EntityKind.ALBUM)
+    query = text_query("Burial - Untrue (Deluxe)", EntityKind.ALBUM)
     record = RecordCandidate(
         artist="Burial",
         title="Untrue (Deluxe)",
@@ -200,7 +200,7 @@ def test_markdown_sections_and_sources() -> None:
 
 def test_markdown_of_empty_dossier_names_the_query() -> None:
     by_url = merge(Query(url="https://example.com/x"), [], generated_at=NOW)
-    by_text = merge(parse_query("A - B", EntityKind.TRACK), [], generated_at=NOW)
+    by_text = merge(text_query("A - B", EntityKind.TRACK), [], generated_at=NOW)
 
     assert to_markdown(by_url) == "# https://example.com/x\n\n## Identity\n"
     assert to_markdown(by_text) == "# A - B\n\n## Identity\n\n- **Kind:** track\n"

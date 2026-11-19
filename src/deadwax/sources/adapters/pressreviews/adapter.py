@@ -20,6 +20,7 @@ class PressAdapter(HttpAdapter):
     name = "pressreviews"
     group = SourceGroup.PRESS
     pass_ = Pass.LINKS
+    service = None
     profile = Profile.BROWSER
     capabilities = frozenset({Capability.TEXTS})
 

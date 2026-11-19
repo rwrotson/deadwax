@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1 and R-2 done, R-3 is next.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1–R-3 done, R-4 is next.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -118,7 +118,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Order: shared infr
 | 19 | Done (WhoSampled access intermittent) | 1001Tracklists, WhoSampled. |
 | R-1 | Done | Layout: adapters in `sources/adapters/`, one package per adapter, tests per source, `_base` split, source `ra`, fixtures `tracklists`. |
 | R-2 | Done | Shared helpers: `prose()`, JSON through models, adapter access description. |
-| R-3 | Not started | Service catalogue in `sources/services.py`; `service` and default `resolves()` on every adapter; URL rules leave the core. |
+| R-3 | Done | Service catalogue in `sources/services.py`; `service` and default `resolves()` on every adapter; URL rules leave the core. |
 | R-4 | Not started | Source defaults in settings, `LookupConfig` with a `sources` section shared by the CLI, resolved settings for `HttpClient`, registry. |
 | R-5 | Not started | Core: `Facts` base, `deadline` module, access label out of the core, nested `SourceInfo.access`, shared formatters. |
 | R-6 | Not started | Trace event names, repository cleanup, journal split, architecture docs. |
@@ -279,6 +279,25 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 ## Progress evidence and decision log
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
+
+### 2026-11-19 — R-3 evidence (service catalogue)
+
+Changed:
+- `sources/services.py` holds `SERVICES`, one `Service` per web service with its hosts (suffix match), its URL rules, and whether its URLs are links (`link=False` for MusicBrainz and Discogs, which are in the catalogue for their rules only). It replaces `_SERVICES` and the core's `_URL_RULES`. New `service_of(url)` and `recognize(url)`; `service_for_url` and `link_target` keep their results.
+- Core `query.py` keeps `Query`, `EntityKind`, `IdKind` and text parsing: public `UrlRule` (path pattern, kind, id kind, optional query parameter `param` that carries the id, which replaces the Apple `?i=` special case), generic `recognize_url(url, rules)` that matches path and parameter only, and `text_query(text, kind)`. `deadwax.core.parse_query` is gone.
+- `parse_query` (URL or text) lives in `sources/services.py`; `deadwax.parse_query` is a lazy name of the sources layer, so importing `deadwax` still loads no httpx.
+- `HttpAdapter` declares `service: str | None` without a default, and every adapter sets it. The default `resolves()` (moved from `SearchPageAdapter`) takes URLs of that service. Bandcamp, Norman Records, SoundCloud, and WhoSampled dropped their own `resolves()`. Spotify, Deezer, iTunes, Discogs, and MusicBrainz keep their ID-based overrides and declare their service. Odesli and the sources that read no pages of their own declare `None`.
+- import-linter R4: `services` is a layer below `_adapter | _html`, since `_adapter` now imports it.
+- Tests: the URL table and URL query cases moved from `tests/core/test_query.py` to `tests/sources/test_services.py`; the core tests the generic `recognize_url` with local rules; core and logs tests build text queries with `text_query`; `test_lookup.py` checks that every adapter names a catalogue service or `None`, and covers the default `resolves()`. Docs: `docs/architecture.md` R4, `docs/reference/index.md`.
+
+Decisions:
+- (agent) URL rules apply to every host of their service, subdomains included. Before, they needed the exact host after stripping `www.`/`m.`. As a result, `itunes.apple.com` album and song URLs now get Apple Music IDs.
+- (agent) WhoSampled resolves a URL by its host instead of finding `whosampled.com` anywhere in the URL.
+- (agent) The core `Adapter` protocol is unchanged: `service` lives on `HttpAdapter`, which every adapter subclasses.
+
+Checks: `uv run poe check` passed (fmt-check, lint, lint-imports 16 contracts kept, mypy, 1023 tests, coverage 96.77%); `uv run --group docs properdocs build --strict` passed; `deadwax sources` runs; `from deadwax import parse_query` parses an `itunes.apple.com` `?i=` URL into a track. No live runs (refactor only).
+
+**Suggested message:** `refactor(sources)!: move service hosts and URL rules into a service catalogue`.
 
 ### 2026-11-19 — R-2 evidence (shared helpers)
 

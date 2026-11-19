@@ -83,6 +83,7 @@ class MusicBrainzAdapter(HttpAdapter):
     name = "musicbrainz"
     pass_ = Pass.IDENTITY
     group = SourceGroup.CORE
+    service = "musicbrainz"
     capabilities = frozenset(
         {
             Capability.IDENTITY,

@@ -16,7 +16,7 @@ from deadwax.core import (
     Identity,
     Provenance,
     Sourced,
-    parse_query,
+    text_query,
     trace,
     trace_scope,
 )
@@ -33,7 +33,7 @@ from deadwax.logs import (
 )
 
 NOW = datetime(2026, 11, 13, tzinfo=UTC)
-QUERY = parse_query("Everything but the Girl - Missing", EntityKind.TRACK)
+QUERY = text_query("Everything but the Girl - Missing", EntityKind.TRACK)
 
 library = logging.getLogger("deadwax.tests")
 

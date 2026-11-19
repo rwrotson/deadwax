@@ -24,6 +24,7 @@ class YouTubeAdapter(HttpAdapter):
     name = parse.SOURCE
     pass_ = Pass.LINKS
     group = SourceGroup.STREAMING
+    service = None
     capabilities = frozenset({Capability.LINKS})
     requires = (Requirement(setting="youtube.api_key", purpose="every lookup"),)
     secret_params = frozenset({"key"})

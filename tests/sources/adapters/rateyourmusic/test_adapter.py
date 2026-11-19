@@ -3,6 +3,7 @@ import pytest
 
 from deadwax import EntityKind, ErrorKind, MetricKind, Query, RelationKind, TagKind, TextKind
 from deadwax.core import RecordKey, SourceError
+from deadwax.sources import parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.rateyourmusic import RateYourMusicAdapter
 from deadwax.sources.config import Escalation, SourcesConfig, SourceSettings
@@ -60,8 +61,6 @@ def test_search_and_missing_identity() -> None:
 
 
 def test_browser_is_first_and_url_kind() -> None:
-    from deadwax.core.query import parse_query  # noqa: PLC0415 -- test checks URL parsing
-
     config = SourcesConfig()
     assert config.html_transports("rateyourmusic") == (Escalation.BROWSER,)
     assert (

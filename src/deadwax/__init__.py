@@ -45,7 +45,6 @@ from .core import (
     TraceFilter,
     VersionInfo,
     VersionKind,
-    parse_query,
     parse_title,
     to_markdown,
 )
@@ -66,6 +65,7 @@ if TYPE_CHECKING:
         YouTubeSettings,
         describe_sources,
         lookup,
+        parse_query,
     )
 
 # The sources layer imports httpx, which loads rich and click whenever they are installed,
@@ -86,6 +86,7 @@ _SOURCES_NAMES = frozenset(
         "YouTubeSettings",
         "describe_sources",
         "lookup",
+        "parse_query",
     },
 )
 

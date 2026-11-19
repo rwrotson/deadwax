@@ -25,6 +25,7 @@ class KexpAdapter(HttpAdapter):
     name = "kexp"
     pass_ = Pass.ENRICH
     group = SourceGroup.RADIO
+    service = None
     capabilities = frozenset({Capability.IDENTITY, Capability.TEXTS, Capability.RELATIONS})
 
     async def lookup(self, query: Query, context: LookupContext) -> Partial:

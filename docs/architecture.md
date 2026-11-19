@@ -48,12 +48,15 @@ From top to bottom:
 deadwax.sources.lookup                  composition: builds adapters and runs the orchestrator
 deadwax.sources.adapters                one package per source
 deadwax.sources._search                 search keys, search hits, `SearchPageAdapter`, `track_on_release`
-deadwax.sources._adapter | services | _html   `HttpAdapter` | service names of URLs | HTML and JSON-LD helpers
+deadwax.sources._adapter | _html        `HttpAdapter` and its default `resolves()` | HTML and JSON-LD helpers
+deadwax.sources.services                service catalogue: hosts and URL rules; URL queries and `parse_query`
 deadwax.sources._http
 deadwax.sources.config
 ```
 
 Every adapter is a package `deadwax.sources.adapters.<name>`, named after its source, with the modules `adapter` (the adapter class and its requests), `parse` (pure functions from responses to facts), and optionally `models` (Pydantic models of JSON responses), layered in that order (contract "R4: adapter package modules"). Its tests live in `tests/sources/adapters/<name>/` and its recorded responses in `tests/fixtures/<name>/`.
+
+Every adapter declares `service`: the name of the catalogue service whose pages it reads, or `None`. The default `resolves()` takes a query URL of that service; adapters that resolve by recognized identifiers override it. The core knows no services: it matches a URL against rules it is given (`recognize_url`) and parses text queries (`text_query`).
 
 Adapters are independent (contract "R4: adapters are independent"): they never import each other, and data found by one adapter reaches another only through `LookupContext`. A helper needed by two adapters moves down into `_search`, `_adapter`, `services`, `_html`, or `_http`.
 

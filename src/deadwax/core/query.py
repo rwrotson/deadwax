@@ -1,4 +1,5 @@
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Self
@@ -68,141 +69,18 @@ class Query(BaseModel):
 
 
 @dataclass(frozen=True, slots=True)
-class _UrlRule:
-    host: re.Pattern[str]
+class UrlRule:
+    """Path of a record page on one service, the kind of record it opens, and its identifier.
+
+    The identifier is the path's `id` group, or the value of `param` when it is set; a rule
+    with `param` matches only URLs that carry that query parameter.
+    """
+
     path: re.Pattern[str]
     kind: EntityKind
     id_kind: IdKind | None = None
+    param: str | None = None
 
-
-_MBID = r"(?P<id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
-_BANDCAMP = re.compile(r"(?:^|\.)bandcamp\.com$")
-_MUSICBRAINZ = re.compile(r"^musicbrainz\.org$")
-_DISCOGS = re.compile(r"^discogs\.com$")
-_SPOTIFY = re.compile(r"^open\.spotify\.com$")
-_DEEZER = re.compile(r"^deezer\.com$")
-_APPLE_MUSIC = re.compile(r"^music\.apple\.com$")
-_SOUNDCLOUD = re.compile(r"^soundcloud\.com$")
-_BEATPORT = re.compile(r"^beatport\.com$")
-_HARDWAX = re.compile(r"^hardwax\.com$")
-_SOUNDOHM = re.compile(r"^soundohm\.com$")
-_JUNO = re.compile(r"^juno\.co\.uk$")
-_PHONICA = re.compile(r"^phonicarecords\.com$")
-_BOOMKAT = re.compile(r"^boomkat\.com$")
-_NORMAN = re.compile(r"^normanrecords\.com$")
-_BLEEP = re.compile(r"^bleep\.com$")
-_FORCED_EXPOSURE = re.compile(r"^forcedexposure\.com$")
-_ALLMUSIC = re.compile(r"^allmusic\.com$")
-_ALBUM_OF_THE_YEAR = re.compile(r"^albumoftheyear\.org$")
-_RATE_YOUR_MUSIC = re.compile(r"^rateyourmusic\.com$")
-_WHOSAMPLED = re.compile(r"^whosampled\.com$")
-_TRACKLISTS = re.compile(r"^1001tracklists\.com$")
-
-# A SoundCloud track page is '/<user>/<track>', optionally with a secret-link token; the
-# names below are site sections and profile tabs, not users and tracks. Sets ('/<user>/sets/')
-# are albums or playlists, which only the resolver can tell apart.
-_SOUNDCLOUD_TRACK = re.compile(
-    r"^/(?!(?:discover|search|charts|stream|you|upload|pages|settings|messages|notifications|"
-    r"people|tags|terms-of-use)/)[^/]+/(?!(?:sets|likes|tracks|albums|reposts|followers|"
-    r"following|popular-tracks|comments|spotlight)(?:/|$))[^/]+(?:/s-\w+)?/?$",
-)
-
-_URL_RULES = (
-    _UrlRule(_SOUNDCLOUD, _SOUNDCLOUD_TRACK, EntityKind.TRACK),
-    _UrlRule(
-        _BEATPORT,
-        re.compile(r"^(?:/[a-z]{2})?/track/[^/]+/(?P<id>\d+)"),
-        EntityKind.TRACK,
-        IdKind.BEATPORT_TRACK,
-    ),
-    _UrlRule(
-        _BEATPORT,
-        re.compile(r"^(?:/[a-z]{2})?/release/[^/]+/(?P<id>\d+)"),
-        EntityKind.ALBUM,
-        IdKind.BEATPORT_RELEASE,
-    ),
-    _UrlRule(_HARDWAX, re.compile(r"^/\d+/"), EntityKind.ALBUM),
-    _UrlRule(_SOUNDOHM, re.compile(r"^/product/[^/]+"), EntityKind.ALBUM),
-    _UrlRule(_JUNO, re.compile(r"^/products/[^/]+/\d+-\d+"), EntityKind.ALBUM),
-    _UrlRule(_PHONICA, re.compile(r"^/product/[^/]+/\d+"), EntityKind.ALBUM),
-    _UrlRule(_BOOMKAT, re.compile(r"^/artists/[^/]+/releases/[^/]+/[^/]+"), EntityKind.ALBUM),
-    _UrlRule(_BOOMKAT, re.compile(r"^/products/[^/]+"), EntityKind.ALBUM),
-    _UrlRule(_NORMAN, re.compile(r"^/records/\d+-"), EntityKind.ALBUM),
-    _UrlRule(_BLEEP, re.compile(r"^/release/\d+"), EntityKind.ALBUM),
-    _UrlRule(_FORCED_EXPOSURE, re.compile(r"^/Catalog/.+\.html$"), EntityKind.ALBUM),
-    _UrlRule(_ALLMUSIC, re.compile(r"^/album/"), EntityKind.ALBUM),
-    _UrlRule(_ALLMUSIC, re.compile(r"^/song/"), EntityKind.TRACK),
-    _UrlRule(_ALBUM_OF_THE_YEAR, re.compile(r"^/album/"), EntityKind.ALBUM),
-    _UrlRule(_RATE_YOUR_MUSIC, re.compile(r"^/release/"), EntityKind.ALBUM),
-    _UrlRule(_RATE_YOUR_MUSIC, re.compile(r"^/song/"), EntityKind.TRACK),
-    _UrlRule(_WHOSAMPLED, re.compile(r"^/[^/]+/[^/]+/?$"), EntityKind.TRACK),
-    _UrlRule(_TRACKLISTS, re.compile(r"^/track/[^/]+/[^/]+/"), EntityKind.TRACK),
-    _UrlRule(_BANDCAMP, re.compile(r"^/album/"), EntityKind.ALBUM),
-    _UrlRule(_BANDCAMP, re.compile(r"^/track/"), EntityKind.TRACK),
-    _UrlRule(
-        _MUSICBRAINZ,
-        re.compile(rf"^/recording/{_MBID}"),
-        EntityKind.TRACK,
-        IdKind.MUSICBRAINZ_RECORDING,
-    ),
-    _UrlRule(
-        _MUSICBRAINZ,
-        re.compile(rf"^/release-group/{_MBID}"),
-        EntityKind.ALBUM,
-        IdKind.MUSICBRAINZ_RELEASE_GROUP,
-    ),
-    _UrlRule(
-        _MUSICBRAINZ,
-        re.compile(rf"^/release/{_MBID}"),
-        EntityKind.ALBUM,
-        IdKind.MUSICBRAINZ_RELEASE,
-    ),
-    _UrlRule(
-        _DISCOGS,
-        re.compile(r"^(?:/[^/]+)?/release/(?P<id>\d+)"),
-        EntityKind.ALBUM,
-        IdKind.DISCOGS_RELEASE,
-    ),
-    _UrlRule(
-        _DISCOGS,
-        re.compile(r"^(?:/[^/]+)?/master/(?P<id>\d+)"),
-        EntityKind.ALBUM,
-        IdKind.DISCOGS_MASTER,
-    ),
-    _UrlRule(
-        _SPOTIFY,
-        re.compile(r"^(?:/intl-[a-z]+)?/track/(?P<id>\w+)"),
-        EntityKind.TRACK,
-        IdKind.SPOTIFY,
-    ),
-    _UrlRule(
-        _SPOTIFY,
-        re.compile(r"^(?:/intl-[a-z]+)?/album/(?P<id>\w+)"),
-        EntityKind.ALBUM,
-        IdKind.SPOTIFY,
-    ),
-    _UrlRule(
-        _DEEZER,
-        re.compile(r"^(?:/[a-z]{2})?/track/(?P<id>\d+)"),
-        EntityKind.TRACK,
-        IdKind.DEEZER,
-    ),
-    _UrlRule(
-        _DEEZER,
-        re.compile(r"^(?:/[a-z]{2})?/album/(?P<id>\d+)"),
-        EntityKind.ALBUM,
-        IdKind.DEEZER,
-    ),
-    _UrlRule(
-        _APPLE_MUSIC,
-        re.compile(r"^/[a-z]{2}/song/(?:[^/]+/)?(?P<id>\d+)"),
-        EntityKind.TRACK,
-        IdKind.APPLE_MUSIC,
-    ),
-)
-
-# Apple Music album URLs point at a track when they carry the `i` parameter.
-_APPLE_ALBUM_PATH = re.compile(r"^/[a-z]{2}/album/(?:[^/]+/)?(?P<id>\d+)")
 
 # Hyphen, non-breaking hyphen, figure dash, en and em dashes, horizontal bar, minus sign.
 DASHES = "-\u2010\u2011\u2012\u2013\u2014\u2015\u2212"
@@ -213,46 +91,23 @@ QUOTES = "\"'\u201c\u201d\u2018\u2019\u00ab\u00bb\u201e"
 _ARTIST_TITLE_SEPARATOR = re.compile(rf"\s+[{DASHES}]\s+")
 
 
-def _host(netloc: str) -> str:
-    host = netloc.lower().rsplit("@", 1)[-1].split(":", 1)[0]
-    for prefix in ("www.", "m."):
-        host = host.removeprefix(prefix)
-    return host
-
-
-def _apple_album(host: str, path: str, query: str) -> tuple[EntityKind, dict[IdKind, str]] | None:
-    match = _APPLE_ALBUM_PATH.match(path) if _APPLE_MUSIC.match(host) else None
-    if match is None:
-        return None
-    track_ids = parse_qs(query).get("i")
-    if track_ids:
-        return EntityKind.TRACK, {IdKind.APPLE_MUSIC: track_ids[0]}
-    return EntityKind.ALBUM, {IdKind.APPLE_MUSIC: match["id"]}
-
-
-def recognize_url(url: str) -> tuple[EntityKind | None, dict[IdKind, str]]:
-    """Infer the record kind and identifiers from a known service URL."""
+def recognize_url(
+    url: str,
+    rules: Iterable[UrlRule],
+) -> tuple[EntityKind | None, dict[IdKind, str]]:
+    """Infer the record kind and identifiers of a URL from the first rule its path matches."""
     parts = urlsplit(url)
-    host, path = _host(parts.netloc), parts.path or "/"
-    apple = _apple_album(host, path, parts.query)
-    if apple is not None:
-        return apple
-    for rule in _URL_RULES:
-        match = rule.path.match(path) if rule.host.search(host) else None
-        if match is not None:
-            ids = {rule.id_kind: match["id"]} if rule.id_kind is not None else {}
-            return rule.kind, ids
+    path = parts.path or "/"
+    params = parse_qs(parts.query)
+    for rule in rules:
+        match = rule.path.match(path)
+        values = params.get(rule.param) if rule.param is not None else None
+        if match is None or (rule.param is not None and not values):
+            continue
+        if rule.id_kind is None:
+            return rule.kind, {}
+        return rule.kind, {rule.id_kind: values[0] if values else match["id"]}
     return None, {}
-
-
-def _url_query(url: str, kind: EntityKind | None) -> Query:
-    parts = urlsplit(url)
-    if parts.scheme not in {"http", "https"} or not parts.netloc:
-        raise InvalidQueryError(f"not an HTTP(S) URL: {url}")
-    url_kind, ids = recognize_url(url)
-    if kind is not None and url_kind is not None and kind != url_kind:
-        raise InvalidQueryError(f"the URL points to a {url_kind}, but a {kind} was requested")
-    return Query(kind=kind or url_kind, url=url, ids=ids)
 
 
 def _unquote(text: str) -> str:
@@ -273,13 +128,11 @@ def _split_artist_title(text: str) -> tuple[str, str]:
     return artist, title
 
 
-def parse_query(text: str, kind: EntityKind | None = None) -> Query:
-    """Build a query from 'Artist - Title' text or a record page URL."""
+def text_query(text: str, kind: EntityKind | None) -> Query:
+    """Build a query from 'Artist - Title' text."""
     text = text.strip()
     if not text:
         raise InvalidQueryError("the query is empty")
-    if re.match(r"^[a-z][a-z0-9+.-]*://", text, re.IGNORECASE):
-        return _url_query(text, kind)
     artist, title = _split_artist_title(text)
     if kind is None:
         raise InvalidQueryError("state whether the query is an album or a track")

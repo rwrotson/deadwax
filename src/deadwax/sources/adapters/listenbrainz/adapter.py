@@ -41,6 +41,7 @@ class ListenBrainzAdapter(HttpAdapter):
     name = "listenbrainz"
     pass_ = Pass.ENRICH
     group = SourceGroup.CATALOGUES
+    service = None
     capabilities = frozenset({Capability.TEXTS, Capability.RELATIONS, Capability.METRICS})
 
     async def lookup(self, query: Query, context: LookupContext) -> Partial:

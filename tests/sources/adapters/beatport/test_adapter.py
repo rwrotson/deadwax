@@ -24,9 +24,8 @@ from deadwax.core import (
     TagKind,
     VersionKind,
     merge,
-    parse_query,
 )
-from deadwax.sources import SourcesConfig
+from deadwax.sources import SourcesConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.beatport import BeatportAdapter, models
 from deadwax.sources.adapters.beatport import parse as p

@@ -21,9 +21,8 @@ from deadwax.core import (
     SourceError,
     SourceState,
     merge,
-    parse_query,
 )
-from deadwax.sources import CacheSettings, SourcesConfig
+from deadwax.sources import CacheSettings, SourcesConfig, parse_query
 from deadwax.sources._http import HttpResources, open_cache
 from deadwax.sources.adapters.spotify import SpotifyAdapter
 from deadwax.sources.adapters.spotify.models import Copyright, SearchResults

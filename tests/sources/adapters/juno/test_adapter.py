@@ -21,9 +21,8 @@ from deadwax.core import (
     TextKind,
     VersionKind,
     merge,
-    parse_query,
 )
-from deadwax.sources import SourcesConfig
+from deadwax.sources import SourcesConfig, parse_query
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.juno import JunoAdapter
 from deadwax.sources.adapters.juno import parse as p

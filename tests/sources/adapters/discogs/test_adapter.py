@@ -18,9 +18,8 @@ from deadwax.core import (
     Query,
     RelationKind,
     SourceState,
-    parse_query,
 )
-from deadwax.sources import SourcesConfig
+from deadwax.sources import SourcesConfig, parse_query
 from deadwax.sources._http import Fetcher, HttpResources
 from deadwax.sources.adapters.discogs import DiscogsAdapter
 from deadwax.sources.adapters.discogs.adapter import ANONYMOUS_RATE, DEFAULT_USER_AGENT

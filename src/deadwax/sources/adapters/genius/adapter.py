@@ -40,6 +40,7 @@ class GeniusAdapter(HttpAdapter):
     name = "genius"
     pass_ = Pass.ENRICH
     group = SourceGroup.CATALOGUES
+    service = None
     additional_profiles = (Profile.BROWSER,)
     capabilities = frozenset(
         {

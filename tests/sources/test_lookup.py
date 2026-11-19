@@ -28,7 +28,9 @@ from deadwax import (
     lookup,
     parse_query,
 )
-from deadwax.sources._http import BrowserSessions
+from deadwax.sources import build_adapters
+from deadwax.sources._http import BrowserSessions, HttpResources
+from deadwax.sources.services import SERVICES
 
 Replay = Callable[..., httpx.MockTransport]
 
@@ -686,3 +688,39 @@ async def test_radio_search_reports_blocked_source(source: str) -> None:
     assert [(error.source, error.kind) for error in dossier.errors] == [
         (source, ErrorKind.BLOCKED),
     ]
+
+
+def test_every_adapter_names_a_catalogue_service_or_none() -> None:
+    names = {service.name for service in SERVICES}
+
+    adapters = build_adapters(SourcesConfig(), HttpResources())
+
+    assert all(adapter.service is None or adapter.service in names for adapter in adapters)
+
+
+@pytest.mark.parametrize(
+    ("source", "text", "resolves"),
+    [
+        ("whosampled", "https://www.whosampled.com/Daft-Punk/One-More-Time/", True),
+        ("whosampled", "https://example.com/?from=whosampled.com", False),
+        ("hardwax", "https://hardwax.com/act/burial/", True),
+        ("hardwax", "https://www.juno.co.uk/products/x/1-01/", False),
+        ("lastfm", "https://www.last.fm/music/Burial/_/Archangel", False),
+    ],
+)
+def test_default_resolves_reads_pages_of_the_adapter_service(
+    source: str,
+    text: str,
+    resolves: bool,
+) -> None:
+    adapters = {
+        adapter.name: adapter for adapter in build_adapters(SourcesConfig(), HttpResources())
+    }
+
+    assert adapters[source].resolves(parse_query(text)) is resolves
+
+
+def test_text_query_is_resolved_by_no_adapter() -> None:
+    adapters = build_adapters(SourcesConfig(), HttpResources())
+
+    assert not any(adapter.resolves(PARANOID_ANDROID) for adapter in adapters)

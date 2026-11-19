@@ -18,7 +18,6 @@ from deadwax.sources._http import Response
 from deadwax.sources._search import pick_hit, search_key
 from deadwax.sources.adapters.soundcloud import models
 from deadwax.sources.adapters.soundcloud import parse as p
-from deadwax.sources.services import service_for_url
 
 API = "https://api-v2.soundcloud.com/"
 SEARCH_RESULTS = "20"
@@ -31,6 +30,7 @@ class SoundCloudAdapter(HttpAdapter):
     name = "soundcloud"
     pass_ = Pass.ENRICH
     group = SourceGroup.STREAMING
+    service = p.SERVICE
     capabilities = frozenset(
         {
             Capability.IDENTITY,
@@ -52,10 +52,6 @@ class SoundCloudAdapter(HttpAdapter):
     def missing_credential(self) -> str | None:
         """Every API call needs a client ID."""
         return None if self._client_id else "needs soundcloud.client_id"
-
-    def resolves(self, query: Query) -> bool:
-        """SoundCloud track and set pages."""
-        return query.url is not None and service_for_url(query.url) == p.SERVICE
 
     async def _get(self, path: str, **params: str) -> Response:
         try:
