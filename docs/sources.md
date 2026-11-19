@@ -218,6 +218,7 @@ These shops are opt-in. Phonica uses Patchright headless by default and sends it
 
 - **Pass:** enrichment; opt-in; group `catalogues`.
 - **Contributes:** critic scores by publication, user score as a metric, genres, and links to original reviews for the later press pass.
+- **Tracks:** a track query searches releases and accepts one, such as the track's single, only when its tracklist lists the track; the track is related to that release, and the release's scores keep the release-group scope.
 - **Limits:** direct requests currently meet Cloudflare 403 from the development network. The extraction selectors require verification against a saved page.
 
 ## Press reviews

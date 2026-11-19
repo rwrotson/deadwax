@@ -2,12 +2,33 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+import httpx
 import pytest
 
-from deadwax import EntityKind, MetricKind, Query, Rating, ReviewLink, Scope, Text, TextKind
-from deadwax.core import Partial, Provenance, RecordCandidate, SourceError, merge
+from deadwax import (
+    EntityKind,
+    MetricKind,
+    Query,
+    Rating,
+    RelationKind,
+    ReviewLink,
+    Scope,
+    Text,
+    TextKind,
+)
+from deadwax.core import (
+    NotFoundError,
+    Partial,
+    Provenance,
+    RecordCandidate,
+    RecordKey,
+    SourceError,
+    merge,
+)
 from deadwax.sources.albumoftheyear import AlbumOfTheYearAdapter
 from deadwax.sources.allmusic import AllMusicAdapter
+from deadwax.sources.config import Escalation, SourcesConfig, SourceSettings
+from deadwax.sources.lookup import lookup
 
 ALLMUSIC_PAGES = Path(__file__).resolve().parent.parent / "fixtures" / "allmusic" / "pages"
 AOTY_PAGES = Path(__file__).resolve().parent.parent / "fixtures" / "albumoftheyear" / "pages"
@@ -139,3 +160,60 @@ def test_unrecognized_allmusic_page_is_traced(
     [event] = traced("parse.unrecognized")
     assert event["title"] == "Access check"
     assert event["snippet"] == "Please wait"
+
+
+THERE_THERE = "https://www.albumoftheyear.org/album/54781-radiohead-there-there.php"
+
+
+def test_albumoftheyear_single_page_gives_the_track_on_its_release() -> None:
+    adapter = object.__new__(AlbumOfTheYearAdapter)
+    key = RecordKey("Radiohead", "There There", EntityKind.TRACK)
+
+    result = adapter.read_page(
+        (AOTY_PAGES / "there_there_single.html").read_bytes(),
+        THERE_THERE,
+        key,
+    )
+
+    assert result.candidate is not None
+    assert (result.candidate.kind, result.candidate.artist, result.candidate.title) == (
+        EntityKind.TRACK,
+        "Radiohead",
+        "There, There",
+    )
+    [relation] = result.relations
+    assert (relation.kind, relation.target.name) == (RelationKind.APPEARS_ON, "There, There")
+    assert all(tag.scope is Scope.RELEASE_GROUP for tag in result.tags)
+
+
+def test_albumoftheyear_release_without_the_track_is_not_found() -> None:
+    adapter = object.__new__(AlbumOfTheYearAdapter)
+    key = RecordKey("Radiohead", "Creep", EntityKind.TRACK)
+
+    with pytest.raises(NotFoundError, match="does not list the track"):
+        adapter.read_page((AOTY_PAGES / "there_there_single.html").read_bytes(), THERE_THERE, key)
+
+
+@pytest.mark.asyncio
+async def test_albumoftheyear_track_query_finds_its_single() -> None:
+    search = (
+        '<div class="albumBlock"><a href="/album/54781-radiohead-there-there.php">'
+        '<div class="albumTitle">There, There</div></a>'
+        '<div class="artistTitle">Radiohead</div></div>'
+    )
+    single = (AOTY_PAGES / "there_there_single.html").read_bytes()
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/search/":
+            return httpx.Response(200, text=search)
+        return httpx.Response(200, content=single)
+
+    dossier = await lookup(
+        Query(kind=EntityKind.TRACK, artist="Radiohead", title="There There"),
+        SourcesConfig(albumoftheyear=SourceSettings(html_transports=(Escalation.HTTPX,))),
+        include=["albumoftheyear"],
+        transport=httpx.MockTransport(respond),
+    )
+
+    assert dossier.errors == []
+    assert any(relation.target.url == THERE_THERE for relation in dossier.relations)

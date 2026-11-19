@@ -1,3 +1,4 @@
+import dataclasses
 from collections.abc import Mapping
 from urllib.parse import urljoin, urlsplit
 
@@ -21,7 +22,7 @@ from deadwax.core import (
     Text,
     TextKind,
 )
-from deadwax.sources._base import SearchHit, SearchPageAdapter
+from deadwax.sources._base import SearchHit, SearchPageAdapter, track_on_release
 from deadwax.sources._html import attribute, parse_html, text_of
 
 MAX_SCORE = 100
@@ -72,8 +73,14 @@ class AlbumOfTheYearAdapter(SearchPageAdapter):
                 )
         return hits
 
-    def read_page(self, content: bytes, url: str, key: RecordKey | None) -> Partial:  # noqa: ARG002 -- protocol
-        """Read the album and its scores."""
+    async def search(self, key: RecordKey) -> str | None:
+        """Search releases; for a track, a release named after it, such as its single, counts."""
+        if key.kind is not EntityKind.TRACK:
+            return await super().search(key)
+        return await super().search(dataclasses.replace(key, kind=EntityKind.ALBUM))
+
+    def read_page(self, content: bytes, url: str, key: RecordKey | None) -> Partial:
+        """Read the release and its scores; for a track, only a release that lists it."""
         page = parse_html(content)
         title = text_of(page.css_first("h1.albumTitle, h1"))
         artist = text_of(page.css_first(".albumHeadline .artist a")) or text_of(
@@ -129,11 +136,22 @@ class AlbumOfTheYearAdapter(SearchPageAdapter):
             if user_score is not None
             else []
         )
+        candidate = RecordCandidate(kind=EntityKind.ALBUM, artist=artist, title=title, url=url)
+        relations = []
+        if key is not None and key.kind is EntityKind.TRACK:
+            tracks = [
+                (artist, name)
+                for node in page.css("#tracklist .trackList li, .trackListTable .trackTitle")
+                if (name := text_of(node))
+            ]
+            candidate, relation = track_on_release(candidate, tracks, key, provenance)
+            relations.append(relation)
         return Partial(
             source=self.name,
-            candidate=RecordCandidate(kind=EntityKind.ALBUM, artist=artist, title=title, url=url),
+            candidate=candidate,
             tags=genres,
             texts=reviews,
             metrics=metrics,
             review_links=links,
+            relations=relations,
         )
