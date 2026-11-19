@@ -13,6 +13,14 @@ type FetcherFactory = Callable[[HttpSettings, str | None], Fetcher]
 BROWSER_STEPS = frozenset({Escalation.BROWSER, Escalation.NODRIVER})
 
 
+@dataclass(frozen=True, slots=True)
+class BrowserLease:
+    """A shared browser lent for one request, and whether it shows a window."""
+
+    fetcher: Fetcher
+    headed: bool
+
+
 @dataclass(slots=True)
 class _Session:
     """One browser and the requests currently using it."""
@@ -86,14 +94,14 @@ class BrowserSessions:
         proxy: str | None,
         *,
         headed: bool,
-    ) -> AsyncIterator[Fetcher]:
+    ) -> AsyncIterator[BrowserLease]:
         """Lend the browser of a transport, launch options, and proxy for one request."""
         key = (step, proxy, settings.model_dump_json(exclude={"browser_headless"}))
         session = self._sessions.setdefault(key, _Session())
         async with pause_adapter_timeout():
             fetcher = await session.acquire(factory, settings, proxy, headed=headed)
         try:
-            yield fetcher
+            yield BrowserLease(fetcher, headed=session.headed)
         except ConfigurationError:
             session.broken = True
             raise

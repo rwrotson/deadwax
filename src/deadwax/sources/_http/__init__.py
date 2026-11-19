@@ -27,7 +27,7 @@ from .profiles import (
 )
 from .ratelimit import HostLimiters, RateLimiter
 from .retry import RETRY_STATUSES, RetryPolicy, parse_retry_after
-from .sessions import BROWSER_STEPS, BrowserSessions, FetcherFactory
+from .sessions import BROWSER_STEPS, BrowserLease, BrowserSessions, FetcherFactory
 
 __all__ = [
     "BROWSERS",
@@ -37,6 +37,7 @@ __all__ = [
     "RETRY_STATUSES",
     "BrowserFetcher",
     "BrowserIdentity",
+    "BrowserLease",
     "BrowserSessions",
     "ClientSpec",
     "Fetcher",

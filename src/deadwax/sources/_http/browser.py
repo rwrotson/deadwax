@@ -29,6 +29,9 @@ MISSING_BROWSER = "Chromium for Patchright is not installed: run 'patchright ins
 
 _POLL_SECONDS = 0.25
 
+# Chromium's navigation error for an error status whose body it does not render.
+_STATUS_WITHOUT_PAGE = "net::ERR_HTTP_RESPONSE_CODE_FAILURE"
+
 # Launch errors that mean the browser executable is absent, not that this launch failed.
 _MISSING_EXECUTABLE = ("Executable doesn't exist", "is not found at")
 
@@ -96,7 +99,12 @@ class BrowserFetcher:
 
     async def _open(self) -> BrowserContext:
         async with self._opening:
-            return await self._launch()
+            if self._context is not None:
+                return self._context
+
+            # Launching is a cost shared by every source of the lookup, not adapter time.
+            async with pause_adapter_timeout():
+                return await self._launch()
 
     async def _launch(self) -> BrowserContext:
         from patchright.async_api import Error, async_playwright  # noqa: PLC0415 -- optional (R7)
@@ -173,11 +181,23 @@ class BrowserFetcher:
 
         page.on("response", record)
         try:
-            await page.goto(
-                request.full_url,
-                wait_until="domcontentloaded",
-                timeout=self._timeout_ms,
-            )
+            try:
+                await page.goto(
+                    request.full_url,
+                    wait_until="domcontentloaded",
+                    timeout=self._timeout_ms,
+                )
+            except Error as error:
+                if _STATUS_WITHOUT_PAGE not in str(error) or not navigations:
+                    raise
+                refused = navigations[-1]
+                headers = await refused.all_headers()
+                return Response(
+                    url=request.full_url,
+                    status=refused.status,
+                    content=b"",
+                    headers=headers,
+                )
 
             content = await self._ready_content(page, request, navigations)
             final = navigations[-1] if navigations else None

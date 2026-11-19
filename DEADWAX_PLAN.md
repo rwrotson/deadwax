@@ -263,6 +263,21 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
 
+### 2026-11-19 — Browser timeout budget and follow-up fixes (Stage 20 partial)
+
+Run `20261119T122953Z-7df17b` (`radiohead - there there`, `--sources all --no-cache`) after `52c6c67`. The table pasted with it repeated the previous run; the journal shows: no "not installed" errors; Beatport found the track through the headed fallback; Album of the Year and 1001Tracklists loaded. Remaining:
+- Deezer (40.6 s), Discogs (36.5 s), and Genius (34.9 s) hit the 30 s adapter timeout before the manual prompt: API requests, the headless attempt, launching headed Chrome on the empty `…-direct` profile, `goto`, and the automatic wait all counted.
+- RYM ran headless-configured in the already headed browser, then fell back to the same browser again; the final 403 without a body (`net::ERR_HTTP_RESPONSE_CODE_FAILURE`) was retried three times as a network error and reported as `failed`.
+- WhoSampled `/radiohead/there-there/` redirected to `/Radiohead/` and was reported as `failed`.
+- AllMusic returned 200 but no recognisable record; nothing was recorded about the page.
+- Not changed: WFMU `ConnectTimeout`, Forced Exposure HTTP 403.
+
+Decisions (user): browser launches and every headed request are outside the adapter timeout; fix the four smaller issues.
+
+Changed: `BrowserSessions.use()` yields `BrowserLease(fetcher, headed)`; the client pauses the adapter timeout for headed requests, treats a headless source served headed as headed (no second fallback, `[headed]` label), and labels requests after they run. Fetchers pause the timeout while launching. Patchright returns an empty-bodied response for `ERR_HTTP_RESPONSE_CODE_FAILURE` after a recorded navigation; Nodriver returns the document status for Chrome's error page when it is 400 or more. WhoSampled reports a redirect to an artist page as `not_found`. AllMusic writes `parse.unrecognized` (URL, title, 300 body characters) before its parse error.
+
+Verification: `uv run poe check` passed (973 offline tests, 96.75% coverage); `uv run --group docs properdocs build --strict` passed. Live behaviour unverified.
+
 ### 2026-11-19 — Browser blocks after shared sessions (Stage 20 partial)
 
 Run `20261119T120927Z-2e3a98` (`radiohead - true love waits`, `--sources all --no-cache`) after `5d4b838`. Journal findings:

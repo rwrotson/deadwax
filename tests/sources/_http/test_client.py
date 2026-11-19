@@ -1,6 +1,7 @@
 import asyncio
 import random
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -211,6 +212,41 @@ async def test_a_challenged_headless_browser_retries_headed_and_stays_headed() -
     assert first.text == second.text == "<html>ok</html>"
     assert setup.headless == [True, False]
     assert len(browser.requests) == 3
+
+
+@pytest.mark.asyncio
+async def test_a_headless_source_served_headed_neither_falls_back_nor_counts_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pauses: list[str] = []
+
+    @asynccontextmanager
+    async def pause() -> AsyncIterator[None]:
+        pauses.append("paused")
+        yield
+
+    monkeypatch.setattr(client_module, "pause_adapter_timeout", pause)
+    setup = Setup(Server([httpx.Response(403, content=CHALLENGE)]), headed_fallback=True)
+    browser = FakeFetcher("browser", [page(200, CHALLENGE)])
+    setup.fetchers = {Escalation.BROWSER: browser}
+    client = setup.client(Profile.BROWSER, escalation=Escalation.BROWSER)
+    assert setup.resources is not None
+    async with setup.resources.sessions.use(
+        Escalation.BROWSER,
+        setup.resources.escalations[Escalation.BROWSER],
+        client._browser_settings,
+        None,
+        headed=True,
+    ):
+        pass
+
+    async with client:
+        with pytest.raises(BlockedError, match=r"tried httpx, browser\[headed\]\)$"):
+            await client.get(URL)
+
+    assert setup.headless == [False]
+    assert len(browser.requests) == 1
+    assert pauses == ["paused"]
 
 
 @pytest.mark.asyncio

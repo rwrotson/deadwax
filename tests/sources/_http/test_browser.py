@@ -2,7 +2,8 @@ import asyncio
 import logging
 import sys
 import types
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from deadwax.sources._http import (
     TransportError,
     launch_proxy,
 )
+from deadwax.sources._http import browser as browser_module
 from deadwax.sources._http import client as client_module
 
 
@@ -36,6 +38,7 @@ class Scenario:
     launch_error: str = "Executable doesn't exist"
     close_fails: bool = False
     goto_fails: bool = False
+    goto_error: str | None = None
     never_idle: bool = False
     launches: list[dict[str, object]] = field(default_factory=list)
     contexts: list[dict[str, object]] = field(default_factory=list)
@@ -86,6 +89,8 @@ class FakePage:
         for response in responses:
             for handler in self.handlers:
                 handler(response)
+        if self.scenario.goto_error is not None:
+            raise FakeError(self.scenario.goto_error)
 
     async def wait_for_load_state(self, state: str, **options: object) -> None:
         if self.scenario.never_idle:
@@ -442,3 +447,47 @@ async def test_headless_browser_does_not_ask_for_help(scenario: Scenario) -> Non
 
     assert response.text == CHALLENGE
     assert scenario.fronts == []
+
+
+@pytest.mark.asyncio
+async def test_an_error_status_without_a_page_is_returned(scenario: Scenario) -> None:
+    scenario.statuses = [403]
+    scenario.goto_error = "net::ERR_HTTP_RESPONSE_CODE_FAILURE at https://rateyourmusic.com/"
+    fetcher = BrowserFetcher(timeout=5, max_bytes=100)
+
+    response = await fetcher.fetch(PAGE)
+
+    assert response.status == 403
+    assert response.content == b""
+    assert scenario.pages[0].closed
+
+
+@pytest.mark.asyncio
+async def test_other_navigation_errors_stay_transport_errors(scenario: Scenario) -> None:
+    scenario.goto_error = "net::ERR_NAME_NOT_RESOLVED"
+    fetcher = BrowserFetcher(timeout=5, max_bytes=100)
+
+    with pytest.raises(TransportError, match="ERR_NAME_NOT_RESOLVED"):
+        await fetcher.fetch(PAGE)
+
+
+@pytest.mark.asyncio
+async def test_only_the_launch_is_kept_out_of_the_adapter_timeout(
+    scenario: Scenario,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pauses: list[str] = []
+
+    @asynccontextmanager
+    async def pause() -> AsyncIterator[None]:
+        pauses.append("paused")
+        yield
+
+    monkeypatch.setattr(browser_module, "pause_adapter_timeout", pause)
+    fetcher = BrowserFetcher(timeout=5, max_bytes=100)
+
+    await fetcher.fetch(PAGE)
+    await fetcher.fetch(PAGE)
+
+    assert pauses == ["paused"]
+    assert len(scenario.launches) == 1

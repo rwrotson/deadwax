@@ -1,5 +1,5 @@
 import re
-from urllib.parse import quote, urljoin
+from urllib.parse import quote, urljoin, urlsplit
 
 from deadwax.core import (
     Capability,
@@ -123,6 +123,11 @@ class WhoSampledAdapter(HttpAdapter):
             raise NotFoundError("WhoSampled needs an artist and track title")
         url = _record_url(query, key)
         response = await self.client.get(url)
+
+        # The site redirects an unknown track to its artist's page.
+        if len(urlsplit(response.url).path.strip("/").split("/")) == 1:
+            raise NotFoundError("no WhoSampled page for the track", url=response.url)
+
         page = parse_html(response.content)
         title = attribute(page.css_first('h1 meta[itemprop="name"]'), "content")
         if not title:

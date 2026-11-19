@@ -21,6 +21,7 @@ from deadwax.core import (
     NotFoundError,
     RateLimitedError,
     SourceError,
+    pause_adapter_timeout,
     trace,
 )
 from deadwax.sources._http.browser import BrowserFetcher
@@ -244,8 +245,8 @@ class HttpClient:
         )
         self._escalated: dict[Escalation, Fetcher] = {}
         self._level = 0
-        self._headed = not self._settings.browser_headless
-        self._fell_back = False
+        self._configured_headed = not self._settings.browser_headless
+        self._headed = self._configured_headed
         self._unavailable = (
             [
                 f"{step} unavailable: install {_EXTRA_PACKAGES[step]}"
@@ -408,7 +409,7 @@ class HttpClient:
     def _label(self, step: Escalation) -> str:
         if step is Escalation.HTTPX:
             return self._plain.name
-        if step in BROWSER_STEPS and self._fell_back:
+        if step in BROWSER_STEPS and self._headed and not self._configured_headed:
             return f"{step}[headed]"
         return str(step)
 
@@ -424,14 +425,13 @@ class HttpClient:
         level = self._level
         while level < len(self._steps):
             step = self._steps[level]
-            label = self._label(step)
             try:
                 response = await self._attempt(step, request, safe_url, exchange)
             except TransportError as error:
                 error.url = error.url or safe_url
                 if level == len(self._steps) - 1:
                     raise
-                self._unavailable.append(f"{label} failed: {error}")
+                self._unavailable.append(f"{self._label(step)} failed: {error}")
                 trace(logger, "http.step_failed", step=step, reason=str(error))
                 level += 1
                 continue
@@ -441,6 +441,7 @@ class HttpClient:
             except ConfigurationError as error:
                 await self._drop_step(level, error)
                 continue
+            label = self._label(step)
             tried.append(label)
             if (problem := self._problem(response, safe_url, label)) is None:
                 self._level = level
@@ -448,7 +449,7 @@ class HttpClient:
             reason, challenge = problem
             challenged = challenged or challenge
             if challenge and self._falls_back(step):
-                self._headed = self._fell_back = True
+                self._headed = True
                 trace(logger, "http.headed_fallback", url=safe_url, fetcher=label)
                 continue
             level += 1
@@ -495,8 +496,25 @@ class HttpClient:
             self._browser_settings,
             self._proxy,
             headed=self._headed,
-        ) as fetcher:
-            return await fetcher.fetch(request)
+        ) as lease:
+            if not lease.headed:
+                return await lease.fetcher.fetch(request)
+
+            # A visible browser may wait for a visitor; its requests are not adapter time.
+            self._headed = True
+            async with pause_adapter_timeout():
+                return await lease.fetcher.fetch(request)
+
+    async def _fetch_recorded(
+        self,
+        step: Escalation,
+        request: Request,
+        exchange: _Exchange,
+    ) -> Response:
+        try:
+            return await self._fetch_once(step, request)
+        finally:
+            exchange.fetchers.append(self._label(step))
 
     async def _attempt(
         self,
@@ -514,9 +532,8 @@ class HttpClient:
         while True:
             await limiter.acquire()
             exchange.attempts += 1
-            exchange.fetchers.append(self._label(step))
             try:
-                response = await self._fetch_once(step, request)
+                response = await self._fetch_recorded(step, request, exchange)
             except TransportError as error:
                 if attempt >= self._policy.retries:
                     raise

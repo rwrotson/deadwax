@@ -1,4 +1,5 @@
 import contextlib
+import logging
 import re
 from collections.abc import Mapping
 from urllib.parse import quote, urlsplit
@@ -25,9 +26,15 @@ from deadwax.core import (
     TagKind,
     Text,
     TextKind,
+    trace,
 )
 from deadwax.sources._base import SearchHit, SearchPageAdapter
 from deadwax.sources._html import attribute, parse_html, text_of
+
+# Body text kept in the journal when a page cannot be read.
+_SNIPPET_CHARS = 300
+
+logger = logging.getLogger(__name__)
 
 
 class AllMusicAdapter(SearchPageAdapter):
@@ -81,6 +88,14 @@ class AllMusicAdapter(SearchPageAdapter):
             page.css_first("#albumArtists a, .album-artist, .song-artist, .artist-name"),
         )
         if not title or not artist:
+            body = text_of(page.css_first("body")) or ""
+            trace(
+                logger,
+                "parse.unrecognized",
+                url=url,
+                title=text_of(page.css_first("title")),
+                snippet=body[:_SNIPPET_CHARS],
+            )
             raise SourceError("the AllMusic page names no record", url=url)
         scope = (
             Scope.RELEASE_GROUP if key is None or key.kind is EntityKind.ALBUM else Scope.RECORDING

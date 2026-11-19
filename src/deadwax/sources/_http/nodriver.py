@@ -65,6 +65,7 @@ MISSING_EXTRA = (
 )
 MISSING_BROWSER = "Chrome for Nodriver is not installed"
 _MIN_HTTP_STATUS = 100
+_MIN_ERROR_STATUS = 400
 _POLL_SECONDS = 0.25
 
 logger = logging.getLogger(__name__)
@@ -171,7 +172,12 @@ class NodriverFetcher:
 
     async def _open(self) -> _Browser:
         async with self._opening:
-            return await self._launch()
+            if self._browser is not None:
+                return self._browser
+
+            # Launching is a cost shared by every source of the lookup, not adapter time.
+            async with pause_adapter_timeout():
+                return await self._launch()
 
     async def _launch(self) -> _Browser:
         module = _module()
@@ -253,7 +259,18 @@ class NodriverFetcher:
         while True:
             content = (await asyncio.wait_for(tab.get_content(), timeout=self._timeout)).encode()
             if _chrome_error_page(content):
-                raise TransportError("Chrome could not load the page")
+                final = responses[-1] if responses else None
+                if final is None or final.status < _MIN_ERROR_STATUS:
+                    raise TransportError("Chrome could not load the page")
+
+                # Chrome shows its own page for an error status with an empty body.
+                headers = lower_headers(final.headers)
+                return Response(
+                    url=final.url,
+                    status=final.status,
+                    content=b"",
+                    headers=headers,
+                ), True
             navigation_status = await _navigation_status(tab, responses, self._timeout)
             response = _page_response(
                 tab.url,

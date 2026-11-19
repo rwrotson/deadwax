@@ -1,8 +1,11 @@
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+
 from deadwax import EntityKind, MetricKind, Query, Rating, ReviewLink, Scope, Text, TextKind
-from deadwax.core import Partial, Provenance, RecordCandidate, merge
+from deadwax.core import Partial, Provenance, RecordCandidate, SourceError, merge
 from deadwax.sources.albumoftheyear import AlbumOfTheYearAdapter
 from deadwax.sources.allmusic import AllMusicAdapter
 
@@ -122,3 +125,17 @@ def test_review_score_merges_and_rejected_links_do_not_leak() -> None:
     assert len(dossier.texts) == 1
     assert {item.source for item in dossier.texts[0].sources} == {"wikipedia", "allmusic"}
     assert dossier.review_links == []
+
+
+def test_unrecognized_allmusic_page_is_traced(
+    traced: Callable[[str], list[dict[str, object]]],
+) -> None:
+    html = b"<html><title>Access check</title><body><p>Please wait</p></body></html>"
+    adapter = object.__new__(AllMusicAdapter)
+
+    with pytest.raises(SourceError, match="names no record"):
+        adapter.read_page(html, "https://www.allmusic.com/album/x", None)
+
+    [event] = traced("parse.unrecognized")
+    assert event["title"] == "Access check"
+    assert event["snippet"] == "Please wait"

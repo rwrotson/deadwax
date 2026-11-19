@@ -319,3 +319,17 @@ async def test_visible_browser_returns_a_page_missing_only_its_marker(scenario: 
 
     assert b"MISSING" not in response.content
     assert scenario.tab.fronts == 0
+
+
+@pytest.mark.asyncio
+async def test_an_error_status_without_a_page_is_returned(scenario: Scenario) -> None:
+    scenario.tab.status = 403
+    scenario.tab.content = (
+        '<html><body class="neterror">ERR_HTTP_RESPONSE_CODE_FAILURE</body></html>'
+    )
+    fetcher = NodriverFetcher(timeout=5, max_bytes=1000)
+
+    response = await fetcher.fetch(Request("GET", "https://example.test/page"))
+
+    assert response.status == 403
+    assert response.content == b""

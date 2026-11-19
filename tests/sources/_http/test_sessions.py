@@ -53,10 +53,11 @@ async def borrow(
         SETTINGS,
         proxy,
         headed=headed,
-    ) as fetcher:
+    ) as lease:
         await asyncio.sleep(hold)
-        assert isinstance(fetcher, Browser)
-        return fetcher
+        assert isinstance(lease.fetcher, Browser)
+        assert lease.headed is not lease.fetcher.headless
+        return lease.fetcher
 
 
 @pytest.mark.asyncio
@@ -94,8 +95,10 @@ async def test_a_headed_browser_serves_headless_requests() -> None:
     factory = Factory()
 
     headed = await borrow(sessions, factory, headed=True)
-    later = await borrow(sessions, factory)
+    async with sessions.use(Escalation.BROWSER, factory, SETTINGS, None, headed=False) as lease:
+        later = lease.fetcher
 
+    assert lease.headed
     assert later is headed
     assert len(factory.opened) == 1
 

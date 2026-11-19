@@ -54,6 +54,27 @@ async def test_missing_record_is_reported() -> None:
 
 
 @pytest.mark.asyncio
+async def test_redirect_to_the_artist_page_is_not_found() -> None:
+    config = SourcesConfig(whosampled=SourceSettings(html_transports=(Escalation.HTTPX,)))
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/Radiohead/":
+            return httpx.Response(200, content=b"<html><h1>Radiohead</h1></html>")
+        return httpx.Response(301, headers={"location": "https://www.whosampled.com/Radiohead/"})
+
+    dossier = await lookup(
+        Query(kind=EntityKind.TRACK, artist="Radiohead", title="There There"),
+        config,
+        include=["whosampled"],
+        transport=httpx.MockTransport(respond),
+    )
+
+    [error] = dossier.errors
+    assert error.kind is ErrorKind.NOT_FOUND
+    assert error.url == "https://www.whosampled.com/Radiohead/"
+
+
+@pytest.mark.asyncio
 async def test_blocked_page_is_reported() -> None:
     config = SourcesConfig(whosampled=SourceSettings(html_transports=(Escalation.HTTPX,)))
     dossier = await lookup(
