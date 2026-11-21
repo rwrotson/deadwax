@@ -24,6 +24,7 @@ More specific instructions live in `src/deadwax/sources/AGENTS.md` and `tests/AG
 ```bash
 uv sync --all-groups --locked
 uv run poe check        # fmt-check, lint, lint-imports, typecheck, test (95% branch coverage)
+uv run poe quick        # lint, lint-imports, typecheck (no tests)
 uv run poe test-fast    # pytest without coverage
 uv run poe test-live    # opt-in live lookups in tests/integration (network, keys from .env)
 uv run poe fmt          # ruff format (rewrites files)

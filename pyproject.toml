@@ -452,6 +452,7 @@ test = "pytest --cov"
 test-fast = "pytest"
 docs = "properdocs serve"
 check = ["fmt-check", "lint", "lint-imports", "typecheck", "test"]
+quick = ["lint", "lint-imports", "typecheck"]
 
 # Live lookups of tests/integration, one at a time to respect the sources' rate limits;
 # credentials come from .env when it exists.
