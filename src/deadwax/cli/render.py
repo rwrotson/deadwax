@@ -296,12 +296,16 @@ def _capabilities(info: SourceInfo) -> str:
     return ", ".join(capability.value for capability in info.capabilities)
 
 
+def _kinds(info: SourceInfo) -> str:
+    return ", ".join(kind.value for kind in info.kinds)
+
+
 def print_sources(
     infos: Sequence[SourceInfo],
     output: OutputFormat,
     console: Console | None = None,
 ) -> None:
-    """Print sources with their access methods, capabilities, and status."""
+    """Print sources with their access methods, record kinds, capabilities, and status."""
     console = console or Console()
     if output is OutputFormat.JSON:
         payload = [info.model_dump(mode="json") for info in infos]
@@ -310,8 +314,8 @@ def print_sources(
 
     if output is OutputFormat.MARKDOWN:
         lines = [
-            "| Source | Group | Default | Pass | Access | Contributes | Status |",
-            "| --- | --- | --- | --- | --- | --- | --- |",
+            "| Source | Group | Default | Pass | Access | Kinds | Contributes | Status |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- |",
         ]
         for info in infos:
             cells = (
@@ -320,6 +324,7 @@ def print_sources(
                 _default(info),
                 info.pass_.value,
                 access_label(info.access),
+                _kinds(info),
                 _capabilities(info),
                 _status(info).plain,
             )
@@ -327,7 +332,16 @@ def print_sources(
         console.out("\n".join(lines), highlight=False)
         return
 
-    table = _table("source", "group", "default", "pass", "access", "contributes", "status")
+    table = _table(
+        "source",
+        "group",
+        "default",
+        "pass",
+        "access",
+        "kinds",
+        "contributes",
+        "status",
+    )
     for info in infos:
         table.add_row(
             info.source,
@@ -335,6 +349,7 @@ def print_sources(
             _default(info),
             info.pass_.value,
             Text(access_label(info.access)),
+            _kinds(info),
             _capabilities(info),
             _status(info),
         )

@@ -3,6 +3,7 @@ from deadwax.core import (
     Capability,
     EntityKind,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -67,7 +68,12 @@ class SoundCloudAdapter(HttpAdapter):
             )
             raise SourceError(message, url=error.url) from None
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Tracks and release sets; the resolved upload tells which."""
+        return Lookups(track=self.find, album=self.find, unresolved=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Read the upload behind the query URL, an earlier source's link, or a search."""
         key = search_key(query, context)
         kind = query.kind or (key.kind if key is not None else None) or EntityKind.TRACK

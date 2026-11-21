@@ -8,6 +8,7 @@ from deadwax import (
     AdapterError,
     Capability,
     Dossier,
+    EntityKind,
     ErrorKind,
     Pass,
     Query,
@@ -137,6 +138,7 @@ INFOS = [
         default=True,
         pass_=Pass.IDENTITY,
         capabilities=[Capability.IDENTITY, Capability.LINKS],
+        kinds=[EntityKind.ALBUM, EntityKind.TRACK],
         requires=[],
         status=SourceStatus(source="musicbrainz", state=SourceState.READY),
         access=SourceAccess(),
@@ -147,6 +149,7 @@ INFOS = [
         default=True,
         pass_=Pass.ENRICH,
         capabilities=[Capability.TAGS],
+        kinds=[EntityKind.TRACK],
         requires=[Requirement(setting="sources.lastfm.api_key", purpose="every lookup")],
         status=SourceStatus(source="lastfm", state=SourceState.MISSING_CREDENTIAL, detail="x"),
         access=SourceAccess(api=True),
@@ -157,6 +160,7 @@ INFOS = [
         default=True,
         pass_=Pass.ENRICH,
         capabilities=[],
+        kinds=[],
         requires=[],
         status=SourceStatus(
             source="bandcamp",
@@ -175,6 +179,7 @@ INFOS = [
         default=False,
         pass_=Pass.ENRICH,
         capabilities=[],
+        kinds=[],
         requires=[],
         status=SourceStatus(source="itunes", state=SourceState.DISABLED),
         access=SourceAccess(),
@@ -203,11 +208,13 @@ def test_sources(output: OutputFormat) -> None:
         access = json.loads(text)[2]["access"]
         assert access["html_transports"] == ["httpx", "patchright", "nodriver"]
         assert access["browser_headless"] is False
+        assert json.loads(text)[0]["kinds"] == ["album", "track"]
     else:
         assert "missing DEADWAX_SOURCES__LASTFM__API_KEY" in text
         assert "missing extra: deadwax[browser]" in text
         assert "disabled" in text
         assert "identity, links" in text
+        assert "album, track" in text
         assert "core" in text
         assert "yes" in text
         assert "API (httpx); HTML (httpx → patchright [headed] → nodriver [headed])" in text

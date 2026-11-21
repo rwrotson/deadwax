@@ -9,6 +9,7 @@ from deadwax.core import (
     EntityKind,
     EntityType,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Provenance,
@@ -128,7 +129,12 @@ class SearchPageAdapter(HttpAdapter):
         """Client used for search; sources with JSON feeds may override it."""
         return self.client
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Track, album, and unresolved queries share one search, told apart by the search key."""
+        return Lookups(track=self.find, album=self.find, unresolved=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Find the record's page and read it."""
         key = search_key(query, context)
         url = await self._page_url(query, context, key)

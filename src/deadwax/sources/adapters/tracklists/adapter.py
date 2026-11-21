@@ -8,6 +8,7 @@ from deadwax.core import (
     EntityKind,
     EntityType,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -110,10 +111,15 @@ class TracklistsAdapter(SearchPageAdapter):
                 )
         return relations
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Tracks, also from a track page URL."""
+        return Lookups(track=self.find, unresolved=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Find a track page, then verify the sets that list that exact track."""
         key = search_key(query, context)
-        if query.kind is EntityKind.ALBUM or (key is None and not self.resolves(query)):
+        if key is None and not self.resolves(query):
             raise NotFoundError("1001Tracklists needs an artist and track title")
         url = await self._page_url(query, context, key)
         response = await self.client.get(url)

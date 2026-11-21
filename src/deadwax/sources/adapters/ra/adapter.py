@@ -3,6 +3,7 @@ import json
 from deadwax.core import (
     Capability,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -77,7 +78,12 @@ class ResidentAdvisorAdapter(HttpAdapter):
                 return f"https://ra.co{path}"
         return None
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Reviews of tracks and albums."""
+        return Lookups(track=self.find, album=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Query RA for a linked review and keep facts matching the record."""
         key = search_key(query, context)
         if key is None:

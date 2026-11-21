@@ -12,6 +12,7 @@ from deadwax.core import (
     ErrorKind,
     IdKind,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -123,7 +124,12 @@ class DiscogsAdapter(HttpAdapter):
         response = await self.client.get(f"{API}{path}", params=params or None)
         return model.model_validate_json(response.content)
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Tracks and albums; the page of a query URL tells which."""
+        return Lookups(track=self.find, album=self.find, unresolved=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Read the master and its main release, then versions, artist, label, and reviews."""
         key = search_key(query, context)
         kind = query.kind or (key.kind if key is not None else None) or EntityKind.ALBUM

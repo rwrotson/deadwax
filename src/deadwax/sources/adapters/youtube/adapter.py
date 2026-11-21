@@ -3,6 +3,7 @@ from deadwax.core import (
     Capability,
     EntityKind,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -38,7 +39,12 @@ class YouTubeAdapter(HttpAdapter):
         """Every Data API call needs a key."""
         return None if self._key else "needs sources.youtube.api_key"
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Videos of tracks and playlists of albums."""
+        return Lookups(track=self.find, album=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Search music videos, or playlists for an album, and keep uploads of the record."""
         key = search_key(query, context)
         if key is None:

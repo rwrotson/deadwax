@@ -8,6 +8,7 @@ from deadwax.core import (
     EntityKind,
     IdKind,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -120,7 +121,12 @@ class SpotifyAdapter(HttpAdapter):
         response = await self.client.get(url, params=params or None, headers=headers)
         return model.model_validate_json(response.content)
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Tracks and albums; a Spotify ID tells which."""
+        return Lookups(track=self.find, album=self.find, unresolved=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Read the record by Spotify ID, else find it by ISRC or barcode, else by search."""
         key = search_key(query, context)
         kind = query.kind or (key.kind if key is not None else None) or EntityKind.TRACK

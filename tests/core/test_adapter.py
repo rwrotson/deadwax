@@ -6,6 +6,8 @@ from deadwax.core import (
     Link,
     LinkTarget,
     LookupContext,
+    Lookups,
+    Partial,
     Provenance,
     Query,
     Sourced,
@@ -66,3 +68,27 @@ def test_context_lists_the_query_isrc_first_without_repeats() -> None:
     ]
     assert LookupContext(query=query).isrcs() == ["GBAYE9701376"]
     assert LookupContext(query=Query(url="https://s/1")).isrcs() == []
+
+
+async def _found(query: Query, context: LookupContext) -> Partial:
+    return Partial(source="x")
+
+
+def test_lookups_return_the_slot_of_a_kind_and_list_the_kinds_they_fill() -> None:
+    lookups = Lookups(track=_found, unresolved=_found)
+
+    assert lookups.get(EntityKind.TRACK) is _found
+    assert lookups.get(EntityKind.ALBUM) is None
+    assert lookups.get(None) is _found
+    assert lookups.kinds == {EntityKind.TRACK}
+    assert Lookups().kinds == frozenset()
+
+
+def test_context_kind_comes_from_the_query_then_earlier_passes() -> None:
+    url = Query(url="https://example.org/x")
+    album = Identity(kind=EntityKind.ALBUM)
+    track = text_query("A - B", EntityKind.TRACK)
+
+    assert LookupContext(query=url).kind is None
+    assert LookupContext(query=url, identity=album).kind is EntityKind.ALBUM
+    assert LookupContext(query=track, identity=album).kind is EntityKind.TRACK

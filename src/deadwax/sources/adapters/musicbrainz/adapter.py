@@ -8,6 +8,7 @@ from deadwax.core import (
     IdKind,
     LinkTarget,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -103,7 +104,12 @@ class MusicBrainzAdapter(HttpAdapter):
         response = await self.client.get(f"{API}{path}", params={**params, "fmt": "json"})
         return model.model_validate_json(response.content)
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Recordings and release groups; an identifier or URL tells which."""
+        return Lookups(track=self.find, album=self.find, unresolved=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Find the recording or release group and collect what MusicBrainz knows about it."""
         target = await self._find_by_ids(query)
         if target is None:

@@ -1,3 +1,4 @@
+from deadwax import EntityKind
 from deadwax.sources import LookupConfig, PerSourceSettings, SourceSettings, build_adapters
 from deadwax.sources._http import HttpResources
 from deadwax.sources.registry import ADAPTERS
@@ -31,3 +32,21 @@ def test_adapters_read_their_own_section() -> None:
 
     for adapter in build_adapters(config, HttpResources()):
         assert adapter.settings is getattr(config.sources, adapter.name)
+
+
+TRACKS_ONLY = {"genius", "nts", "secondhandsongs", "tracklists", "wfmu", "whosampled"}
+
+# Without a service of their own, they still find the kind: from a streaming URL, a Wikidata item.
+UNRESOLVED_WITHOUT_SERVICE = {"odesli", "wikipedia"}
+
+
+def test_adapters_declare_the_record_kinds_they_look_up() -> None:
+    adapters = build_adapters(LookupConfig(), HttpResources())
+
+    kinds = {adapter.name: adapter.lookups.kinds for adapter in adapters}
+    unresolved = {adapter.name for adapter in adapters if adapter.lookups.unresolved is not None}
+
+    assert {name for name, found in kinds.items() if found == {EntityKind.TRACK}} == TRACKS_ONLY
+    assert all(found == set(EntityKind) for name, found in kinds.items() if name not in TRACKS_ONLY)
+    readers = {adapter.name for adapter in adapters if adapter.service is not None}
+    assert unresolved == (readers - {"genius"}) | UNRESOLVED_WITHOUT_SERVICE

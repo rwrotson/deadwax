@@ -155,10 +155,11 @@ async def test_without_a_record_name() -> None:
     adapter, seen = make()
     query = parse_query("https://example.org/page")
 
-    with pytest.raises(NotFoundError, match="neither"):
+    with pytest.raises(NotFoundError, match="does not look up a record of kind None"):
         await adapter.lookup(query, LookupContext(query=query))
     await adapter.aclose()
 
+    assert adapter.lookups.unresolved is None
     assert seen == []
 
 

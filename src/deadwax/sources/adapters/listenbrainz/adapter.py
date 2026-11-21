@@ -2,9 +2,9 @@ import json
 
 from deadwax.core import (
     Capability,
-    EntityKind,
     IdKind,
     LookupContext,
+    Lookups,
     Metric,
     NotFoundError,
     Partial,
@@ -50,19 +50,23 @@ class ListenBrainzAdapter(HttpAdapter):
     service = None
     capabilities = frozenset({Capability.TEXTS, Capability.RELATIONS, Capability.METRICS})
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
-        """Read what ListenBrainz knows about the MusicBrainz entity earlier sources found."""
-        artist = context.id(IdKind.MUSICBRAINZ_ARTIST)
-        group = context.id(IdKind.MUSICBRAINZ_RELEASE_GROUP)
-        if (query.kind or context.identity.kind) is EntityKind.ALBUM:
-            if group is None:
-                raise NotFoundError("no MusicBrainz release group from earlier sources")
-            return await self._album(group, artist, context)
+    @property
+    def lookups(self) -> Lookups:
+        """Recordings and release groups that earlier sources identified in MusicBrainz."""
+        return Lookups(track=self._find_track, album=self._find_album)
 
+    async def _find_track(self, query: Query, context: LookupContext) -> Partial:  # noqa: ARG002 -- KindLookup
         recording = context.id(IdKind.MUSICBRAINZ_RECORDING)
         if recording is None:
             raise NotFoundError("no MusicBrainz recording from earlier sources")
-        return await self._track(recording, group, artist, context)
+        group = context.id(IdKind.MUSICBRAINZ_RELEASE_GROUP)
+        return await self._track(recording, group, context.id(IdKind.MUSICBRAINZ_ARTIST), context)
+
+    async def _find_album(self, query: Query, context: LookupContext) -> Partial:  # noqa: ARG002 -- KindLookup
+        group = context.id(IdKind.MUSICBRAINZ_RELEASE_GROUP)
+        if group is None:
+            raise NotFoundError("no MusicBrainz release group from earlier sources")
+        return await self._album(group, context.id(IdKind.MUSICBRAINZ_ARTIST), context)
 
     async def _popularity(self, entity: str, mbid: str) -> list[models.Popularity]:
         body = json.dumps({f"{entity.replace('-', '_')}_mbids": [mbid]}).encode()

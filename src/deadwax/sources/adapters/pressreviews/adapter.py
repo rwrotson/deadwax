@@ -1,6 +1,7 @@
 from deadwax.core import (
     Capability,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -24,7 +25,12 @@ class PressAdapter(HttpAdapter):
     profile = Profile.BROWSER
     capabilities = frozenset({Capability.TEXTS})
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Reviews of tracks and albums."""
+        return Lookups(track=self.find, album=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Read linked reviews whose page identity matches the requested record."""
         key = search_key(query, context)
         if key is None:

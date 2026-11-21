@@ -1,6 +1,7 @@
 from deadwax.core import (
     Capability,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -25,7 +26,12 @@ class NormanAdapter(HttpAdapter):
     )
     required_marker = b"<h1"
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Products named by a URL, whatever their kind."""
+        return Lookups(track=self.find, album=self.find, unresolved=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Read a named Norman Records product without searching the site."""
         url = query.url if self.resolves(query) else next(iter(context.urls(self.name)), None)
         if url is None:

@@ -3,6 +3,7 @@ from deadwax.core import (
     EntityKind,
     IdKind,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -28,7 +29,12 @@ class KexpAdapter(HttpAdapter):
     service = None
     capabilities = frozenset({Capability.IDENTITY, Capability.TEXTS, Capability.RELATIONS})
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Plays of tracks and albums."""
+        return Lookups(track=self.find, album=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Read the latest plays by MusicBrainz recording ID, else by artist and title."""
         key = search_key(query, context)
         if key is None:

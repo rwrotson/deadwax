@@ -160,23 +160,24 @@ async def test_later_version_by_the_original_artist_shares_the_covers() -> None:
 
 
 @pytest.mark.asyncio
-async def test_album_contributes_nothing() -> None:
+async def test_looks_up_tracks_only() -> None:
     seen: list[httpx.Request] = []
     adapter = make(seen=seen)
     album = parse_query("Band - Record", EntityKind.ALBUM)
 
-    partial = await adapter.lookup(album, LookupContext(query=album))
+    with pytest.raises(NotFoundError, match="does not look up a record of kind album"):
+        await adapter.lookup(album, LookupContext(query=album))
 
-    assert partial.model_dump(exclude={"source"}) == {
-        "candidate": None, "tags": [], "credits": [], "texts": [], "relations": [],
-        "metrics": [], "links": [], "review_links": [], "errors": [],
-    }  # fmt: skip
+    assert adapter.lookups.kinds == {EntityKind.TRACK}
+    assert adapter.lookups.unresolved is None
     assert seen == []
 
 
 @pytest.mark.asyncio
 async def test_not_found() -> None:
-    url_query = parse_query("https://www.discogs.com/master/1-Band-Song")
+    url_query = parse_query(
+        "https://musicbrainz.org/recording/0f0c9d2b-1a3e-4d4b-9c1a-2b3c4d5e6f70",
+    )
 
     with pytest.raises(NotFoundError, match="name the record"):
         await make().lookup(url_query, LookupContext(query=url_query))

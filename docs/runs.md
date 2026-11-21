@@ -50,8 +50,8 @@ Each event line holds `event`, `level`, `logger`, `timestamp`, `run_id`, and the
 | Event | Fields |
 | --- | --- |
 | `run.start`, `run.settings`, `query.parsed` | arguments, version, platform; settings; the parsed query |
-| `lookup.selected`, `lookup.resolver`, `lookup.kind_adopted` | ready, skipped (with reasons), and unselected sources; the URL resolver; the kind it found |
-| `pass.start` | sources of the pass and the context it starts from |
+| `lookup.selected`, `lookup.resolver`, `lookup.kind_adopted` | ready, skipped (with reasons), unsupported (no lookup of the query's kind), and unselected sources; the URL resolver; the kind it found |
+| `pass.start` | sources of the pass, the record kind it dispatches on, the sources without a lookup of that kind, and the context it starts from |
 | `http.request` | method, URL, status, cache `hit`/`miss`/`blocked`/`off`, transports, attempts, duration, size, SHA-256, error |
 | `http.retry`, `http.challenge`, `http.step_dropped`, `http.step_failed` | retries with their cause and delay; bot challenges; unavailable transports; transports that failed to start |
 | `http.headed_fallback`, `http.page_incomplete` | a challenge retried in a visible browser; a page without its required state |

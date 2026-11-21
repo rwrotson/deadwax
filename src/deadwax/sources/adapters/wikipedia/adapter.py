@@ -5,6 +5,7 @@ from deadwax.core import (
     EntityKind,
     IdKind,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -71,7 +72,12 @@ class WikipediaAdapter(HttpAdapter):
             found |= response.entities
         return found
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Tracks and albums; the Wikidata item tells which."""
+        return Lookups(track=self.find, album=self.find, unresolved=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Read the Wikidata item from earlier passes or a search, then its articles."""
         key = search_key(query, context)
         qid = context.id(IdKind.WIKIDATA)

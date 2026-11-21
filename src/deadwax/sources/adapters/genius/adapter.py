@@ -12,6 +12,7 @@ from deadwax.core import (
     Link,
     LinkTarget,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -206,13 +207,16 @@ class GeniusAdapter(HttpAdapter):
             return [Text(kind=TextKind.LYRICS, body=body, scope=Scope.WORK, sources=source)], []
         return [], []
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Songs only."""
+        return Lookups(track=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Find a matching song and collect its API data and page lyrics."""
         key = search_key(query, context)
         if key is None:
             raise NotFoundError("neither the query nor earlier sources name the record")
-        if key.kind is EntityKind.ALBUM:
-            return Partial(source=self.name)
         song_id = await self._find(key)
         song = (await self._get(models.SongData, f"/songs/{song_id}")).song
         candidate = parse.candidate(song)

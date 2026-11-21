@@ -1,10 +1,12 @@
+from collections.abc import Awaitable
+from dataclasses import dataclass
 from enum import StrEnum
-from typing import Protocol
+from typing import Protocol, assert_never
 
 from pydantic import BaseModel, ConfigDict
 
 from deadwax.core.models import Identity, Link, Partial, ReviewLink, SourceAccess
-from deadwax.core.query import IdKind, Query, normalize_code
+from deadwax.core.query import EntityKind, IdKind, Query, normalize_code
 
 
 class _Model(BaseModel):
@@ -87,6 +89,7 @@ class SourceInfo(_Model):
     group: SourceGroup
     pass_: Pass
     capabilities: list[Capability]
+    kinds: list[EntityKind]
     requires: list[Requirement]
     status: SourceStatus
     access: SourceAccess
@@ -105,6 +108,11 @@ class LookupContext(_Model):
 
     # Facets the request asked for; unset means all of them.
     facets: frozenset[Capability] | None = None
+
+    @property
+    def kind(self) -> EntityKind | None:
+        """Record kind from the query, else from earlier passes."""
+        return self.query.kind or self.identity.kind
 
     def wants(self, facet: Capability) -> bool:
         """Whether the request asked for a kind of facts, so an adapter may skip the rest."""
@@ -128,6 +136,42 @@ class LookupContext(_Model):
     def urls(self, service: str) -> list[str]:
         """Return the known link URLs of a service."""
         return [link.url for link in self.links if link.service == service]
+
+
+class KindLookup(Protocol):
+    """Lookup of one kind of record by one source."""
+
+    def __call__(self, query: Query, context: LookupContext, /) -> Awaitable[Partial]:
+        """Find the record and return what the source knows about it."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class Lookups:
+    """Lookups of an adapter by record kind; an unset slot means the source does not look it up."""
+
+    track: KindLookup | None = None
+    album: KindLookup | None = None
+
+    # Reads a query whose kind neither the query nor earlier passes established.
+    unresolved: KindLookup | None = None
+
+    @property
+    def kinds(self) -> frozenset[EntityKind]:
+        """Record kinds the adapter looks up."""
+        return frozenset(kind for kind in EntityKind if self.get(kind) is not None)
+
+    def get(self, kind: EntityKind | None) -> KindLookup | None:
+        """Return the lookup of a record kind, or of an unknown kind for None."""
+        match kind:
+            case EntityKind.TRACK:
+                return self.track
+            case EntityKind.ALBUM:
+                return self.album
+            case None:
+                return self.unresolved
+            case _:
+                assert_never(kind)
 
 
 class Adapter(Protocol):
@@ -166,6 +210,7 @@ class Adapter(Protocol):
         """Whether the adapter reads the page or entity behind the query URL."""
         ...
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
-        """Find the record and return what the source knows about it."""
+    @property
+    def lookups(self) -> Lookups:
+        """Lookups the adapter runs, one per record kind it supports."""
         ...

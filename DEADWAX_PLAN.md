@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md). Closed v2 stages (8–17, 19, R-1–R-5), their evidence, and the v2 decision log are archived in [`plans/v2.md`](plans/v2.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1–R-6 done. Stages M-1–M-3 (2026-11-20, requests and data for the mixhound consumer) run before Stage 20; M-1–M-3 done. Stage 20 done on 2026-11-20; v0.1.0 is the first tagged release (GitHub only, no PyPI).
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1–R-6 done. Stages M-1–M-3 (2026-11-20, requests and data for the mixhound consumer) run before Stage 20; M-1–M-3 done. Stage 20 done on 2026-11-20; v0.1.0 is the first tagged release (GitHub only, no PyPI). Stages E-1–E-3 (2026-11-21, artist, label, and other record kinds) defined; E-1 done.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -20,6 +20,7 @@ This is the active specification and multi-session handoff for deadwax. deadwax 
 | Streaming links | MusicBrainz URL relations, iTunes Search, and Deezer in the first two passes; Odesli reads the song.link page in the links pass. |
 | Language | Code, docs, plan journal, commit messages in English. |
 | Requests | Applications ask for facets (`Capability`), not sources; configuration decides which sources may run. One `Deadwax` client shares cache, rate limiters, and browsers across lookups; adapters are built per lookup (2026-11-20, `docs/requests.md`). |
+| Record kinds | Adapters dispatch by record kind through `Lookups`, one optional slot per kind (`track`, `album`, `unresolved`; `artist`, `label` from E-2): a typed visitor whose methods may be absent, so a new kind breaks no adapter and the orchestrator sees which kinds a source supports. Classic Visitor, `singledispatch`, and a global dispatch table were weighed and rejected (2026-11-21). |
 | Git | No agent commits; stop after each stage with a Conventional Commit suggestion (AGENTS.md "Commit Handoff"). |
 
 ### Product contract
@@ -128,6 +129,9 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Sections of closed
 | M-2 | Done | Leads: LB Radio, Last.fm similar artists for tracks, MusicBrainz associated artists. |
 | M-3 | Done | Bandcamp stream previews, ISRC in queries. |
 | 20 | Done (RYM blocked, Forced Exposure HTTP 403, Norman disabled by the local allowlist) | Qualification; release v0.1.0. |
+| E-1 | Done | Per-kind lookup slots (`Lookups`), dispatch by the kind known in each pass, `SourceInfo.kinds`. |
+| E-2 | Planned | Typed queries per kind, a model for artists and labels, CLI `--artist` and `--label`. |
+| E-3 | Planned | Artist and label lookups, MusicBrainz, Discogs, Last.fm, Wikipedia, and Bandcamp first. |
 
 Common acceptance for source stages 9–19, in addition to each stage's own:
 
@@ -189,6 +193,19 @@ Agreed with the user on 2026-11-20. mixhound, an application that finds recordin
 
 **Acceptance:** all checks pass or blocked ones have precise reasons. **Suggested message:** `docs: document sources and qualify deadwax v2`.
 
+### Stages E-1–E-3: record kinds
+
+Agreed with the user on 2026-11-21. deadwax will look up artists and labels, and possibly works, besides tracks and albums; sources support them selectively. Breaking changes carry `!`. Each stage passes `uv run poe check` and the strict docs build and ends with evidence and a commit suggestion.
+
+- **E-1 (dispatch, no new kinds).** `core.Lookups` with optional `track`, `album`, and `unresolved` slots replaces `Adapter.lookup`; `HttpAdapter.lookup` remains as a convenience that runs the slot of `LookupContext.kind`. The orchestrator drops adapters without a slot for the query's kind at selection (`lookup.selected.unsupported`), dispatches each pass on the kind known so far (`pass.start.kind`, `pass.start.unsupported`), and picks a resolver only among adapters with a slot for the query's kind. Track-only sources declare only `track` instead of refusing albums with `not_found` or an empty partial. `SourceInfo.kinds` and a `kinds` column in `deadwax sources`.
+- **E-2 (model).**
+  - `Query` becomes a union discriminated by `kind`: `TrackQuery`, `AlbumQuery`, `ArtistQuery`, `LabelQuery`, and `UnresolvedQuery` for a URL whose kind only a resolver finds; slots are typed by their query.
+  - A matching key for names (artist, label) beside `RecordKey`; `Identity` and `RecordCandidate` split into common and per-kind parts (decide the shape with the user first); merge orders for the new kinds; `Capability` meanings for artists and labels.
+  - URL rules for artist and label pages; CLI `--artist`, `--label`; README, docs, `.env.example`.
+- **E-3 (sources).** `artist` and `label` slots, MusicBrainz, Discogs, Last.fm, Wikipedia, and Bandcamp first; live invariants for the new kinds in `tests/integration`.
+
+**Suggested messages:** `refactor!: dispatch adapter lookups by record kind`; E-2 and E-3 at their end.
+
 ### Later, unscheduled: automation masking for Cloudflare-protected sources
 
 - [ ] Masking browser automation (stealth plugins, undetected-chromedriver, nodriver, Camoufox, fingerprint spoofing) so that Beatport and similar sources pass Cloudflare challenges that defeat httpx, curl_cffi, and plain Playwright.
@@ -214,6 +231,24 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 ## Progress evidence and decision log
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
+
+### 2026-11-21 — E-1 evidence (per-kind lookup slots)
+
+Decision (user, 2026-11-21): of the five Visitor variants weighed (methods on nodes, pattern matching, classic Visitor, dispatch matrix, `singledispatch`), none fits as is: there is no tree to traverse, and the adapter × kind matrix is sparse, so a classic Visitor would force every adapter to implement every kind. Chosen: a typed slot per kind on each adapter (`Lookups`), one `match` in the core, slots typed by per-kind queries from E-2.
+
+Changed:
+- `core/adapter.py`: `KindLookup`, `Lookups` (`get`, `kinds`), `LookupContext.kind`, `SourceInfo.kinds`; `Adapter.lookups` replaces `Adapter.lookup`.
+- `core/orchestrator.py`: selection drops adapters without a slot for a known query kind; each pass dispatches on `LookupContext.kind`; the resolver must have a slot for the query's kind.
+- `sources`: `HttpAdapter.lookups` is abstract and `HttpAdapter.lookup` dispatches; `SearchPageAdapter.find` fills all three slots. Tracks only: Genius, SecondHandSongs, NTS, WFMU (`track`), 1001Tracklists and WhoSampled (`track`, `unresolved`); their album refusals are removed. Last.fm and ListenBrainz split into track and album lookups. Adapters that read their own URLs, plus Odesli and Wikipedia, keep an `unresolved` slot; the others no longer guess a kind when none is known.
+- CLI: `deadwax sources` shows a kinds column. Docs: architecture lookup flow and adding a source, run events, sources.
+
+Behaviour change: an album query no longer runs the track-only sources, so their `not_found` errors and empty partials disappear; with an unknown kind after a pass, sources without an `unresolved` slot sit the pass out instead of searching as a track.
+
+Checks: `uv run poe check` passed (fmt-check, lint, lint-imports, mypy, 1149 tests, coverage 97.00%); `uv run --group docs properdocs build --strict` passed. Live lookups were not run: dispatch for track and album queries is unchanged apart from the cases above.
+
+Remaining: E-2 (typed queries and the model for new kinds), E-3.
+
+**Suggested message:** `refactor!: dispatch adapter lookups by record kind`.
 
 ### 2026-11-20 — Stage 20 evidence (qualification) and release v0.1.0
 

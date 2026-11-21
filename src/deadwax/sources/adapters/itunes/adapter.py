@@ -3,6 +3,7 @@ from deadwax.core import (
     EntityKind,
     IdKind,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -35,7 +36,12 @@ class ItunesAdapter(HttpAdapter):
         response = await self.client.get(f"{parse.API}{path}", params=params)
         return Results.model_validate_json(response.content).results
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Tracks and albums; an Apple Music ID tells which."""
+        return Lookups(track=self.find, album=self.find, unresolved=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Look up the Apple Music ID of the query, or search by artist and title."""
         apple_id = query.ids.get(IdKind.APPLE_MUSIC) or parse.linked_id(query, context)
         if apple_id is not None:

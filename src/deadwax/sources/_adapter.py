@@ -4,6 +4,8 @@ from collections.abc import Mapping
 from deadwax.core import (
     Capability,
     LookupContext,
+    Lookups,
+    NotFoundError,
     Partial,
     Pass,
     Query,
@@ -130,9 +132,17 @@ class HttpAdapter(ABC):
             )
         return self._client
 
+    @property
     @abstractmethod
+    def lookups(self) -> Lookups:
+        """Lookups the adapter runs, one per record kind it supports."""
+
     async def lookup(self, query: Query, context: LookupContext) -> Partial:
-        """Find the record and return what the source knows about it."""
+        """Run the lookup of the record kind the query or earlier passes established."""
+        lookup = self.lookups.get(context.kind)
+        if lookup is None:
+            raise NotFoundError(f"{self.name} does not look up a record of kind {context.kind}")
+        return await lookup(query, context)
 
     async def aclose(self) -> None:
         """Close the HTTP client if it was opened."""

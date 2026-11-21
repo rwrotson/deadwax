@@ -6,6 +6,7 @@ from deadwax.core import (
     EntityKind,
     EntityType,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -81,11 +82,14 @@ class WhoSampledAdapter(HttpAdapter):
             )
         return relations
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Tracks, also from a track page URL."""
+        return Lookups(track=self.find, unresolved=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Open a record directly because the site's search path is excluded by robots.txt."""
         key = search_key(query, context)
-        if query.kind is EntityKind.ALBUM:
-            raise NotFoundError("WhoSampled needs an artist and track title")
         url = parse.record_url(query, key)
         response = await self.client.get(url)
 

@@ -4,6 +4,7 @@ from deadwax.core import (
     Capability,
     IdKind,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -31,7 +32,12 @@ class OdesliAdapter(HttpAdapter):
             kind in query.ids for kind in (IdKind.SPOTIFY, IdKind.APPLE_MUSIC, IdKind.DEEZER)
         )
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Records with a streaming URL; the song.link page tells their kind."""
+        return Lookups(track=self.find, album=self.find, unresolved=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Open the song.link page of a streaming URL from the query or an earlier pass."""
         seed = parse.seed(query, context)
         if seed is None:

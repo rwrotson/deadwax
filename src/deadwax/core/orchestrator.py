@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from deadwax.core.adapter import (
     Adapter,
     Capability,
+    KindLookup,
     LookupContext,
     Pass,
     SourceGroup,
@@ -72,7 +73,7 @@ def _outcome(partial: Partial) -> dict[str, object]:
 
 async def _call(
     adapter: Adapter,
-    query: Query,
+    lookup: KindLookup,
     context: LookupContext,
     seconds: float,
     slots: asyncio.Semaphore | None,
@@ -85,7 +86,7 @@ async def _call(
     with trace_scope(source=adapter.name):
         async with slots or contextlib.nullcontext():
             started = time.monotonic()
-            partial = await _timed(adapter, query, context, seconds)
+            partial = await _timed(adapter, lookup, context, seconds)
         trace(
             logger,
             TraceEvent.ADAPTER_END,
@@ -96,10 +97,15 @@ async def _call(
         return partial
 
 
-async def _timed(adapter: Adapter, query: Query, context: LookupContext, seconds: float) -> Partial:
+async def _timed(
+    adapter: Adapter,
+    lookup: KindLookup,
+    context: LookupContext,
+    seconds: float,
+) -> Partial:
     try:
         async with adapter_deadline(seconds):
-            return await adapter.lookup(query, context)
+            return await lookup(context.query, context)
     except TimeoutError:
         return _failure(adapter, ErrorKind.TIMEOUT, f"no answer within {seconds:g} s")
     except SourceError as error:
@@ -179,8 +185,12 @@ def _select(
 
     ready: list[Adapter] = []
     skipped: list[AdapterError] = []
+    unsupported: list[str] = []
     for adapter in adapters:
         if adapter.name in exclude or (include is not None and adapter.name not in include):
+            continue
+        if query.kind is not None and adapter.lookups.get(query.kind) is None:
+            unsupported.append(adapter.name)
             continue
         if not _needed(adapter, query, options.facets):
             continue
@@ -199,10 +209,12 @@ def _select(
         facets=None if options.facets is None else sorted(options.facets),
         ready=[adapter.name for adapter in ready],
         skipped={error.source: error.reason for error in skipped},
+        unsupported=unsupported,
         not_selected=sorted(
             adapter.name
             for adapter in adapters
-            if adapter not in ready and adapter.name not in {e.source for e in skipped}
+            if adapter not in ready
+            and adapter.name not in {*unsupported, *(e.source for e in skipped)}
         ),
     )
     return ready, skipped
@@ -236,10 +248,15 @@ class _Run:
     async def _run(self, adapters: Sequence[Adapter]) -> None:
         context = self.context()
         identity = context.identity
+        kind = context.kind
+        lookups = [(adapter, adapter.lookups.get(kind)) for adapter in adapters]
+        runnable = [(adapter, lookup) for adapter, lookup in lookups if lookup is not None]
         trace(
             logger,
             TraceEvent.PASS_START,
-            sources=[adapter.name for adapter in adapters],
+            sources=[adapter.name for adapter, _ in runnable],
+            kind=kind,
+            unsupported=[adapter.name for adapter, lookup in lookups if lookup is None],
             query=self.query.model_dump(mode="json"),
             identity={
                 "kind": identity.kind,
@@ -255,13 +272,13 @@ class _Run:
                 group.create_task(
                     _call(
                         adapter,
-                        self.query,
+                        lookup,
                         context,
                         self.options.timeout_for(adapter.name),
                         self.slots,
                     ),
                 )
-                for adapter in adapters
+                for adapter, lookup in runnable
             ]
         self.partials.extend(task.result() for task in tasks)
 
@@ -289,7 +306,10 @@ async def run(
 
     resolver = None
     if query.url is not None:
-        resolver = next((adapter for adapter in ready if adapter.resolves(query)), None)
+        resolver = next(
+            (a for a in ready if a.resolves(query) and a.lookups.get(query.kind) is not None),
+            None,
+        )
         trace(
             logger,
             TraceEvent.LOOKUP_RESOLVER,

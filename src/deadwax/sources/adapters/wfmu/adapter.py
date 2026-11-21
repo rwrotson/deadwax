@@ -7,6 +7,7 @@ from deadwax.core import (
     EntityKind,
     EntityType,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -99,10 +100,15 @@ class WfmuAdapter(HttpAdapter):
             return None
         return Partial(source=self.name, candidate=candidate, relations=relations, texts=texts)
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Tracks only: playlists list tracks."""
+        return Lookups(track=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Search posted playlists and check their track rows before adding facts."""
         key = search_key(query, context)
-        if key is None or key.kind is EntityKind.ALBUM:
+        if key is None:
             raise NotFoundError("WFMU playlist search needs an artist and track title")
         initial = key.artist[:1].upper()
         index = await self.client.get(

@@ -1,7 +1,7 @@
 from deadwax.core import (
     Capability,
-    EntityKind,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -29,6 +29,13 @@ def _artist_page(url: str | None) -> str | None:
         return None
     head, _, rest = url.partition("/music/")
     return f"{head}/music/{rest.split('/', 1)[0]}"
+
+
+def _key(query: Query, context: LookupContext) -> RecordKey:
+    key = search_key(query, context)
+    if key is None:
+        raise NotFoundError("neither the query nor earlier sources name the record")
+    return key
 
 
 class LastfmAdapter(HttpAdapter):
@@ -59,14 +66,16 @@ class LastfmAdapter(HttpAdapter):
         p.check(response.content, response.url)
         return model.model_validate_json(response.content)
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
-        """Read the track or album, its tags and wiki, the artist's tags, and similar items."""
-        key = search_key(query, context)
-        if key is None:
-            raise NotFoundError("neither the query nor earlier sources name the record")
-        if key.kind is EntityKind.ALBUM:
-            return await self._album(key, context)
-        return await self._track(key, context)
+    @property
+    def lookups(self) -> Lookups:
+        """Tracks and albums through their own API methods."""
+        return Lookups(track=self._find_track, album=self._find_album)
+
+    async def _find_track(self, query: Query, context: LookupContext) -> Partial:
+        return await self._track(_key(query, context), context)
+
+    async def _find_album(self, query: Query, context: LookupContext) -> Partial:
+        return await self._album(_key(query, context), context)
 
     async def _artist_tags(self, artist: str, page: str | None) -> list[Tag]:
         found = await self._call(

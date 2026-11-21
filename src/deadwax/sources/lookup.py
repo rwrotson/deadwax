@@ -10,7 +10,7 @@ from deadwax.sources.registry import build_adapters
 
 
 def describe_sources(config: LookupConfig | None = None) -> list[SourceInfo]:
-    """List the sources with their group, pass, capabilities, requirements, and status.
+    """List the sources with their group, pass, capabilities, record kinds, requirements, status.
 
     Raises `ConfigurationError` when the default source set names an unknown source or group.
     """
@@ -24,6 +24,7 @@ def describe_sources(config: LookupConfig | None = None) -> list[SourceInfo]:
             default=adapter.name in defaults,
             pass_=adapter.pass_,
             capabilities=sorted(adapter.capabilities),
+            kinds=sorted(adapter.lookups.kinds),
             requires=list(adapter.requires),
             status=adapter.status(),
             access=adapter.access(),

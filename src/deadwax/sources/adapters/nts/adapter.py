@@ -4,6 +4,7 @@ from deadwax.core import (
     EntityKind,
     EntityType,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -85,10 +86,15 @@ class NtsAdapter(HttpAdapter):
                 )
         return Partial(source=self.name, candidate=candidate, relations=relations, tags=tags)
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
+    @property
+    def lookups(self) -> Lookups:
+        """Tracks only: episode tracklists list tracks."""
+        return Lookups(track=self.find)
+
+    async def find(self, query: Query, context: LookupContext) -> Partial:
         """Search the public track index, then verify each episode tracklist."""
         key = search_key(query, context)
-        if key is None or key.kind is EntityKind.ALBUM:
+        if key is None:
             raise NotFoundError("NTS track search needs an artist and track title")
         response = await self.client.get(
             f"{parse.API}/search",

@@ -18,6 +18,7 @@ from deadwax.core import (
     LinkTarget,
     LookupContext,
     LookupOptions,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -58,7 +59,17 @@ class FakeAdapter:
     capabilities: frozenset[Capability] = frozenset({Capability.TAGS})
     requires: tuple[Requirement, ...] = ()
     group: SourceGroup = SourceGroup.CORE
+    kinds: frozenset[EntityKind] = frozenset(EntityKind)
+    unresolved: bool = True
     calls: list[tuple[Query, LookupContext]] = field(default_factory=list)
+
+    @property
+    def lookups(self) -> Lookups:
+        return Lookups(
+            track=self.lookup if EntityKind.TRACK in self.kinds else None,
+            album=self.lookup if EntityKind.ALBUM in self.kinds else None,
+            unresolved=self.lookup if self.unresolved else None,
+        )
 
     def status(self) -> SourceStatus:
         return SourceStatus(source=self.name, state=self.state, detail=self.detail)
@@ -580,3 +591,44 @@ async def test_without_facets_every_adapter_runs_and_wants_everything() -> None:
 
     [(_, context)] = silent.calls
     assert context.wants(Capability.METRICS)
+
+
+async def test_adapters_without_a_lookup_of_the_query_kind_do_not_run(traced: Traced) -> None:
+    album = text_query("Everything but the Girl - Walking Wounded", EntityKind.ALBUM)
+    lastfm = FakeAdapter("lastfm", behaviour=returning(found("lastfm", title="Walking Wounded")))
+    genius = FakeAdapter("genius", kinds=frozenset({EntityKind.TRACK}))
+
+    errors = await lookup([lastfm, genius], album)
+
+    assert (len(lastfm.calls), len(genius.calls)) == (1, 0)
+    assert errors == []
+    [selected] = traced("lookup.selected")
+    assert selected["unsupported"] == ["genius"]
+    assert selected["not_selected"] == []
+
+
+async def test_each_pass_dispatches_on_the_kind_known_so_far(traced: Traced) -> None:
+    query = Query(url="https://example.org/x")
+    page = found("musicbrainz", kind=EntityKind.ALBUM)
+    musicbrainz = FakeAdapter("musicbrainz", Pass.IDENTITY, returning(page))
+    lastfm = FakeAdapter("lastfm", unresolved=False)
+    genius = FakeAdapter("genius", kinds=frozenset({EntityKind.TRACK}))
+
+    await lookup([musicbrainz, lastfm, genius], query)
+
+    assert (len(musicbrainz.calls), len(lastfm.calls), len(genius.calls)) == (1, 1, 0)
+    starts = {event["pass"]: event for event in traced("pass.start")}
+    assert starts["identity"]["kind"] is None
+    assert starts["enrich"]["kind"] == "album"
+    assert starts["enrich"]["sources"] == ["lastfm"]
+    assert starts["enrich"]["unsupported"] == ["genius"]
+
+
+async def test_a_resolver_needs_a_lookup_of_an_unknown_kind() -> None:
+    query = Query(url="https://artist.bandcamp.com/x")
+    tracks_only = FakeAdapter("shop", resolves_urls=True, unresolved=False)
+    bandcamp = FakeAdapter("bandcamp", resolves_urls=True)
+
+    await lookup([tracks_only, bandcamp], query)
+
+    assert (len(tracks_only.calls), len(bandcamp.calls)) == (0, 1)

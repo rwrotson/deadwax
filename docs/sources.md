@@ -1,6 +1,6 @@
 # Sources
 
-`deadwax sources` lists every source with its group, whether it is in the default set, its pass, what it contributes, and whether it can run. Each source has the settings `enabled`, `rate` (requests per second), `ttl` (cache lifetime), `user_agent`, and `proxy`, set as `DEADWAX_SOURCES__<SOURCE>__<SETTING>` or in a `[<source>]` TOML table; see [Configuration](configuration.md).
+`deadwax sources` lists every source with its group, whether it is in the default set, its pass, the record kinds it looks up, what it contributes, and whether it can run. Genius, SecondHandSongs, NTS, WFMU, 1001Tracklists, and WhoSampled look up tracks only and do not run for an album. Each source has the settings `enabled`, `rate` (requests per second), `ttl` (cache lifetime), `user_agent`, and `proxy`, set as `DEADWAX_SOURCES__<SOURCE>__<SETTING>` or in a `[<source>]` TOML table; see [Configuration](configuration.md).
 
 Its Access column shows the configured retrieval methods: API requests use httpx; HTML pages use the listed transports in order. `impersonate` uses curl_cffi, `patchright` uses Patchright, and `nodriver` uses Nodriver. Browser transports show their configured `headed` or `headless` mode; `headless → headed` means a challenged headless page is retried in a window (`http.headed_fallback`). If the global allowlist leaves an HTML source with no transport, `sources` shows `HTML (no permitted transports)` and a disabled status; lookups omit that source, including any API work it could do. The list does not check whether optional packages are installed or whether a site will accept a request. Flags on a separate lookup can override its browser mode.
 
@@ -103,7 +103,7 @@ The README lists deferred sources and those deadwax will not use.
 
 - **Group:** `catalogues`; in the default set. Optional `DEADWAX_SOURCES__SECONDHANDSONGS__API_KEY` raises the request limit.
 - **Access:** the JSON API at `api.secondhandsongs.com`, keyless; the website is behind a Cloudflare challenge and is not used.
-- **Finds the record by:** a performance search by title and performer, through the matching gate. Songs only: an album query contributes nothing.
+- **Finds the record by:** a performance search by title and performer, through the matching gate. Songs only: it does not run for an album.
 - **Contributes:** the performance's first release date; writers of the work as `writer` credits; for an original, its covers as `covered_by`; for a cover, the work and the dated original as `cover_of`; for a later recording by the original artist, the first performance as `other_version` and that performance's covers; adaptations (translations, new lyrics) as `cover_of` or `covered_by` works with the note `adaptation`.
 - **Limits:** without a key the API allows about 10–20 requests a minute; the default rate is 0.25 per second. Covers carry no dates, which would take one request per cover.
 

@@ -3,8 +3,8 @@ from collections.abc import Mapping
 from deadwax.core import (
     Capability,
     Credit,
-    EntityKind,
     LookupContext,
+    Lookups,
     NotFoundError,
     Partial,
     Pass,
@@ -36,16 +36,16 @@ class SecondHandSongsAdapter(HttpAdapter):
         key = {"x-api-key": api_key.get_secret_value()} if api_key is not None else {}
         return {"accept": "application/json", **key}
 
-    async def lookup(self, query: Query, context: LookupContext) -> Partial:
-        """Find the performance and read its originals or covers and its works.
+    @property
+    def lookups(self) -> Lookups:
+        """Songs only: SecondHandSongs describes performances."""
+        return Lookups(track=self.find)
 
-        SecondHandSongs describes songs, so an album query contributes nothing.
-        """
+    async def find(self, query: Query, context: LookupContext) -> Partial:
+        """Find the performance and read its originals or covers and its works."""
         key = search_key(query, context)
         if key is None:
             raise NotFoundError("neither the query nor earlier sources name the record")
-        if key.kind is EntityKind.ALBUM:
-            return Partial(source=self.name)
 
         performance = await self._get(models.Performance, await self._find(key))
         relations = (

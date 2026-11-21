@@ -129,9 +129,9 @@ Tests may import internal modules to test them; CLI tests go through `deadwax.cl
 ## Lookup flow
 
 1. A `Deadwax` client (`sources/client.py`) opens the cache, the per-host rate limiters, and the shared browser sessions for its whole life; `deadwax.lookup(request, config)` opens one for a single call. For each lookup, `registry.build_adapters` constructs every adapter of `ADAPTERS` with its settings section; each builds its `HttpClient` from `LookupConfig.client_settings(name)` on first use.
-2. The orchestrator (`core/orchestrator.py`) selects adapters from `include`, `exclude`, the default set, and the request's facets (see [Requests](requests.md)); disabled ones produce no error, adapters without a key or extra are `skipped`.
-3. For a URL query, the first adapter whose `resolves()` accepts it runs alone and its candidate becomes the reference; a URL whose kind only a request reveals takes the kind it found.
-4. The remaining adapters run pass by pass (`identity`, `enrich`, `links`), concurrently within a pass up to `concurrency`, each under its time budget (`core/deadline.py`). Each pass receives a `LookupContext` with the identity, links, and review links of a merge of the earlier passes.
+2. The orchestrator (`core/orchestrator.py`) selects adapters from `include`, `exclude`, the default set, the record kind of the query, and the request's facets (see [Requests](requests.md)); disabled ones and those that do not look up the query's kind produce no error, adapters without a key or extra are `skipped`.
+3. For a URL query, the first adapter whose `resolves()` accepts it and that has a lookup for the query's kind (`unresolved` when the URL does not reveal it) runs alone and its candidate becomes the reference; a URL whose kind only a request reveals takes the kind it found.
+4. The remaining adapters run pass by pass (`identity`, `enrich`, `links`), concurrently within a pass up to `concurrency`, each under its time budget (`core/deadline.py`). Each pass receives a `LookupContext` with the identity, links, and review links of a merge of the earlier passes. Each adapter runs the slot of its `Lookups` for the kind known so far (`LookupContext.kind`: the query's, else the merged identity's); an adapter without that slot sits the pass out.
 5. `merge` passes every partial through the matching gate: a candidate of another version becomes an `other_version` relation and a `version` discrepancy; an unrelated candidate is a `no_match` error. The result is the `Dossier`; a `blocked` error gets the adapter's access description, and `select.trim` keeps only the requested facts.
 
 Each step emits `TraceEvent` events through `trace()`; the run journal (`deadwax.logs.run_journal`) records them.
@@ -139,7 +139,7 @@ Each step emits `TraceEvent` events through `trace()`; the run journal (`deadwax
 ## Adding a source
 
 1. A settings class in `sources/config.py` with the source's defaults (rate, HTML transports, browser mode, credentials) and a field in `PerSourceSettings`.
-2. A package `sources/adapters/<name>/` with `adapter`, `parse`, and optionally `models`; the adapter declares `name`, `group`, `pass_`, `service`, and `requires`. An HTML source that searches and reads one page builds on `SearchPageAdapter`.
+2. A package `sources/adapters/<name>/` with `adapter`, `parse`, and optionally `models`; the adapter declares `name`, `group`, `pass_`, `service`, and `requires`, and returns from `lookups` one lookup per record kind it supports (`track`, `album`, and `unresolved` for a query whose kind it can find itself); an unset slot means the source does not look that kind up. An HTML source that searches and reads one page builds on `SearchPageAdapter`, whose default slots share one search.
 3. The service's hosts and URL rules in `sources/services.py` when the adapter reads its own pages.
 4. An entry in `ADAPTERS` (`sources/registry.py`), in resolver order.
 5. Recorded responses in `tests/fixtures/<name>/`, tests in `tests/sources/adapters/<name>/`, a line per setting in `.env.example`, a credentials section in README when it needs one, and the source in `docs/sources.md` and the README tables.
