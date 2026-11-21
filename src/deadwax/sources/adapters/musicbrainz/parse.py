@@ -2,14 +2,18 @@ import re
 from collections.abc import Iterable, Sequence
 
 from deadwax.core import (
+    ArtistCandidate,
+    ArtistType,
     CandidateLabel,
     Credit,
     Entity,
     EntityKind,
     EntityType,
     IdKind,
+    LabelCandidate,
     Link,
     LinkTarget,
+    NameKey,
     Provenance,
     RecordKey,
     Relation,
@@ -23,6 +27,8 @@ from deadwax.core import (
     VersionKind,
     classify_marker,
     compare,
+    compare_names,
+    normalize_text,
     parse_title,
 )
 from deadwax.sources.adapters.musicbrainz import models
@@ -347,8 +353,15 @@ def review_links(relations: Iterable[models.Relation], url: str) -> list[ReviewL
 _WIKIDATA = re.compile(r"^https?://(?:www\.)?wikidata\.org/wiki/(Q\d+)$")
 
 
-def url_ids(relations: Iterable[models.Relation]) -> dict[IdKind, str]:
-    """Collect Wikidata and Discogs identifiers from URL relations."""
+_RECORD_URL_IDS = (IdKind.DISCOGS_MASTER, IdKind.DISCOGS_RELEASE)
+
+
+def url_ids(
+    relations: Iterable[models.Relation],
+    kinds: Iterable[IdKind] = _RECORD_URL_IDS,
+) -> dict[IdKind, str]:
+    """Collect the Wikidata identifier and those of the given kinds from URL relations."""
+    wanted = tuple(kinds)
     ids: dict[IdKind, str] = {}
     for relation in relations:
         if relation.url is None:
@@ -359,7 +372,7 @@ def url_ids(relations: Iterable[models.Relation]) -> dict[IdKind, str]:
             ids.setdefault(IdKind.WIKIDATA, wikidata[1])
             continue
         _, found = recognize(resource)
-        for kind in (IdKind.DISCOGS_MASTER, IdKind.DISCOGS_RELEASE):
+        for kind in wanted:
             if kind in found:
                 ids.setdefault(kind, found[kind])
     return ids
@@ -530,3 +543,200 @@ def track_credits(release: models.Release) -> list[Credit]:
         )
         for (role, name, attributes), titles in grouped.items()
     ]
+
+
+ARTIST_TYPES = {
+    "Person": ArtistType.PERSON,
+    "Group": ArtistType.GROUP,
+    "Orchestra": ArtistType.ORCHESTRA,
+    "Choir": ArtistType.CHOIR,
+    "Character": ArtistType.CHARACTER,
+    "Other": ArtistType.OTHER,
+}
+
+# Main release groups listed as an artist's releases, oldest first.
+RELEASES_LIMIT = 25
+
+# Alias types that only help search and name nothing the artist or label used.
+_SEARCH_HINT = "Search hint"
+
+# Label-to-label relation types whose forward direction points at a label the queried one owns.
+_SUBLABEL_TYPES = frozenset({"imprint", "label ownership"})
+
+
+def rank_names(
+    reference: NameKey,
+    entities: Sequence[models.Artist | models.Label],
+    id_kind: IdKind,
+) -> list[models.Artist | models.Label]:
+    """Keep the artists or labels that match the reference, in search order."""
+    return [
+        entity
+        for entity in entities
+        if compare_names(
+            reference,
+            NameKey(name=entity.name, kind=reference.kind, ids={id_kind: entity.id}),
+        ).verdict
+        is Verdict.MATCH
+    ]
+
+
+def aliases(
+    entity: models.Artist | models.Label,
+    entity_type: EntityType,
+    scope: Scope,
+    url: str,
+) -> list[Relation]:
+    """Return other names of an artist or label, without search hints and the name itself."""
+    seen = {normalize_text(entity.name)}
+    result = []
+    for alias in entity.aliases:
+        key = normalize_text(alias.name)
+        if alias.type == _SEARCH_HINT or not key or key in seen:
+            continue
+        seen.add(key)
+        result.append(
+            Relation(
+                kind=RelationKind.ALIAS,
+                target=Entity(type=entity_type, name=alias.name),
+                note=alias.type,
+                scope=scope,
+                sources=[Provenance(source=SOURCE, url=url)],
+            ),
+        )
+    return result
+
+
+def _label_entity(label: models.LabelRef) -> Entity:
+    return Entity(
+        type=EntityType.LABEL,
+        name=label.name,
+        url=page("label", label.id),
+        ids={IdKind.MUSICBRAINZ_LABEL: label.id},
+    )
+
+
+def artist_labels(artist: models.Artist) -> list[Relation]:
+    """Return the labels an artist had a recording contract with."""
+    url = page("artist", artist.id)
+    return [
+        Relation(
+            kind=RelationKind.LABEL,
+            target=_label_entity(relation.label),
+            note=relation.type,
+            scope=Scope.ARTIST,
+            sources=[Provenance(source=SOURCE, url=url)],
+        )
+        for relation in artist.relations
+        if relation.label is not None and relation.type == "recording contract"
+    ]
+
+
+def label_hierarchy(label: models.Label) -> list[Relation]:
+    """Return the labels that own the label or that it owns, such as imprints."""
+    url = page("label", label.id)
+    result = []
+    for relation in label.relations:
+        if relation.label is None or relation.type not in _SUBLABEL_TYPES:
+            continue
+        kind = (
+            RelationKind.SUBLABEL if relation.direction == "forward" else RelationKind.PARENT_LABEL
+        )
+        result.append(
+            Relation(
+                kind=kind,
+                target=_label_entity(relation.label),
+                note=relation.type,
+                scope=Scope.LABEL,
+                sources=[Provenance(source=SOURCE, url=url)],
+            ),
+        )
+    return result
+
+
+def label_artists(label: models.Label) -> list[Relation]:
+    """Return artists related to the label, such as its founders and signed artists."""
+    url = page("label", label.id)
+    result = []
+    for relation in label.relations:
+        if relation.artist is None:
+            continue
+        attributes = ", ".join(relation.attributes)
+        result.append(
+            Relation(
+                kind=RelationKind.ASSOCIATED,
+                target=Entity(
+                    type=EntityType.ARTIST,
+                    name=relation.artist.name,
+                    url=page("artist", relation.artist.id),
+                    ids={IdKind.MUSICBRAINZ_ARTIST: relation.artist.id},
+                ),
+                note=f"{relation.type}: {attributes}" if attributes else relation.type,
+                scope=Scope.LABEL,
+                sources=[Provenance(source=SOURCE, url=url)],
+            ),
+        )
+    return result
+
+
+def releases(groups: Iterable[models.ReleaseGroup], artist: models.Artist) -> list[Relation]:
+    """Return an artist's albums and EPs without secondary types, oldest first."""
+    url = page("artist", artist.id)
+    main = [
+        group
+        for group in groups
+        if group.primary_type in {"Album", "EP"} and not group.secondary_types
+    ]
+    main.sort(key=lambda group: (_date_key(group.first_release_date), group.title))
+    return [
+        Relation(
+            kind=RelationKind.RELEASE,
+            target=Entity(
+                type=EntityType.RELEASE,
+                name=group.title,
+                artist=credit_name(group.artist_credit) or None,
+                date=group.first_release_date or None,
+                url=page("release-group", group.id),
+                ids={IdKind.MUSICBRAINZ_RELEASE_GROUP: group.id},
+            ),
+            note=group.primary_type,
+            scope=Scope.ARTIST,
+            sources=[Provenance(source=SOURCE, url=url)],
+        )
+        for group in main[:RELEASES_LIMIT]
+    ]
+
+
+def artist_candidate(artist: models.Artist) -> ArtistCandidate:
+    """Describe an artist with the Wikidata and Discogs identifiers of its URL relations."""
+    ids = {
+        IdKind.MUSICBRAINZ_ARTIST: artist.id,
+        **url_ids(artist.relations, (IdKind.DISCOGS_ARTIST,)),
+    }
+    return ArtistCandidate(
+        name=artist.name,
+        disambiguation=artist.disambiguation or None,
+        type=ARTIST_TYPES.get(artist.type) if artist.type is not None else None,
+        country=artist.country,
+        begin=artist.life_span.begin,
+        end=artist.life_span.end,
+        ids=ids,
+        url=page("artist", artist.id),
+    )
+
+
+def label_candidate(label: models.Label) -> LabelCandidate:
+    """Describe a label with the Wikidata and Discogs identifiers of its URL relations."""
+    ids = {
+        IdKind.MUSICBRAINZ_LABEL: label.id,
+        **url_ids(label.relations, (IdKind.DISCOGS_LABEL,)),
+    }
+    return LabelCandidate(
+        name=label.name,
+        disambiguation=label.disambiguation or None,
+        country=label.country,
+        begin=label.life_span.begin,
+        end=label.life_span.end,
+        ids=ids,
+        url=page("label", label.id),
+    )

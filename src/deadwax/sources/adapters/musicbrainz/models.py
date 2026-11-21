@@ -72,6 +72,27 @@ class RecordingRef(ApiModel):
     artist_credit: list[ArtistCredit] = Field(default=[], alias="artist-credit")
 
 
+class LabelRef(ApiModel):
+    """Label of a release."""
+
+    id: str
+    name: str
+
+
+class LifeSpan(ApiModel):
+    """Dates an artist or label was active, possibly partial."""
+
+    begin: str | None = None
+    end: str | None = None
+
+
+class Alias(ApiModel):
+    """Other name of an artist or label."""
+
+    name: str
+    type: str | None = None
+
+
 class Relation(ApiModel):
     """Typed relationship to another entity or a URL."""
 
@@ -80,6 +101,7 @@ class Relation(ApiModel):
     target_type: str = Field(alias="target-type")
     attributes: list[str] = []
     artist: ArtistRef | None = None
+    label: LabelRef | None = None
     url: UrlRef | None = None
     work: WorkRef | None = None
     recording: RecordingRef | None = None
@@ -107,13 +129,6 @@ class RecordingSearch(ApiModel):
     """Result of a recording search."""
 
     recordings: list[Recording] = []
-
-
-class LabelRef(ApiModel):
-    """Label of a release."""
-
-    id: str
-    name: str
 
 
 class LabelInfo(ApiModel):
@@ -183,12 +198,50 @@ class Work(ApiModel):
 
 
 class Artist(ApiModel):
-    """Artist with its relations."""
+    """Artist from a lookup or a search, with its relations."""
 
     id: str
     name: str
     type: str | None = None
+    disambiguation: str = ""
+    country: str | None = None
+    life_span: LifeSpan = Field(default=LifeSpan(), alias="life-span")
+    aliases: list[Alias] = []
+    tags: list[Tag] = []
+    genres: list[Tag] = []
     relations: list[Relation] = []
+
+
+class ArtistSearch(ApiModel):
+    """Result of an artist search."""
+
+    artists: list[Artist] = []
+
+
+class Label(ApiModel):
+    """Label from a lookup or a search, with its relations."""
+
+    id: str
+    name: str
+    disambiguation: str = ""
+    country: str | None = None
+    life_span: LifeSpan = Field(default=LifeSpan(), alias="life-span")
+    aliases: list[Alias] = []
+    tags: list[Tag] = []
+    genres: list[Tag] = []
+    relations: list[Relation] = []
+
+
+class LabelSearch(ApiModel):
+    """Result of a label search."""
+
+    labels: list[Label] = []
+
+
+class ReleaseGroupBrowse(ApiModel):
+    """Page of an artist's release groups."""
+
+    release_groups: list[ReleaseGroup] = Field(default=[], alias="release-groups")
 
 
 class UrlEntity(ApiModel):

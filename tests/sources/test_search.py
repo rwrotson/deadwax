@@ -4,7 +4,11 @@ import httpx
 import pytest
 
 from deadwax.core import (
+    ArtistIdentity,
     EntityKind,
+    ExternalId,
+    IdKind,
+    LabelIdentity,
     Link,
     LinkTarget,
     LookupContext,
@@ -23,7 +27,7 @@ from deadwax.core import (
 )
 from deadwax.sources import LookupConfig, SourceSettings, parse_query
 from deadwax.sources._http import HttpResources
-from deadwax.sources._search import SearchHit, SearchPageAdapter, pick_hit, search_key
+from deadwax.sources._search import SearchHit, SearchPageAdapter, name_key, pick_hit, search_key
 
 SOURCES = [Provenance(source="musicbrainz")]
 
@@ -208,3 +212,40 @@ def test_pick_hit_traces_the_hits_it_compared(
         ("/driving", "no_match"),
         ("/missing", "match"),
     ]
+
+
+def test_name_key_takes_the_query_name() -> None:
+    query = parse_query("Burial", EntityKind.ARTIST)
+
+    key = name_key(query, LookupContext(query=query))
+
+    assert key is not None
+    assert (key.name, key.kind, dict(key.ids)) == ("Burial", EntityKind.ARTIST, {})
+
+
+def test_name_key_of_a_url_takes_the_name_and_ids_found_earlier() -> None:
+    query = parse_query("https://www.discogs.com/artist/166535")
+    identity = ArtistIdentity(
+        name=Sourced(value="Burial", sources=SOURCES),
+        external_ids=[
+            ExternalId(kind=IdKind.MUSICBRAINZ_ARTIST, value="a", sources=SOURCES),
+            ExternalId(kind=IdKind.MUSICBRAINZ_ARTIST, value="b", sources=SOURCES),
+        ],
+    )
+
+    key = name_key(query, LookupContext(query=query, identity=identity))
+
+    assert key is not None
+    assert key.name == "Burial"
+    assert dict(key.ids) == {IdKind.MUSICBRAINZ_ARTIST: "a", IdKind.DISCOGS_ARTIST: "166535"}
+
+
+def test_name_key_ignores_an_identity_of_another_kind() -> None:
+    query = parse_query("https://www.discogs.com/artist/166535")
+    identity = LabelIdentity(name=Sourced(value="Hyperdub", sources=SOURCES))
+
+    assert name_key(query, LookupContext(query=query, identity=identity)) is None
+
+
+def test_name_key_of_a_record_query_is_none() -> None:
+    assert name_key(TRACK, LookupContext(query=TRACK)) is None

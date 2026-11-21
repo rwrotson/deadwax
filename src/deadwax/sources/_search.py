@@ -6,11 +6,17 @@ from urllib.parse import urljoin
 
 from deadwax.core import (
     AlbumQuery,
+    ArtistIdentity,
+    ArtistQuery,
     Entity,
     EntityKind,
     EntityType,
+    IdKind,
+    LabelIdentity,
+    LabelQuery,
     LookupContext,
     Lookups,
+    NameKey,
     NotFoundError,
     Partial,
     Provenance,
@@ -54,6 +60,25 @@ def search_key(query: Query, context: LookupContext) -> RecordKey | None:
         kind=kind,
         version=identity.version,
     )
+
+
+def name_key(query: Query, context: LookupContext) -> NameKey | None:
+    """Return the artist or label to look for, with the identifiers known so far.
+
+    The name is the query's, else the one an earlier pass found for a URL query.
+    """
+    if not isinstance(query, ArtistQuery | LabelQuery):
+        return None
+    ids: dict[IdKind, str] = {}
+    name = query.name
+    identity = context.identity
+    if isinstance(identity, ArtistIdentity | LabelIdentity) and identity.kind is query.kind:
+        for external in identity.external_ids:
+            ids.setdefault(external.kind, external.value)
+        if name is None and identity.name is not None:
+            name = identity.name.value
+    ids |= query.ids
+    return None if name is None else NameKey(name=name, kind=query.kind, ids=ids)
 
 
 @dataclass(frozen=True, slots=True)

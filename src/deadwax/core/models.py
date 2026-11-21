@@ -78,11 +78,23 @@ class RelationKind(StrEnum):
     MEMBER = "member"
     PROJECT = "project"
 
-    # Another artist-to-artist relation; the note names its MusicBrainz type.
+    # Another relation to an artist; the note names its source type, such as 'founder'.
     ASSOCIATED = "associated"
 
+    # Another name of the artist or label, such as an alias or a name variation.
+    ALIAS = "alias"
+
     LABEL = "label"
+    PARENT_LABEL = "parent_label"
+
+    # Imprint or label owned by the queried label.
+    SUBLABEL = "sublabel"
+
     LABEL_RELEASE = "label_release"
+
+    # A main release of the queried artist.
+    RELEASE = "release"
+
     APPEARS_ON = "appears_on"
     COMPILATION = "compilation"
     MIX = "mix"

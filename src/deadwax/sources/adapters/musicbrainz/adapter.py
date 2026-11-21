@@ -3,12 +3,16 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from deadwax.core import (
+    ArtistQuery,
     Capability,
     EntityKind,
+    EntityType,
     IdKind,
+    LabelQuery,
     LinkTarget,
     LookupContext,
     Lookups,
+    NameKey,
     NotFoundError,
     Partial,
     Pass,
@@ -23,7 +27,7 @@ from deadwax.core import (
     trace,
 )
 from deadwax.sources._adapter import HttpAdapter
-from deadwax.sources._search import TRACED_HITS, search_key
+from deadwax.sources._search import TRACED_HITS, name_key, search_key
 from deadwax.sources.adapters.musicbrainz import models
 from deadwax.sources.adapters.musicbrainz import parse as p
 
@@ -37,6 +41,11 @@ _RELEASE_INC = "labels+release-groups+url-rels+artist-rels"
 _ALBUM_RELEASE_INC = f"{_RELEASE_INC}+recordings+recording-level-rels"
 _WORK_INC = "recording-rels+url-rels+artist-rels+artist-credits"
 _URL_INC = "recording-rels+release-rels+release-group-rels"
+_ARTIST_INC = "aliases+tags+genres+url-rels+artist-rels+label-rels"
+_LABEL_INC = "aliases+tags+genres+url-rels+label-rels+artist-rels"
+_NAME_URL_INC = "artist-rels+label-rels"
+_NAME_SEARCH_LIMIT = "25"
+_BROWSE_LIMIT = "100"
 _SEARCH_LIMIT = "100"
 _MAIN_RELEASES = "status:official AND primarytype:(album OR single OR ep)"
 
@@ -45,8 +54,16 @@ _RESOLVED_IDS = (
     IdKind.MUSICBRAINZ_RECORDING,
     IdKind.MUSICBRAINZ_RELEASE,
     IdKind.MUSICBRAINZ_RELEASE_GROUP,
+    IdKind.MUSICBRAINZ_ARTIST,
+    IdKind.MUSICBRAINZ_LABEL,
     IdKind.SPOTIFY,
 )
+
+# Identifier kind of each name kind's MusicBrainz entity.
+_NAME_IDS = {
+    EntityKind.ARTIST: IdKind.MUSICBRAINZ_ARTIST,
+    EntityKind.LABEL: IdKind.MUSICBRAINZ_LABEL,
+}
 
 type Target = tuple[EntityKind, str]
 
@@ -106,8 +123,121 @@ class MusicBrainzAdapter(HttpAdapter):
 
     @property
     def lookups(self) -> Lookups:
-        """Recordings and release groups; an identifier or URL tells which."""
-        return Lookups(track=self.find, album=self.find, unresolved=self.find)
+        """Recordings, release groups, artists, and labels; an identifier or URL tells which."""
+        return Lookups(
+            track=self.find,
+            album=self.find,
+            artist=self.find_artist,
+            label=self.find_label,
+            unresolved=self.find,
+        )
+
+    async def find_artist(self, query: ArtistQuery, context: LookupContext) -> Partial:
+        """Find the artist and collect their tags, aliases, relations, releases, and links."""
+        mbid = await self._name_target(query, context)
+        artist = await self._get(models.Artist, f"artist/{mbid}", inc=_ARTIST_INC)
+        url = p.page("artist", artist.id)
+        relations = [
+            *p.artist_relations(artist),
+            *p.artist_labels(artist),
+            *p.aliases(artist, EntityType.ARTIST, Scope.ARTIST, url),
+        ]
+        if context.wants(Capability.RELATIONS):
+            groups = await self._get(
+                models.ReleaseGroupBrowse,
+                "release-group",
+                artist=artist.id,
+                type="album|ep",
+                limit=_BROWSE_LIMIT,
+                **{"release-group-status": "website-default"},
+            )
+            relations += p.releases(groups.release_groups, artist)
+        return Partial(
+            source=self.name,
+            candidate=p.artist_candidate(artist),
+            tags=p.tags(artist.tags, artist.genres, Scope.ARTIST, url),
+            relations=relations,
+            links=p.links(artist.relations, LinkTarget.ARTIST, url),
+        )
+
+    async def find_label(self, query: LabelQuery, context: LookupContext) -> Partial:
+        """Find the label and collect its tags, aliases, owners, imprints, artists, and links."""
+        mbid = await self._name_target(query, context)
+        label = await self._get(models.Label, f"label/{mbid}", inc=_LABEL_INC)
+        url = p.page("label", label.id)
+        return Partial(
+            source=self.name,
+            candidate=p.label_candidate(label),
+            tags=p.tags(label.tags, label.genres, Scope.LABEL, url),
+            relations=[
+                *p.label_hierarchy(label),
+                *p.label_artists(label),
+                *p.aliases(label, EntityType.LABEL, Scope.LABEL, url),
+            ],
+            links=p.links(label.relations, LinkTarget.LABEL, url),
+        )
+
+    async def _name_target(self, query: ArtistQuery | LabelQuery, context: LookupContext) -> str:
+        """Return the MBID from the query or earlier passes, the query URL, or a name search."""
+        if (mbid := context.id(_NAME_IDS[query.kind])) is not None:
+            return mbid
+        if query.url is not None and (mbid := await self._name_by_url(query)) is not None:
+            return mbid
+        key = name_key(query, context)
+        if key is None:
+            raise NotFoundError("neither the query nor earlier sources name the record")
+        mbid = await self._search_name(key)
+        if mbid is None:
+            raise NotFoundError(f"no matching {query.kind} in MusicBrainz")
+        return mbid
+
+    async def _name_by_url(self, query: ArtistQuery | LabelQuery) -> str | None:
+        try:
+            entity = await self._get(
+                models.UrlEntity,
+                "url",
+                resource=query.url or "",
+                inc=_NAME_URL_INC,
+            )
+        except NotFoundError:
+            return None
+        for relation in entity.relations:
+            if query.kind is EntityKind.ARTIST and relation.artist is not None:
+                return relation.artist.id
+            if query.kind is EntityKind.LABEL and relation.label is not None:
+                return relation.label.id
+        return None
+
+    async def _search_name(self, key: NameKey) -> str | None:
+        entity = "artist" if key.kind is EntityKind.ARTIST else "label"
+        query = f"{entity}:{p.phrase(key.name)}"
+        found: Sequence[models.Artist | models.Label]
+        if key.kind is EntityKind.ARTIST:
+            search = await self._get(
+                models.ArtistSearch,
+                entity,
+                query=query,
+                limit=_NAME_SEARCH_LIMIT,
+            )
+            found = search.artists
+        else:
+            labels = await self._get(
+                models.LabelSearch,
+                entity,
+                query=query,
+                limit=_NAME_SEARCH_LIMIT,
+            )
+            found = labels.labels
+        ranked = p.rank_names(key, found, _NAME_IDS[key.kind])
+        trace(
+            logger,
+            TraceEvent.SEARCH_RANKED,
+            query=query,
+            results=len(found),
+            matched=[{"id": entity.id, "name": entity.name} for entity in ranked[:TRACED_HITS]],
+            picked=ranked[0].id if ranked else None,
+        )
+        return ranked[0].id if ranked else None
 
     async def find(self, query: Query, context: LookupContext) -> Partial:
         """Find the recording or release group and collect what MusicBrainz knows about it."""

@@ -61,8 +61,11 @@ Relation kinds are directional:
 | Kind | Target |
 |------|--------|
 | `member`, `project` | Band members; other projects of the artist or its members |
-| `associated` | Other related artists from MusicBrainz; `note` holds the relation type and its attributes, such as `supporting musician: guitar`, `subgroup`, or `tribute` |
+| `associated` | Other related artists from MusicBrainz; `note` holds the relation type and its attributes, such as `supporting musician: guitar`, `subgroup`, `tribute`, or, for a label, `label founder` and `recording contract` |
+| `alias` | Other names of the queried artist or label; `note` holds the alias type, such as `Legal name` |
 | `label`, `label_release` | The label; its other releases |
+| `parent_label`, `sublabel` | A label that owns the queried label; an imprint or label it owns |
+| `release` | Main albums and EPs of the queried artist, oldest first |
 | `appears_on`, `compilation` | Releases and compilations containing the record |
 | `mix`, `broadcast` | DJ mixes and broadcasts containing it |
 | `co_played` | Recordings directly before or after it in a radio episode or DJ set |

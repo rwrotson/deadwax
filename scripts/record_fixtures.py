@@ -94,6 +94,11 @@ SCENARIOS: dict[str, Query] = {
     "stronger_samples": parse_query("Kanye West - Stronger", EntityKind.TRACK),
     "reckoner": parse_query("Radiohead - Reckoner", EntityKind.TRACK),
     "soundcloud_url": parse_query("https://soundcloud.com/radiohead/paranoid-android"),
+    "aphex_twin": parse_query("Aphex Twin", EntityKind.ARTIST),
+    "warp": parse_query("Warp", EntityKind.LABEL),
+    "musicbrainz_artist_url": parse_query(
+        "https://musicbrainz.org/artist/f22942a1-6f70-4f48-866e-238cb2308fbd",
+    ),
 }
 
 
@@ -288,9 +293,8 @@ async def main() -> None:
         sys.stdout.write(f"{name}\n")
         dossier = await record(name, SCENARIOS[name], live)
         identity = dossier.identity
-        title = None
-        if isinstance(identity, RecordIdentity) and identity.title is not None:
-            title = identity.title.value
+        found = identity.title if isinstance(identity, RecordIdentity) else identity.name
+        title = None if found is None else found.value
         errors = [(error.source, error.kind.value) for error in dossier.errors]
         sys.stdout.write(f"  -> {title!r}; errors: {errors}\n")
 

@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md). The v2 source scope, closed v2 stages (8–17, 19, 20, R-1–R-6, M-1–M-3), their evidence, the Stage 18 access attempts, and the v2 decision log are archived in [`plans/v2.md`](plans/v2.md).
 
-- **Status:** v1 and v2 complete; v0.1.0 is the first tagged release (2026-11-20, GitHub only, no PyPI). Stage 18 (Rate Your Music) deferred until RYM is accessible; Boomkat and Norman Records remain access-limited. Stages E-1–E-3 (artist, label, and other record kinds): E-1 and E-2 done, E-3 next.
+- **Status:** v1 and v2 complete; v0.1.0 is the first tagged release (2026-11-20, GitHub only, no PyPI). Stage 18 (Rate Your Music) deferred until RYM is accessible; Boomkat and Norman Records remain access-limited. Stages E-1–E-3 (artist, label, and other record kinds): E-1 and E-2 done, E-3 in progress (step 1 of 6 done: groundwork and MusicBrainz).
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -74,7 +74,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Sections of closed
 | 20 | Done (RYM blocked, Forced Exposure HTTP 403, Norman disabled by the local allowlist) | Qualification; release v0.1.0. |
 | E-1 | Done | Per-kind lookup slots (`Lookups`), dispatch by the kind known in each pass, `SourceInfo.kinds`. |
 | E-2 | Done | Typed queries per kind, a model for artists and labels, CLI `--artist` and `--label`. |
-| E-3 | Planned | Artist and label lookups, MusicBrainz, Discogs, Last.fm, Wikipedia, and Bandcamp first. |
+| E-3 | In progress (MusicBrainz done) | Artist and label lookups, MusicBrainz, Discogs, Last.fm, Wikipedia, and Bandcamp first. |
 
 Common acceptance for source stages (9–19, and source work in E-3), in addition to each stage's own:
 
@@ -134,6 +134,24 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 ## Progress evidence and decision log
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
+
+### 2026-11-21 — E-3 progress, step 1 (groundwork and MusicBrainz)
+
+Decisions (user, 2026-11-21):
+- New relation kinds `alias`, `parent_label`, `sublabel` (directional), and `release` (main releases of the queried artist, capped); label discographies reuse `label_release`.
+- E-3 runs in six steps with a pause and commit suggestion after each: groundwork and MusicBrainz; Discogs; Last.fm (artists only, the API has no label methods); Wikipedia; Bandcamp; live invariants, docs, closing evidence.
+- Bandcamp gets artist and label slots; subdomain roots resolve to an artist or label only if a live check finds a reliable marker, otherwise they stay unresolved.
+- MusicBrainz is the hub for names as for records: enrichment sources take Discogs, Wikidata, and Bandcamp IDs and links from it and search by name only without them.
+
+Changed:
+- `core/models.py`: `RelationKind.ALIAS`, `PARENT_LABEL`, `SUBLABEL`, `RELEASE`; `associated` now also covers label-to-artist relations.
+- `sources/_search.py`: `name_key` (query name, else the name of an earlier pass for a URL query, with the known IDs).
+- MusicBrainz: `artist` and `label` slots; resolves its artist and label pages; MBID from the query or earlier passes, any URL through `ws/2/url`, else a name search ranked with `compare_names`. Artists: candidate with type, country, life span, Discogs artist and Wikidata IDs; tags, aliases (no search hints), artist relations, `recording contract` labels, up to 25 official albums and EPs without secondary types (`release-group` browse with `release-group-status=website-default`, skipped without the relations facet), links. Labels: hierarchy from `imprint` and `label ownership`, related artists as `associated`, aliases, tags, links.
+- Fixtures `aphex_twin`, `warp`, `musicbrainz_artist_url` (MusicBrainz only, recorded live 2026-11-21); tests in `tests/sources/adapters/musicbrainz/test_names.py`, `tests/sources/test_lookup_names.py`, `name_key` tests; docs: sources, output relation table, README, getting started.
+
+Checks: `uv run poe check` passed (1240 tests, coverage 97.08%); `uv run --group docs properdocs build --strict` passed. Live: `deadwax --artist "Aphex Twin" --sources musicbrainz --no-cache` and `deadwax --label Warp --sources musicbrainz --no-cache` give the expected identity, relations, and links; the Warp MusicBrainz URL resolves.
+
+Remaining: steps 2–6.
 
 ### 2026-11-21 — E-2 evidence (typed queries, artists and labels)
 
