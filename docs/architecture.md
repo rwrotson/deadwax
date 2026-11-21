@@ -156,6 +156,8 @@ Everything listed in `deadwax.__all__` is public and follows semantic versioning
 
 The library never reads the environment or `.env`. Only the CLI does, in `deadwax.cli.settings`; another application builds the library's settings objects itself and passes them as arguments.
 
+`deadwax.cli.settings.Settings` is a Pydantic `BaseSettings` with prefix `DEADWAX_` and nested delimiter `__`, built from library models: `log` is `LogSettings` (`DEADWAX_LOG__*`). Only `load_settings()` reads the environment and `.env`; empty values use defaults. The configuration page is generated from `Settings` by `docs/gen_config_page.py`.
+
 ## Logging
 
 Library modules log through `logging.getLogger(__name__)`. The `NullHandler` on `deadwax` keeps records silent until the application configures logging, and records then follow the application's levels and handlers.
@@ -182,4 +184,4 @@ The `deadwax` command calls it with `LogSettings` loaded from `DEADWAX_LOG__*`.
 | `RateLimitedError` | `SourceError` | The source kept answering 429 or asked to wait too long |
 | `NotFoundError` | `SourceError` | The source has no page for the request (HTTP 404) |
 
-Callers can catch `DeadwaxError` for all library failures or the built-in base for a specific one. Add a subclass for each new kind of expected failure. Unexpected exceptions are not wrapped. A failing adapter does not raise out of a lookup; its failure is recorded in the dossier.
+Callers can catch `DeadwaxError` for all library failures or the built-in base for a specific one. Add a subclass for each new kind of expected failure, also subclassing a built-in exception when callers would reasonably catch it. Unexpected exceptions are not wrapped. A failing adapter does not raise out of a lookup; its failure is recorded in the dossier.

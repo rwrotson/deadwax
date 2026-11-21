@@ -7,7 +7,7 @@ This is the active specification and multi-session handoff for deadwax. deadwax 
 - **Status:** v1 and v2 complete; v0.1.0 is the first tagged release (2026-11-20, GitHub only, no PyPI). Stage 18 (Rate Your Music) deferred until RYM is accessible; Boomkat and Norman Records remain access-limited. Stages E-1–E-3 (artist, label, and other record kinds): E-1 and E-2 done, E-3 in progress (step 1 of 6 done: groundwork and MusicBrainz).
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
-- Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
+- Read `AGENTS.md` (and the nested `AGENTS.md` of the area you change), `docs/architecture.md` (import rules R1–R9), and `CONTRIBUTING.md` before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
 - Before changing a v1 adapter, read its rows in the decision log of `plans/v1.md`; before changing a v2 adapter, its stage and evidence in `plans/v2.md`.
 
 ### Accepted decisions

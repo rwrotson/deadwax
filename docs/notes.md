@@ -42,6 +42,14 @@ major_version_zero = true
 
 The `commit-msg` hook checks Conventional Commit format.
 
+## CI Workflows
+
+`.github/workflows/ci.yml` triggers on push and pull request to `main` and `dev` and is reusable via `workflow_call`. Its permissions are `contents: read`, and actions are pinned to commit SHAs. The `build` job smoke-tests the wheel with a base install without extras, then with the `cli` extra.
+
+`.github/workflows/release.yml` runs on version tags (`v*`) and `workflow_dispatch`. It runs CI first; on tags it checks that the tag matches `uv version --short`, builds `dist/`, and publishes it (below). The `docs` job deploys the site to GitHub Pages through the `github-pages` environment: Pages Source must be **GitHub Actions** (Settings → Pages), and the environment must allow `v*` tags. Site: https://rwrotson.github.io/deadwax/
+
+Dependabot opens weekly grouped pull requests for uv dependencies, GitHub Actions, and pre-commit hooks (`.github/dependabot.yml`).
+
 ## Publishing
 
 The release workflow publishes version tags to PyPI with [Trusted Publishing](https://docs.pypi.org/trusted-publishers/) only when the repository variable `PUBLISH_TO_PYPI` is `true` (Settings → Secrets and variables → Actions → Variables). Without it, a release builds the package and deploys documentation; install a tagged version from GitHub instead. To publish, on PyPI add a trusted publisher with the repository owner and name, workflow `release.yml`, and environment `pypi`; for a project that does not exist on PyPI yet, add it as a pending publisher. Create the `pypi` environment in the GitHub repository settings, optionally with required reviewers.

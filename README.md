@@ -158,7 +158,7 @@ uv build
 uv run --group docs properdocs build --strict
 ```
 
-Repository conventions for contributors and coding agents are in [`AGENTS.md`](https://github.com/rwrotson/deadwax/blob/main/AGENTS.md); layers and import rules in [the architecture guide](https://rwrotson.github.io/deadwax/architecture/). Commits follow [Conventional Commits](https://www.conventionalcommits.org/); `uv run cz bump` bumps the version, updates `CHANGELOG.md`, and tags the release.
+Contribution rules (checks, dependencies, settings, docstrings, commits and versioning) are in [`CONTRIBUTING.md`](https://github.com/rwrotson/deadwax/blob/main/CONTRIBUTING.md); instructions for coding agents in [`AGENTS.md`](https://github.com/rwrotson/deadwax/blob/main/AGENTS.md); layers and import rules in [the architecture guide](https://rwrotson.github.io/deadwax/architecture/).
 
 ## Project Structure
 

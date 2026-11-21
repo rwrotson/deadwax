@@ -120,6 +120,8 @@ constraint-dependencies = [
 [tool.uv.build-backend]
 module-name = "deadwax"
 module-root = "src"
+# Agent instructions in the source tree are not package data.
+wheel-exclude = ["**/AGENTS.md"]
 
 
 # PYTEST -----------------------------------------------------------------------
