@@ -4,10 +4,14 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from deadwax.core.events import TraceEvent, trace, trace_scope
-from deadwax.core.matching import RecordKey, Verdict, compare
+from deadwax.core.matching import NameKey, RecordKey, Verdict, compare, compare_names
 from deadwax.core.models import (
     AdapterError,
+    ArtistCandidate,
+    ArtistIdentity,
+    ArtistType,
     Attributed,
+    Candidate,
     Discrepancy,
     Dossier,
     Entity,
@@ -17,6 +21,8 @@ from deadwax.core.models import (
     Fact,
     Facts,
     Identity,
+    LabelCandidate,
+    LabelIdentity,
     LabelRef,
     Link,
     LinkTarget,
@@ -24,6 +30,7 @@ from deadwax.core.models import (
     Partial,
     Provenance,
     RecordCandidate,
+    RecordIdentity,
     Relation,
     RelationKind,
     Scope,
@@ -42,7 +49,15 @@ from deadwax.core.normalize import (
     shingle_overlap,
     strip_ellipsis,
 )
-from deadwax.core.query import EntityKind, Query, normalize_code
+from deadwax.core.query import (
+    AlbumQuery,
+    ArtistQuery,
+    EntityKind,
+    LabelQuery,
+    Query,
+    TrackQuery,
+    normalize_code,
+)
 from deadwax.core.versions import parse_title
 
 logger = logging.getLogger(__name__)
@@ -66,6 +81,22 @@ _SCOPE_ORDER = {
         Scope.ARTIST,
         Scope.LABEL,
     ),
+    EntityKind.ARTIST: (
+        Scope.ARTIST,
+        Scope.LABEL,
+        Scope.RELEASE_GROUP,
+        Scope.RELEASE,
+        Scope.RECORDING,
+        Scope.WORK,
+    ),
+    EntityKind.LABEL: (
+        Scope.LABEL,
+        Scope.ARTIST,
+        Scope.RELEASE_GROUP,
+        Scope.RELEASE,
+        Scope.RECORDING,
+        Scope.WORK,
+    ),
 }
 _LINK_ORDER = {
     EntityKind.TRACK: (
@@ -82,6 +113,20 @@ _LINK_ORDER = {
         LinkTarget.LABEL,
         LinkTarget.OTHER,
     ),
+    EntityKind.ARTIST: (
+        LinkTarget.ARTIST,
+        LinkTarget.LABEL,
+        LinkTarget.ALBUM,
+        LinkTarget.TRACK,
+        LinkTarget.OTHER,
+    ),
+    EntityKind.LABEL: (
+        LinkTarget.LABEL,
+        LinkTarget.ARTIST,
+        LinkTarget.ALBUM,
+        LinkTarget.TRACK,
+        LinkTarget.OTHER,
+    ),
 }
 _TEXT_ORDER = tuple(TextKind)
 _RELATION_ORDER = tuple(RelationKind)
@@ -94,23 +139,55 @@ class _Judgement:
     errors: list[AdapterError] = field(default_factory=list)
 
 
-def _candidate_key(candidate: RecordCandidate, kind: EntityKind | None = None) -> RecordKey:
-    return RecordKey(
-        artist=candidate.artist,
-        title=candidate.title,
-        kind=candidate.kind or kind,
-        version=candidate.version,
-    )
+type _Key = RecordKey | NameKey
 
 
-def _reference(query: Query, partials: Sequence[Partial]) -> RecordKey | None:
+def _candidate_key(candidate: Candidate, kind: EntityKind | None = None) -> _Key:
+    if isinstance(candidate, RecordCandidate):
+        return RecordKey(
+            artist=candidate.artist,
+            title=candidate.title,
+            kind=candidate.kind or kind,
+            version=candidate.version,
+        )
+    return NameKey(name=candidate.name, kind=candidate.kind, ids=candidate.ids)
+
+
+def _describe(candidate: Candidate) -> str:
+    if isinstance(candidate, RecordCandidate):
+        return f"{candidate.artist} - {candidate.title}"
+    return candidate.name
+
+
+def _reference(query: Query, partials: Sequence[Partial]) -> _Key | None:
     """Use the query text, or for a URL query the first candidate (the URL's own page)."""
-    if query.artist and query.title:
-        return RecordKey(artist=query.artist, title=query.title, kind=query.kind)
+    match query:
+        case (
+            TrackQuery(artist=str(artist), title=str(title))
+            | AlbumQuery(
+                artist=str(artist),
+                title=str(title),
+            )
+        ):
+            return RecordKey(artist=artist, title=title, kind=query.kind)
+        case ArtistQuery(name=str(name)) | LabelQuery(name=str(name)):
+            return NameKey(name=name, kind=query.kind)
     for partial in partials:
         if partial.candidate is not None:
             return _candidate_key(partial.candidate, query.kind)
     return None
+
+
+def _compare(reference: _Key, candidate: _Key) -> tuple[Verdict, dict[str, float]]:
+    """Compare keys of one family; a record and a name never match."""
+    if isinstance(reference, RecordKey) and isinstance(candidate, RecordKey):
+        match = compare(reference, candidate)
+        scores = {"artist_score": match.artist_score, "title_score": match.title_score}
+        return match.verdict, scores
+    if isinstance(reference, NameKey) and isinstance(candidate, NameKey):
+        name_match = compare_names(reference, candidate)
+        return name_match.verdict, {"name_score": name_match.name_score}
+    return Verdict.NO_MATCH, {}
 
 
 def _provenance(partial: Partial) -> Provenance:
@@ -118,7 +195,7 @@ def _provenance(partial: Partial) -> Provenance:
     return Provenance(source=partial.source, url=url)
 
 
-def _judge(reference: RecordKey | None, partials: Iterable[Partial]) -> _Judgement:
+def _judge(reference: _Key | None, partials: Iterable[Partial]) -> _Judgement:
     judgement = _Judgement()
     for partial in partials:
         judgement.errors.extend(partial.errors)
@@ -127,16 +204,14 @@ def _judge(reference: RecordKey | None, partials: Iterable[Partial]) -> _Judgeme
             judgement.accepted.append(partial)
             continue
         with trace_scope(source=partial.source):
-            match = compare(reference, _candidate_key(candidate))
+            verdict, scores = _compare(reference, _candidate_key(candidate))
             trace(
                 logger,
                 TraceEvent.MERGE_JUDGE,
-                verdict=match.verdict,
-                artist_score=round(match.artist_score, 3),
-                title_score=round(match.title_score, 3),
+                verdict=verdict,
+                **{name: round(score, 3) for name, score in scores.items()},
                 candidate_url=candidate.url,
             )
-        verdict = match.verdict
         if verdict is Verdict.MATCH:
             judgement.accepted.append(partial)
         elif verdict is Verdict.OTHER_VERSION:
@@ -146,8 +221,7 @@ def _judge(reference: RecordKey | None, partials: Iterable[Partial]) -> _Judgeme
                 AdapterError(
                     source=partial.source,
                     kind=ErrorKind.NO_MATCH,
-                    reason=f"best candidate '{candidate.artist} - {candidate.title}' "
-                    "does not match the query",
+                    reason=f"best candidate '{_describe(candidate)}' does not match the query",
                     url=candidate.url,
                 ),
             )
@@ -225,7 +299,7 @@ def _version_discrepancy(
     others = [
         (_version_label(_resolve_version(partial.candidate)), _provenance(partial))
         for partial in other_versions
-        if partial.candidate is not None
+        if isinstance(partial.candidate, RecordCandidate)
     ]
     if not others:
         return None
@@ -269,7 +343,7 @@ def _codes(
 
 
 def _external_ids(
-    matched: list[tuple[RecordCandidate, Provenance]],
+    matched: Sequence[tuple[Candidate, Provenance]],
 ) -> tuple[list[ExternalId], list[Discrepancy]]:
     ids: dict[tuple[str, str], ExternalId] = {}
     for candidate, provenance in matched:
@@ -299,10 +373,26 @@ def build_identity(
     other_versions: list[Partial],
 ) -> Identity:
     """Combine the candidates of matching partials into one identity with its discrepancies."""
+    candidates = [partial.candidate for partial in accepted if partial.candidate is not None]
+    kind = query.kind or next((c.kind for c in candidates if c.kind is not None), None)
+    match kind:
+        case EntityKind.ARTIST:
+            return _artist_identity(accepted)
+        case EntityKind.LABEL:
+            return _label_identity(accepted)
+        case _:
+            return _record_identity(kind, accepted, other_versions)
+
+
+def _record_identity(
+    kind: EntityKind | None,
+    accepted: list[Partial],
+    other_versions: list[Partial],
+) -> RecordIdentity:
     matched = [
         (partial.candidate, _provenance(partial))
         for partial in accepted
-        if partial.candidate is not None
+        if isinstance(partial.candidate, RecordCandidate)
     ]
 
     artist, artist_conflict = _consensus(
@@ -340,10 +430,8 @@ def build_identity(
         key_conflict,
         *id_conflicts,
     ]
-    kinds = [candidate.kind for candidate, _ in matched if candidate.kind is not None]
-
-    return Identity(
-        kind=query.kind or (kinds[0] if kinds else None),
+    return RecordIdentity(
+        kind=kind,
         artist=artist,
         title=title,
         version=version,
@@ -356,6 +444,108 @@ def build_identity(
         copyrights=_codes(matched, lambda c: c.copyrights, normalize_copyright),
         external_ids=external_ids,
         discrepancies=[conflict for conflict in conflicts if conflict is not None],
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _NameParts:
+    """Fields artists and labels share, agreed between sources, with what sources dispute."""
+
+    name: Sourced[str] | None
+    disambiguation: Sourced[str] | None
+    country: Sourced[str] | None
+    begin: Sourced[str] | None
+    end: Sourced[str] | None
+    external_ids: list[ExternalId]
+    discrepancies: list[Discrepancy]
+
+
+def _date(
+    name: str,
+    dates: Iterable[tuple[str | None, Provenance]],
+) -> tuple[Sourced[str] | None, Discrepancy | None]:
+    return _consensus(name, ((date, date[:4], p) for date, p in dates if date), _most_precise)
+
+
+def _name_parts(
+    matched: Sequence[tuple[ArtistCandidate | LabelCandidate, Provenance]],
+    name_key: Callable[[str], str],
+) -> _NameParts:
+    name, name_conflict = _consensus("name", ((c.name, name_key(c.name), p) for c, p in matched))
+    disambiguation, disambiguation_conflict = _consensus(
+        "disambiguation",
+        (
+            (c.disambiguation, normalize_text(c.disambiguation), p)
+            for c, p in matched
+            if c.disambiguation
+        ),
+    )
+    country, country_conflict = _consensus(
+        "country",
+        ((c.country, normalize_text(c.country), p) for c, p in matched if c.country),
+    )
+    begin, begin_conflict = _date("begin", ((c.begin, p) for c, p in matched))
+    end, end_conflict = _date("end", ((c.end, p) for c, p in matched))
+    external_ids, id_conflicts = _external_ids(matched)
+    conflicts = [
+        name_conflict,
+        disambiguation_conflict,
+        country_conflict,
+        begin_conflict,
+        end_conflict,
+        *id_conflicts,
+    ]
+    return _NameParts(
+        name=name,
+        disambiguation=disambiguation,
+        country=country,
+        begin=begin,
+        end=end,
+        external_ids=external_ids,
+        discrepancies=[conflict for conflict in conflicts if conflict is not None],
+    )
+
+
+def _artist_identity(accepted: list[Partial]) -> ArtistIdentity:
+    matched = [
+        (partial.candidate, _provenance(partial))
+        for partial in accepted
+        if isinstance(partial.candidate, ArtistCandidate)
+    ]
+    parts = _name_parts(matched, normalize_artist)
+    agreed, type_conflict = _consensus(
+        "type",
+        ((c.type, c.type, p) for c, p in matched if c.type is not None),
+    )
+    return ArtistIdentity(
+        name=parts.name,
+        disambiguation=parts.disambiguation,
+        type=None
+        if agreed is None
+        else Sourced(value=ArtistType(agreed.value), sources=agreed.sources),
+        country=parts.country,
+        begin=parts.begin,
+        end=parts.end,
+        external_ids=parts.external_ids,
+        discrepancies=[*parts.discrepancies, *([type_conflict] if type_conflict else [])],
+    )
+
+
+def _label_identity(accepted: list[Partial]) -> LabelIdentity:
+    matched = [
+        (partial.candidate, _provenance(partial))
+        for partial in accepted
+        if isinstance(partial.candidate, LabelCandidate)
+    ]
+    parts = _name_parts(matched, normalize_text)
+    return LabelIdentity(
+        name=parts.name,
+        disambiguation=parts.disambiguation,
+        country=parts.country,
+        begin=parts.begin,
+        end=parts.end,
+        external_ids=parts.external_ids,
+        discrepancies=parts.discrepancies,
     )
 
 
@@ -599,7 +789,9 @@ def _facts(kind: EntityKind, accepted: list[Partial], other_versions: list[Parti
 
     found_relations = (relation for p in accepted for relation in p.relations)
     version_relations = (
-        _other_version_relation(p, p.candidate) for p in other_versions if p.candidate is not None
+        _other_version_relation(p, p.candidate)
+        for p in other_versions
+        if isinstance(p.candidate, RecordCandidate)
     )
     relations = _dedupe((*found_relations, *version_relations), _relation_key, _combine_relations)
     metrics = _dedupe((metric for p in accepted for metric in p.metrics), _metric_key)

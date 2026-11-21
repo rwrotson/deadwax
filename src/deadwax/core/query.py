@@ -3,10 +3,18 @@ import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Self
+from typing import Annotated, Literal, Self, assert_never
 from urllib.parse import parse_qs, urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Discriminator,
+    Field,
+    Tag,
+    field_validator,
+    model_validator,
+)
 
 from deadwax.core.errors import InvalidQueryError
 
@@ -16,6 +24,8 @@ class EntityKind(StrEnum):
 
     TRACK = "track"
     ALBUM = "album"
+    ARTIST = "artist"
+    LABEL = "label"
 
 
 class IdKind(StrEnum):
@@ -40,20 +50,24 @@ class IdKind(StrEnum):
     SOUNDCLOUD = "soundcloud"
     BEATPORT_TRACK = "beatport_track"
     BEATPORT_RELEASE = "beatport_release"
+    BEATPORT_ARTIST = "beatport_artist"
+    BEATPORT_LABEL = "beatport_label"
     ISRC = "isrc"
 
 
-class Query(BaseModel):
-    """What to look up: artist and title of a track or album, or a URL of a record page."""
+# Tag of the query, identity, or candidate variant whose kind is not known.
+UNRESOLVED = "unresolved"
 
+
+def _isrc_misfit(kind: EntityKind | None) -> str:
+    article = "an" if str(kind)[0] in "aeiou" else "a"
+    return f"an ISRC identifies a track, not {article} {kind}"
+
+
+class _QueryBase(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    kind: EntityKind | None = Field(
-        default=None,
-        description="Track or album; a URL query may leave it to the resolver",
-    )
-    artist: str | None = None
-    title: str | None = None
+    kind: EntityKind | None = None
     url: str | None = None
     ids: dict[IdKind, str] = Field(
         default_factory=dict,
@@ -67,16 +81,106 @@ class Query(BaseModel):
             return ids | {IdKind.ISRC: isrc_code(ids[IdKind.ISRC])}
         return ids
 
+    def _forbid_isrc(self) -> None:
+        if IdKind.ISRC in self.ids:
+            raise ValueError(_isrc_misfit(self.kind))
+
+
+class _RecordQuery(_QueryBase):
+    artist: str | None = None
+    title: str | None = None
+
     @model_validator(mode="after")
     def _require_target(self) -> Self:
-        if self.url is None:
-            if not (self.artist and self.title):
-                raise ValueError("a query needs an artist and a title, or a URL")
-            if self.kind is None:
-                raise ValueError("a text query must state whether it is an album or a track")
-        if IdKind.ISRC in self.ids and self.kind is EntityKind.ALBUM:
-            raise ValueError("an ISRC identifies a track, not an album")
+        if self.url is None and not (self.artist and self.title):
+            raise ValueError("a query needs an artist and a title, or a URL")
         return self
+
+
+class TrackQuery(_RecordQuery):
+    """Track named by artist and title, or the URL of its page."""
+
+    kind: Literal[EntityKind.TRACK] = EntityKind.TRACK
+
+
+class AlbumQuery(_RecordQuery):
+    """Album named by artist and title, or the URL of its page."""
+
+    kind: Literal[EntityKind.ALBUM] = EntityKind.ALBUM
+
+    @model_validator(mode="after")
+    def _check_ids(self) -> Self:
+        self._forbid_isrc()
+        return self
+
+
+class _NameQuery(_QueryBase):
+    name: str | None = None
+
+    @model_validator(mode="after")
+    def _require_target(self) -> Self:
+        if self.url is None and not self.name:
+            raise ValueError("a query needs a name or a URL")
+        self._forbid_isrc()
+        return self
+
+
+class ArtistQuery(_NameQuery):
+    """Artist named by name, or the URL of their page."""
+
+    kind: Literal[EntityKind.ARTIST] = EntityKind.ARTIST
+
+
+class LabelQuery(_NameQuery):
+    """Label named by name, or the URL of its page."""
+
+    kind: Literal[EntityKind.LABEL] = EntityKind.LABEL
+
+
+class UnresolvedQuery(_QueryBase):
+    """URL of a page whose record kind only the resolving source can tell."""
+
+    kind: None = None
+    url: str
+
+
+def kind_tag(value: object) -> str:
+    """Name the variant of a query, identity, or candidate by its kind, given as model or JSON."""
+    kind = value.get("kind") if isinstance(value, dict) else getattr(value, "kind", None)
+    return UNRESOLVED if kind is None else str(kind)
+
+
+type RecordQuery = TrackQuery | AlbumQuery
+type NameQuery = ArtistQuery | LabelQuery
+
+type Query = Annotated[
+    Annotated[TrackQuery, Tag(EntityKind.TRACK)]
+    | Annotated[AlbumQuery, Tag(EntityKind.ALBUM)]
+    | Annotated[ArtistQuery, Tag(EntityKind.ARTIST)]
+    | Annotated[LabelQuery, Tag(EntityKind.LABEL)]
+    | Annotated[UnresolvedQuery, Tag(UNRESOLVED)],
+    Discriminator(kind_tag),
+]
+
+_QUERIES: dict[EntityKind, type[TrackQuery | AlbumQuery | ArtistQuery | LabelQuery]] = {
+    EntityKind.TRACK: TrackQuery,
+    EntityKind.ALBUM: AlbumQuery,
+    EntityKind.ARTIST: ArtistQuery,
+    EntityKind.LABEL: LabelQuery,
+}
+
+
+def with_kind(query: Query, kind: EntityKind | None) -> Query:
+    """Turn a query of unknown kind into the query of a kind found later, keeping URL and ids."""
+    if not isinstance(query, UnresolvedQuery) or kind is None:
+        return query
+    ids = query.ids
+
+    # A resolver may find that an ISRC given with the URL does not fit the record.
+    if kind is not EntityKind.TRACK:
+        ids = {id_kind: value for id_kind, value in ids.items() if id_kind is not IdKind.ISRC}
+
+    return _QUERIES[kind](url=query.url, ids=ids)
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,17 +263,37 @@ def isrc_ids(isrc: str | None, kind: EntityKind | None) -> dict[IdKind, str]:
     """Identifiers of a query from an ISRC the caller gives, checked against the query kind."""
     if isrc is None:
         return {}
-    if kind is EntityKind.ALBUM:
-        raise InvalidQueryError("an ISRC identifies a track, not an album")
+    if kind not in {EntityKind.TRACK, None}:
+        raise InvalidQueryError(_isrc_misfit(kind))
     return {IdKind.ISRC: isrc_code(isrc)}
 
 
+def url_query(url: str, kind: EntityKind | None, ids: dict[IdKind, str]) -> Query:
+    """Build the query of a record page URL, of a known kind or left to the resolver."""
+    if kind is None:
+        return UnresolvedQuery(url=url, ids=ids)
+    return _QUERIES[kind](url=url, ids=ids)
+
+
 def text_query(text: str, kind: EntityKind | None, *, isrc: str | None = None) -> Query:
-    """Build a query from 'Artist - Title' text and, optionally, the track's ISRC."""
+    """Build a query from 'Artist - Title' text or a name and, optionally, the track's ISRC."""
     text = text.strip()
     if not text:
         raise InvalidQueryError("the query is empty")
-    artist, title = _split_artist_title(text)
     if kind is None:
-        raise InvalidQueryError("state whether the query is an album or a track")
-    return Query(kind=kind, artist=artist, title=title, ids=isrc_ids(isrc, kind))
+        raise InvalidQueryError("state whether the query is a track, album, artist, or label")
+    ids = isrc_ids(isrc, kind)
+    match kind:
+        case EntityKind.ARTIST | EntityKind.LABEL:
+            name = _unquote(text)
+            if not name:
+                raise InvalidQueryError("the query is empty")
+            return ArtistQuery(name=name) if kind is EntityKind.ARTIST else LabelQuery(name=name)
+        case EntityKind.TRACK:
+            artist, title = _split_artist_title(text)
+            return TrackQuery(artist=artist, title=title, ids=ids)
+        case EntityKind.ALBUM:
+            artist, title = _split_artist_title(text)
+            return AlbumQuery(artist=artist, title=title)
+        case _:
+            assert_never(kind)

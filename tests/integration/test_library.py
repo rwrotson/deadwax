@@ -9,7 +9,9 @@ from deadwax import (
     ErrorKind,
     LookupConfig,
     PerSourceSettings,
+    RecordIdentity,
     TextKind,
+    TrackQuery,
     lookup,
     parse_query,
     parse_title,
@@ -90,6 +92,7 @@ def live_config() -> LookupConfig:
 def summary(name: str, dossier: Dossier) -> str:
     """One report line: what was found, by whom, and which sources gave up."""
     identity = dossier.identity
+    assert isinstance(identity, RecordIdentity)
     if identity.title is None or identity.artist is None:
         found = "not found"
     else:
@@ -123,8 +126,10 @@ async def test_library_track(
     facts = [*dossier.tags, *dossier.credits, *dossier.texts, *dossier.relations, *dossier.links]
     assert all(fact.sources for fact in facts)
     identity = dossier.identity
+    assert isinstance(identity, RecordIdentity)
     if identity.artist is None or identity.title is None:
         return
+    assert isinstance(query, TrackQuery)
     assert query.artist is not None
     assert query.title is not None
     reference = RecordKey(query.artist, query.title, EntityKind.TRACK)

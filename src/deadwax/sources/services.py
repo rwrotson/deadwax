@@ -12,6 +12,7 @@ from deadwax.core import (
     isrc_ids,
     recognize_url,
     text_query,
+    url_query,
 )
 
 
@@ -62,6 +63,11 @@ SERVICES = (
                 EntityKind.ALBUM,
                 IdKind.SPOTIFY,
             ),
+            UrlRule(
+                re.compile(r"^(?:/intl-[a-z]+)?/artist/(?P<id>\w+)"),
+                EntityKind.ARTIST,
+                IdKind.SPOTIFY,
+            ),
         ),
     ),
     Service(
@@ -85,6 +91,11 @@ SERVICES = (
                 EntityKind.ALBUM,
                 IdKind.APPLE_MUSIC,
             ),
+            UrlRule(
+                re.compile(r"^/[a-z]{2}/artist/(?:[^/]+/)?(?P<id>\d+)"),
+                EntityKind.ARTIST,
+                IdKind.APPLE_MUSIC,
+            ),
         ),
     ),
     Service(
@@ -99,6 +110,11 @@ SERVICES = (
             UrlRule(
                 re.compile(r"^(?:/[a-z]{2})?/album/(?P<id>\d+)"),
                 EntityKind.ALBUM,
+                IdKind.DEEZER,
+            ),
+            UrlRule(
+                re.compile(r"^(?:/[a-z]{2})?/artist/(?P<id>\d+)"),
+                EntityKind.ARTIST,
                 IdKind.DEEZER,
             ),
         ),
@@ -130,6 +146,16 @@ SERVICES = (
                 re.compile(r"^(?:/[a-z]{2})?/release/[^/]+/(?P<id>\d+)"),
                 EntityKind.ALBUM,
                 IdKind.BEATPORT_RELEASE,
+            ),
+            UrlRule(
+                re.compile(r"^(?:/[a-z]{2})?/artist/[^/]+/(?P<id>\d+)"),
+                EntityKind.ARTIST,
+                IdKind.BEATPORT_ARTIST,
+            ),
+            UrlRule(
+                re.compile(r"^(?:/[a-z]{2})?/label/[^/]+/(?P<id>\d+)"),
+                EntityKind.LABEL,
+                IdKind.BEATPORT_LABEL,
             ),
         ),
     ),
@@ -224,6 +250,16 @@ SERVICES = (
                 EntityKind.ALBUM,
                 IdKind.MUSICBRAINZ_RELEASE,
             ),
+            UrlRule(
+                re.compile(rf"^/artist/{_MBID}"),
+                EntityKind.ARTIST,
+                IdKind.MUSICBRAINZ_ARTIST,
+            ),
+            UrlRule(
+                re.compile(rf"^/label/{_MBID}"),
+                EntityKind.LABEL,
+                IdKind.MUSICBRAINZ_LABEL,
+            ),
         ),
         link=False,
     ),
@@ -240,6 +276,16 @@ SERVICES = (
                 re.compile(r"^(?:/[^/]+)?/master/(?P<id>\d+)"),
                 EntityKind.ALBUM,
                 IdKind.DISCOGS_MASTER,
+            ),
+            UrlRule(
+                re.compile(r"^(?:/[^/]+)?/artist/(?P<id>\d+)"),
+                EntityKind.ARTIST,
+                IdKind.DISCOGS_ARTIST,
+            ),
+            UrlRule(
+                re.compile(r"^(?:/[^/]+)?/label/(?P<id>\d+)"),
+                EntityKind.LABEL,
+                IdKind.DISCOGS_LABEL,
             ),
         ),
         link=False,
@@ -271,7 +317,9 @@ def link_target(url: str, default: LinkTarget) -> LinkTarget:
         return LinkTarget.TRACK
     if kind is EntityKind.ALBUM:
         return LinkTarget.ALBUM
-    if re.search(r"/(?:artist|channel|user)/", urlsplit(url).path):
+    if kind is EntityKind.LABEL:
+        return LinkTarget.LABEL
+    if kind is EntityKind.ARTIST or re.search(r"/(?:artist|channel|user)/", urlsplit(url).path):
         return LinkTarget.ARTIST
     return default
 
@@ -284,7 +332,7 @@ def _url_query(url: str, kind: EntityKind | None, isrc: str | None) -> Query:
     if kind is not None and url_kind is not None and kind != url_kind:
         raise InvalidQueryError(f"the URL points to a {url_kind}, but a {kind} was requested")
     kind = kind or url_kind
-    return Query(kind=kind, url=url, ids=ids | isrc_ids(isrc, kind))
+    return url_query(url, kind, ids | isrc_ids(isrc, kind))
 
 
 def parse_query(

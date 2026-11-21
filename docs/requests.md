@@ -23,12 +23,12 @@ request = Request(
 
 | Field | Meaning |
 |-------|---------|
-| `query` | The record, as for `lookup()`; `parse_query(text, kind, isrc=...)` adds a known ISRC to `Query.ids` |
+| `query` | The record, as for `lookup()`: a `TrackQuery`, `AlbumQuery`, `ArtistQuery`, `LabelQuery`, or `UnresolvedQuery`; `parse_query(text, kind, isrc=...)` builds one and adds a known ISRC to its `ids` |
 | `facets` | Kinds of facts wanted (`Capability`); unset means all of them |
 | `tags_per_source` | At most this many tags from each source, in merge order; unset means no cap |
 | `relations` | Relation kinds wanted, each with an optional target type and a cap per source; unset means every kind without a cap, an empty tuple means none |
 
-Facets are the adapter capabilities: `identity`, `links`, `previews`, `tags`, `credits`, `texts`, `relations`, `metrics`. `previews` are links with a `preview_url` (iTunes, Spotify, Deezer, Bandcamp). Bandcamp's preview is a signed stream URL that expires about a day after the page was fetched; use it soon after the lookup. On the command line, `--facets tags,previews` sets `Request.facets`.
+Facets are the adapter capabilities: `identity`, `links`, `previews`, `tags`, `credits`, `texts`, `relations`, `metrics`. For an artist or label, texts are biographies and profiles, tags are genres, relations are members, labels, and similar artists, metrics are listener counts, and links are service pages; `credits` and `previews` apply only to tracks and albums. `previews` are links with a `preview_url` (iTunes, Spotify, Deezer, Bandcamp). Bandcamp's preview is a signed stream URL that expires about a day after the page was fetched; use it soon after the lookup. On the command line, `--facets tags,previews` sets `Request.facets`.
 
 ### Which sources run
 
@@ -44,7 +44,7 @@ After the merge the dossier is trimmed to the request. `identity`, `errors`, and
 
 ### ISRC
 
-A track query may carry the ISRC the caller knows (`IdKind.ISRC` in `Query.ids`, normalized to 12 uppercase characters; a malformed one, or one on an album query, is rejected). MusicBrainz looks it up before searching, and Spotify searches by it. It is input, not a fact: the dossier's `identity.isrcs` lists only ISRCs that sources report.
+A track query may carry the ISRC the caller knows (`IdKind.ISRC` in the query's `ids`, normalized to 12 uppercase characters; a malformed one, or one on an album, artist, or label query, is rejected). MusicBrainz looks it up before searching, and Spotify searches by it. It is input, not a fact: the dossier's `identity.isrcs` lists only ISRCs that sources report.
 
 ## Client
 

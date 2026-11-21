@@ -3,11 +3,11 @@ import pytest
 
 from deadwax.core import (
     EntityKind,
-    Identity,
     LinkTarget,
     LookupContext,
     NotFoundError,
     Provenance,
+    RecordIdentity,
     Sourced,
     SourceError,
     SourceState,
@@ -119,7 +119,7 @@ async def test_album_playlists_from_the_identity_of_a_url_query() -> None:
     sources = [Provenance(source="spotify")]
     context = LookupContext(
         query=query,
-        identity=Identity(
+        identity=RecordIdentity(
             kind=EntityKind.ALBUM,
             artist=Sourced(value="Radiohead", sources=sources),
             title=Sourced(value="OK Computer", sources=sources),

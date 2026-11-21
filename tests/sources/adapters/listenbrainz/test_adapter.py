@@ -8,12 +8,12 @@ from deadwax.core import (
     EntityKind,
     EntityType,
     ExternalId,
-    Identity,
     IdKind,
     LookupContext,
     MetricKind,
     NotFoundError,
     Provenance,
+    RecordIdentity,
     RelationKind,
     Scope,
     TextKind,
@@ -89,7 +89,7 @@ def make(
 def context(kind: EntityKind, *ids: tuple[IdKind, str]) -> LookupContext:
     query = parse_query("Band - Song", kind)
     sources = [Provenance(source="musicbrainz")]
-    identity = Identity(
+    identity = RecordIdentity(
         kind=kind,
         external_ids=[ExternalId(kind=k, value=v, sources=sources) for k, v in ids],
     )

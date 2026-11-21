@@ -16,6 +16,7 @@ from deadwax.core import (
     NotFoundError,
     Partial,
     Query,
+    RecordCandidate,
     RelationKind,
     Scope,
     SourceError,
@@ -119,7 +120,7 @@ async def test_release_page_with_text_genres_label_and_also_bought() -> None:
 
     assert urls(seen) == [TRUANT]
     candidate = partial.candidate
-    assert candidate is not None
+    assert isinstance(candidate, RecordCandidate)
     assert (candidate.kind, candidate.artist, candidate.title, candidate.date, candidate.url) == (
         EntityKind.ALBUM,
         "BURIAL",
@@ -168,7 +169,7 @@ async def test_release_search_takes_the_first_edition_listed() -> None:
     )
 
     assert urls(seen) == [f"{SEARCH}Truant/0", TRUANT_CD]
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.title == "Truant / Rough Sleeper"
 
 
@@ -189,7 +190,7 @@ async def test_track_is_found_by_artist_on_the_release_that_lists_it() -> None:
 
     assert urls(seen) == [f"{SEARCH}Rough%20Sleeper/0", f"{SEARCH}Burial/0", TRUANT]
     candidate = partial.candidate
-    assert candidate is not None
+    assert isinstance(candidate, RecordCandidate)
     assert (candidate.kind, candidate.artist, candidate.title) == (
         EntityKind.TRACK,
         "BURIAL",
@@ -236,7 +237,7 @@ async def test_product_url_with_paragraphs_and_a_format_in_the_title() -> None:
 
     assert urls(seen) == [COLONIAL_SAVED]
     candidate = partial.candidate
-    assert candidate is not None
+    assert isinstance(candidate, RecordCandidate)
     assert (candidate.artist, candidate.title, candidate.url) == (
         "HUERCO S.",
         "Colonial Patterns",
@@ -279,7 +280,7 @@ async def test_bare_page_without_canonical_url() -> None:
 
     partial = await looked_up(adapter, parse_query(f"{TRUANT}?ref=x"))
 
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert (partial.candidate.url, partial.candidate.title, partial.candidate.labels) == (
         TRUANT,
         "Untrue",

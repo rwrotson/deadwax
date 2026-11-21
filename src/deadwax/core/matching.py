@@ -1,17 +1,19 @@
 import logging
 import re
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from enum import StrEnum
 
 from deadwax.core.events import TraceEvent, trace
 from deadwax.core.models import VersionInfo, VersionKind
 from deadwax.core.normalize import normalize_artist, normalize_text, split_artists
-from deadwax.core.query import EntityKind
+from deadwax.core.query import EntityKind, IdKind
 from deadwax.core.versions import parse_title
 
 ARTIST_THRESHOLD = 0.85
 TITLE_THRESHOLD = 0.85
+NAME_THRESHOLD = 0.85
 
 # Score for an artist found as one name of a collaboration rather than the whole credit.
 COLLABORATION_SCORE = 0.9
@@ -68,12 +70,33 @@ class RecordKey:
 
 
 @dataclass(frozen=True, slots=True)
+class NameKey:
+    """Fields that identify an artist or label for matching."""
+
+    name: str
+    kind: EntityKind
+    ids: Mapping[IdKind, str] = field(default_factory=dict)
+
+    def describe(self) -> dict[str, object]:
+        """Return the key as JSON values for trace events."""
+        return {"name": self.name, "kind": self.kind, "ids": dict(self.ids)}
+
+
+@dataclass(frozen=True, slots=True)
 class Match:
     """Scores and verdict of one comparison."""
 
     verdict: Verdict
     artist_score: float
     title_score: float
+
+
+@dataclass(frozen=True, slots=True)
+class NameMatch:
+    """Score and verdict of comparing two artists or labels."""
+
+    verdict: Verdict
+    name_score: float
 
 
 def key_similarity(left: str, right: str) -> float:
@@ -163,3 +186,47 @@ def compare(reference: RecordKey, candidate: RecordKey) -> Match:
         failed=failed,
     )
     return Match(verdict=verdict, artist_score=artist_score, title_score=title_score)
+
+
+def name_similarity(left: str, right: str, kind: EntityKind) -> float:
+    """Compare names of artists, accepting one name of a collaboration, or of labels."""
+    if kind is EntityKind.ARTIST:
+        return artist_similarity(left, right)
+    return key_similarity(normalize_text(left), normalize_text(right))
+
+
+def _ids_agree(reference: NameKey, candidate: NameKey) -> bool | None:
+    """Whether identifiers of a shared namespace agree; None when no namespace is shared."""
+    shared = reference.ids.keys() & candidate.ids.keys()
+    if not shared:
+        return None
+    return any(reference.ids[kind] == candidate.ids[kind] for kind in shared)
+
+
+def compare_names(reference: NameKey, candidate: NameKey) -> NameMatch:
+    """Decide whether a candidate is the reference artist or label.
+
+    An identifier both carry decides; otherwise the names must be similar. Namesakes are
+    told apart only by identifiers.
+    """
+    name_score = name_similarity(reference.name, candidate.name, reference.kind)
+    failed: list[str] = []
+    if reference.kind != candidate.kind:
+        failed.append("kind")
+    ids = _ids_agree(reference, candidate)
+    if ids is False:
+        failed.append("ids")
+    elif ids is None and name_score < NAME_THRESHOLD:
+        failed.append("name")
+    verdict = Verdict.NO_MATCH if failed else Verdict.MATCH
+
+    trace(
+        logger,
+        TraceEvent.MATCH_COMPARE,
+        reference=reference.describe(),
+        candidate=candidate.describe(),
+        name_score=round(name_score, 3),
+        verdict=verdict,
+        failed=failed,
+    )
+    return NameMatch(verdict=verdict, name_score=name_score)

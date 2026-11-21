@@ -10,14 +10,16 @@ from deadwax.core import (
     EntityKind,
     ErrorKind,
     ExternalId,
-    Identity,
     IdKind,
     LookupContext,
     NotFoundError,
     Provenance,
     Query,
+    RecordCandidate,
+    RecordIdentity,
     RelationKind,
     SourceState,
+    UnresolvedQuery,
 )
 from deadwax.sources import LookupConfig, parse_query
 from deadwax.sources._http import Fetcher, HttpResources
@@ -87,7 +89,7 @@ def with_ids(query: Query, **ids: str) -> LookupContext:
         ExternalId(kind=IdKind(kind), value=value, sources=[Provenance(source="musicbrainz")])
         for kind, value in ids.items()
     ]
-    return LookupContext(query=query, identity=Identity(external_ids=external))
+    return LookupContext(query=query, identity=RecordIdentity(external_ids=external))
 
 
 ALBUM = parse_query("Band - Record", EntityKind.ALBUM)
@@ -166,7 +168,7 @@ async def test_without_ids_or_token_the_search_is_skipped() -> None:
 
 @pytest.mark.asyncio
 async def test_nothing_to_search_for() -> None:
-    query = Query(url="https://example.com/x")
+    query = UnresolvedQuery(url="https://example.com/x")
 
     with pytest.raises(NotFoundError, match="neither the query"):
         await make(routes(), token="t").lookup(query, LookupContext(query=query))
@@ -187,7 +189,7 @@ async def test_track_search_with_a_token_finds_compilations() -> None:
 
     partial = await adapter.lookup(TRACK, LookupContext(query=TRACK))
 
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert (partial.candidate.kind, partial.candidate.title) == (EntityKind.TRACK, "Song")
     kinds = {r.kind for r in partial.relations}
     assert {RelationKind.COMPILATION, RelationKind.APPEARS_ON} <= kinds

@@ -9,16 +9,19 @@ import pytest
 from typer.testing import CliRunner
 
 from deadwax import (
+    ArtistQuery,
     Capability,
     ConfigurationError,
     Dossier,
     EntityKind,
     Escalation,
-    Identity,
     IdKind,
+    LabelQuery,
     LookupConfig,
     Query,
+    RecordIdentity,
     Request,
+    TrackQuery,
 )
 from deadwax.cli import app as app_module
 from deadwax.cli.app import EXIT_NOTHING_MATCHED, EXIT_USAGE, app, select_runs
@@ -79,6 +82,7 @@ def test_query_without_subcommand_runs_a_lookup(fake: FakeLookup) -> None:
 
     assert result.exit_code == 0, result.output
     [(query, config, include, exclude)] = fake.calls
+    assert isinstance(query, TrackQuery)
     assert (query.kind, query.artist, query.title) == (
         EntityKind.TRACK,
         "Everything but the Girl",
@@ -271,7 +275,7 @@ def test_formats(fake: FakeLookup, dossier: Dossier, output: str) -> None:
 
 
 def test_nothing_matched_exits_3(fake: FakeLookup, dossier: Dossier) -> None:
-    fake.dossier = dossier.model_copy(update={"identity": Identity()})
+    fake.dossier = dossier.model_copy(update={"identity": RecordIdentity()})
 
     result = runner.invoke(app, ["--track", "a - b"])
 
@@ -283,7 +287,9 @@ def test_nothing_matched_exits_3(fake: FakeLookup, dossier: Dossier) -> None:
     ("args", "message"),
     [
         (["--album", "--track", "a - b"], "mutually exclusive"),
-        (["a - b"], "album or a track"),
+        (["--artist", "--label", "Warp"], "mutually exclusive"),
+        (["--artist", "Aphex Twin", "--isrc", "GBAYE9701376"], "not an artist"),
+        (["a - b"], "track, album, artist, or label"),
         (["--track", "no separator"], "Artist - Title"),
         (["--album", "https://open.spotify.com/track/1"], "points to a track"),
         (["--track", "a - b", "--config", "missing.toml"], "configuration file not found"),
@@ -556,7 +562,7 @@ def test_exit_codes_give_the_outcome(
     outcome: RunOutcome,
     exit_code: int,
 ) -> None:
-    fake.dossier = fake.dossier.model_copy(update={"identity": Identity()})
+    fake.dossier = fake.dossier.model_copy(update={"identity": RecordIdentity()})
 
     result = runner.invoke(app, args)
 
@@ -613,7 +619,7 @@ def test_runs_lists_and_shows_runs(
 ) -> None:
     monkeypatch.setenv("COLUMNS", "300")
     runner.invoke(app, ["--track", "Everything but the Girl - Missing"])
-    fake.dossier = dossier.model_copy(update={"identity": Identity()})
+    fake.dossier = dossier.model_copy(update={"identity": RecordIdentity()})
     runner.invoke(app, ["--track", "Nobody - Nothing"])
 
     listed = runner.invoke(app, ["runs"])
@@ -674,3 +680,22 @@ def test_select_runs_applies_every_filter() -> None:
     assert select_runs(records, source="itunes") == []
     assert select_runs(records, kind="blocked") == [blocked]
     assert select_runs(records, text="e - f") == [rejected]
+
+
+@pytest.mark.parametrize(
+    ("flag", "expected"),
+    [
+        ("--artist", ArtistQuery(name="Aphex Twin")),
+        ("--label", LabelQuery(name="Aphex Twin")),
+    ],
+)
+def test_artist_and_label_flags_name_the_query_kind(
+    fake: FakeLookup,
+    flag: str,
+    expected: Query,
+) -> None:
+    result = runner.invoke(app, [flag, "Aphex Twin"])
+
+    assert result.exit_code == 0, result.output
+    [(query, *_)] = fake.calls
+    assert query == expected

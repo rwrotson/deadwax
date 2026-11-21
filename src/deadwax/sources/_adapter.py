@@ -14,6 +14,7 @@ from deadwax.core import (
     SourceGroup,
     SourceState,
     SourceStatus,
+    with_kind,
 )
 from deadwax.sources._http import ClientSpec, HttpClient, HttpResources, Profile
 from deadwax.sources.config import ClientSettings, LookupConfig, SourceSettings
@@ -139,10 +140,10 @@ class HttpAdapter(ABC):
 
     async def lookup(self, query: Query, context: LookupContext) -> Partial:
         """Run the lookup of the record kind the query or earlier passes established."""
-        lookup = self.lookups.get(context.kind)
+        lookup = self.lookups.bind(with_kind(query, context.kind))
         if lookup is None:
             raise NotFoundError(f"{self.name} does not look up a record of kind {context.kind}")
-        return await lookup(query, context)
+        return await lookup(context)
 
     async def aclose(self) -> None:
         """Close the HTTP client if it was opened."""

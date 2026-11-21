@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from urllib.parse import urljoin
 
 from deadwax.core import (
+    AlbumQuery,
     Entity,
     EntityKind,
     EntityType,
@@ -15,11 +16,13 @@ from deadwax.core import (
     Provenance,
     Query,
     RecordCandidate,
+    RecordIdentity,
     RecordKey,
     Relation,
     RelationKind,
     Scope,
     TraceEvent,
+    TrackQuery,
     Verdict,
     compare,
     trace,
@@ -36,10 +39,14 @@ logger = logging.getLogger(__name__)
 def search_key(query: Query, context: LookupContext) -> RecordKey | None:
     """Return what to search for: the query text, or what an earlier pass found for a URL query."""
     kind = query.kind or context.identity.kind
-    if query.artist and query.title:
+    if isinstance(query, TrackQuery | AlbumQuery) and query.artist and query.title:
         return RecordKey(artist=query.artist, title=query.title, kind=kind)
     identity = context.identity
-    if identity.artist is None or identity.title is None:
+    if (
+        not isinstance(identity, RecordIdentity)
+        or identity.artist is None
+        or identity.title is None
+    ):
         return None
     return RecordKey(
         artist=identity.artist.value,

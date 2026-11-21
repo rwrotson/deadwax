@@ -14,6 +14,8 @@ from deadwax.core import (
     NotFoundError,
     Partial,
     Query,
+    RecordCandidate,
+    RecordIdentity,
     RelationKind,
     Scope,
     SourceError,
@@ -115,7 +117,7 @@ async def test_release_by_search_with_review_label_and_date() -> None:
 
     assert urls(seen) == [SEARCH, UNTRUE]
     candidate = partial.candidate
-    assert candidate is not None
+    assert isinstance(candidate, RecordCandidate)
     assert (candidate.kind, candidate.artist, candidate.title, candidate.date, candidate.url) == (
         EntityKind.ALBUM,
         "BURIAL",
@@ -143,7 +145,7 @@ async def test_track_is_found_in_the_tracklist_of_its_release() -> None:
 
     assert urls(seen) == [SEARCH, UNTRUE]
     candidate = partial.candidate
-    assert candidate is not None
+    assert isinstance(candidate, RecordCandidate)
     assert (candidate.kind, candidate.title, candidate.date) == (
         EntityKind.TRACK,
         "Archangel",
@@ -163,8 +165,9 @@ async def test_the_todd_terry_club_mix_is_the_todd_terry_remix() -> None:
     dossier = merge(query, [partial], generated_at=NOW)
 
     assert urls(seen) == [SEARCH, MISSING_BLACK]
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.title == "Missing (Todd Terry club mix)"
+    assert isinstance(dossier.identity, RecordIdentity)
     assert dossier.identity.version.kind is VersionKind.REMIX
     assert [r.kind for r in dossier.relations] == [RelationKind.APPEARS_ON]
     assert [(t.name, t.kind) for t in dossier.tags] == [
@@ -185,7 +188,7 @@ async def test_the_original_is_found_on_the_album() -> None:
     )
 
     assert urls(seen) == [SEARCH, AMPLIFIED_HEART]
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.title == "Missing"
     assert partial.relations[0].target.name == (
         "Amplified Heart (25th Anniversary Edition) (half-speed remastered)"
@@ -199,7 +202,7 @@ async def test_unknown_label_and_missing_date_are_left_out() -> None:
     partial = await looked_up(adapter, parse_query(f"{MISSING_COLOURED}?ref=search"))
 
     assert urls(seen) == [MISSING_COLOURED]
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert (partial.candidate.labels, partial.candidate.date) == ([], None)
     assert partial.texts == []
 
@@ -227,7 +230,7 @@ async def test_page_without_canonical_link_keeps_the_requested_url() -> None:
 
     partial = await looked_up(adapter, parse_query(f"{UNTRUE}?ref=x"))
 
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert (partial.candidate.url, partial.candidate.date) == (UNTRUE, None)
     assert [t.name for t in partial.tags] == ["Dubstep"]
 

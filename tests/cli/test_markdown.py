@@ -3,8 +3,11 @@ from datetime import UTC, datetime
 from deadwax.cli.markdown import to_markdown
 from deadwax.core import (
     AdapterError,
+    ArtistCandidate,
+    ArtistType,
     CandidateLabel,
     Credit,
+    Dossier,
     Entity,
     EntityKind,
     EntityType,
@@ -16,7 +19,6 @@ from deadwax.core import (
     MetricKind,
     Partial,
     Provenance,
-    Query,
     Rating,
     RecordCandidate,
     Relation,
@@ -25,6 +27,7 @@ from deadwax.core import (
     Tag,
     Text,
     TextKind,
+    UnresolvedQuery,
     merge,
     text_query,
 )
@@ -199,8 +202,44 @@ def test_markdown_sections_and_sources() -> None:
 
 
 def test_markdown_of_empty_dossier_names_the_query() -> None:
-    by_url = merge(Query(url="https://example.com/x"), [], generated_at=NOW)
+    by_url = merge(UnresolvedQuery(url="https://example.com/x"), [], generated_at=NOW)
     by_text = merge(text_query("A - B", EntityKind.TRACK), [], generated_at=NOW)
 
     assert to_markdown(by_url) == "# https://example.com/x\n\n## Identity\n"
     assert to_markdown(by_text) == "# A - B\n\n## Identity\n\n- **Kind:** track\n"
+
+
+def artist_dossier() -> Dossier:
+    musicbrainz = [Provenance(source="musicbrainz", url="https://musicbrainz.org/artist/f22942a1")]
+    candidate = ArtistCandidate(
+        name="Aphex Twin",
+        disambiguation="Richard D. James",
+        type=ArtistType.PERSON,
+        country="GB",
+        begin="1971-08-18",
+        ids={IdKind.MUSICBRAINZ_ARTIST: "f22942a1"},
+        url=musicbrainz[0].url,
+    )
+    tags = [Tag(name="idm", scope=Scope.ARTIST, sources=musicbrainz)]
+    partial = Partial(source="musicbrainz", candidate=candidate, tags=tags)
+    return merge(text_query("Aphex Twin", EntityKind.ARTIST), [partial], generated_at=NOW)
+
+
+def test_markdown_of_an_artist_names_its_fields() -> None:
+    text = to_markdown(artist_dossier())
+
+    assert text.startswith("# Aphex Twin\n\n## Identity\n\n- **Kind:** artist\n")
+    source = "[musicbrainz](https://musicbrainz.org/artist/f22942a1)"
+    assert f"- **Name:** Aphex Twin ({source})" in text
+    assert f"- **Disambiguation:** Richard D. James ({source})" in text
+    assert f"- **Type:** person ({source})" in text
+    assert f"- **Country:** GB ({source})" in text
+    assert f"- **Begin:** 1971-08-18 ({source})" in text
+    assert f"- **musicbrainz_artist:** f22942a1 ({source})" in text
+    assert "- idm (tag, artist)" in text
+
+
+def test_markdown_of_a_label_without_sources_names_the_query() -> None:
+    dossier = merge(text_query("Warp", EntityKind.LABEL), [], generated_at=NOW)
+
+    assert to_markdown(dossier) == "# Warp\n\n## Identity\n\n- **Kind:** label\n"

@@ -11,6 +11,7 @@ from deadwax import (
     Dossier,
     ErrorKind,
     Provenance,
+    RecordIdentity,
     Relation,
     RelationKind,
     Sourced,
@@ -20,7 +21,15 @@ from deadwax import (
     TraceEvent,
 )
 from deadwax.cli.markdown import to_markdown
-from deadwax.cli.text import access_label, number, rating, relation_details, version_text
+from deadwax.cli.text import (
+    access_label,
+    identity_title,
+    name_fields,
+    number,
+    rating,
+    relation_details,
+    version_text,
+)
 from deadwax.logs import RunRecord
 
 # Longest text body shown in the terminal; JSON and Markdown keep the whole text.
@@ -74,8 +83,17 @@ def _identity_rows(dossier: Dossier) -> list[tuple[str, str, Text]]:
     rows: list[tuple[str, str, Text]] = []
     if identity.kind is not None:
         rows.append(("kind", identity.kind.value, Text()))
+    if isinstance(identity, RecordIdentity):
+        rows += _record_rows(identity)
+    else:
+        rows += [(name, *_sourced(value)) for name, value in name_fields(identity)]
+    rows += [(e.kind.value, e.value, _sources(e.sources)) for e in identity.external_ids]
+    return rows
+
+
+def _record_rows(identity: RecordIdentity) -> list[tuple[str, str, Text]]:
     named = (("artist", identity.artist), ("title", identity.title))
-    rows += [(name, *_sourced(value)) for name, value in named if value is not None]
+    rows = [(name, *_sourced(value)) for name, value in named if value is not None]
 
     rows.append(("version", version_text(identity.version), Text()))
     if identity.date is not None:
@@ -91,7 +109,6 @@ def _identity_rows(dossier: Dossier) -> list[tuple[str, str, Text]]:
     rows += [("ISRC", *_sourced(isrc)) for isrc in identity.isrcs]
     rows += [("UPC", *_sourced(upc)) for upc in identity.upcs]
     rows += [("copyright", *_sourced(line)) for line in identity.copyrights]
-    rows += [(e.kind.value, e.value, _sources(e.sources)) for e in identity.external_ids]
     return rows
 
 
@@ -236,10 +253,9 @@ def _errors(dossier: Dossier) -> list[Text | Table]:
 
 def pretty_dossier(dossier: Dossier) -> Group:
     """Lay the dossier out as terminal sections; every fact shows its sources."""
-    identity = dossier.identity
-    if identity.title is not None:
-        artist = f"{identity.artist.value} — " if identity.artist is not None else ""
-        title = Text(f"{artist}{identity.title.value}", style="bold")
+    heading = identity_title(dossier.identity)
+    if heading is not None:
+        title = Text(heading, style="bold")
     else:
         title = Text("Nothing matched the query", style="bold red")
 

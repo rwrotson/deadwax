@@ -2,7 +2,15 @@ from pathlib import Path
 
 import pytest
 
-from deadwax.core import EntityKind, RecordKey, SourceError, TextKind, Verdict, compare
+from deadwax.core import (
+    EntityKind,
+    RecordCandidate,
+    RecordKey,
+    SourceError,
+    TextKind,
+    Verdict,
+    compare,
+)
 from deadwax.sources.adapters.forcedexposure.parse import page_partial as forced_page
 from deadwax.sources.adapters.forcedexposure.parse import search_hits as forced_hits
 
@@ -20,7 +28,7 @@ def test_forced_exposure_saved_pages() -> None:
         page,
         "https://www.forcedexposure.com/Catalog/va-hyperdub-5-4-ep-12-/HDB.026EP.html",
     )
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.title == "Hyperdub 5.4 EP"
     assert partial.candidate.date == "2009-10-19"
     assert partial.texts[0].kind is TextKind.LABEL

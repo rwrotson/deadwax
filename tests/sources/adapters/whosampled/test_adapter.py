@@ -3,7 +3,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from deadwax import EntityKind, ErrorKind, Query, RelationKind
+from deadwax import ErrorKind, RelationKind, TrackQuery, UnresolvedQuery
 from deadwax.sources import PerSourceSettings, WhoSampledSettings
 from deadwax.sources.config import Escalation, LookupConfig
 from deadwax.sources.lookup import lookup
@@ -25,7 +25,7 @@ async def test_real_record_page_extracts_connections_and_sample_offsets() -> Non
         return httpx.Response(200, content=sample if "/sample/" in request.url.path else page)
 
     dossier = await lookup(
-        Query(kind=EntityKind.TRACK, artist="Daft Punk", title="One More Time"),
+        TrackQuery(artist="Daft Punk", title="One More Time"),
         config,
         include=["whosampled"],
         transport=httpx.MockTransport(respond),
@@ -54,7 +54,7 @@ async def test_missing_record_is_reported() -> None:
         ),
     )
     dossier = await lookup(
-        Query(kind=EntityKind.TRACK, artist="Daft Punk", title="One More Time"),
+        TrackQuery(artist="Daft Punk", title="One More Time"),
         config,
         include=["whosampled"],
         transport=httpx.MockTransport(lambda request: httpx.Response(404)),
@@ -76,7 +76,7 @@ async def test_redirect_to_the_artist_page_is_not_found() -> None:
         return httpx.Response(301, headers={"location": "https://www.whosampled.com/Radiohead/"})
 
     dossier = await lookup(
-        Query(kind=EntityKind.TRACK, artist="Radiohead", title="There There"),
+        TrackQuery(artist="Radiohead", title="There There"),
         config,
         include=["whosampled"],
         transport=httpx.MockTransport(respond),
@@ -95,7 +95,7 @@ async def test_blocked_page_is_reported() -> None:
         ),
     )
     dossier = await lookup(
-        Query(kind=EntityKind.TRACK, artist="Daft Punk", title="One More Time"),
+        TrackQuery(artist="Daft Punk", title="One More Time"),
         config,
         include=["whosampled"],
         transport=httpx.MockTransport(
@@ -118,7 +118,7 @@ async def test_different_version_adds_no_facts() -> None:
         ),
     )
     dossier = await lookup(
-        Query(kind=EntityKind.TRACK, artist="Daft Punk", title="One More Time (Extended Mix)"),
+        TrackQuery(artist="Daft Punk", title="One More Time (Extended Mix)"),
         config,
         include=["whosampled"],
         transport=httpx.MockTransport(lambda request: httpx.Response(200, content=page)),
@@ -137,7 +137,7 @@ async def test_direct_record_url_needs_no_search() -> None:
         ),
     )
     dossier = await lookup(
-        Query(url="https://www.whosampled.com/Daft-Punk/One-More-Time/"),
+        UnresolvedQuery(url="https://www.whosampled.com/Daft-Punk/One-More-Time/"),
         config,
         include=["whosampled"],
         transport=httpx.MockTransport(

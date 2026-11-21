@@ -18,6 +18,8 @@ from deadwax.core import (
     Partial,
     Provenance,
     Query,
+    RecordCandidate,
+    RecordIdentity,
     RelationKind,
     Scope,
     SourceError,
@@ -107,7 +109,7 @@ async def test_track_by_search_with_tempo_key_genre_and_charts() -> None:
         "Everything but the Girl Missing (Todd Terry Remix - Radio Edit)"
     )
     candidate = partial.candidate
-    assert candidate is not None
+    assert isinstance(candidate, RecordCandidate)
     assert (candidate.artist, candidate.title) == (
         "Everything But The Girl",
         "Missing (Todd Terry Remix - Radio Edit)",
@@ -162,6 +164,7 @@ async def test_another_mix_is_kept_out_of_the_record() -> None:
 
     # The page lists no full Todd Terry Remix; the first other version is read instead.
     assert urls(seen)[1:] == [REMIX_EDIT]
+    assert isinstance(dossier.identity, RecordIdentity)
     assert dossier.identity.bpm is None
     assert dossier.tags == []
     [relation] = dossier.relations
@@ -177,7 +180,7 @@ async def test_remixers_are_credits_not_artists() -> None:
     partial = await looked_up(adapter, parse_query(REMIX_EDIT))
 
     assert urls(seen) == [REMIX_EDIT]
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.artist == "Everything But The Girl"
     assert [(c.role, c.name, c.scope) for c in partial.credits] == [
         ("remixer", "CL McSpadden", Scope.RECORDING),
@@ -194,7 +197,7 @@ async def test_release_by_search() -> None:
 
     assert urls(seen) == [f"{SITE}/search/releases", NOTHING_LEFT]
     candidate = partial.candidate
-    assert candidate is not None
+    assert isinstance(candidate, RecordCandidate)
     assert (candidate.kind, candidate.artist, candidate.title, candidate.date) == (
         EntityKind.ALBUM,
         "Everything But The Girl",
@@ -214,7 +217,7 @@ async def test_release_url_is_read_without_searching() -> None:
     partial = await looked_up(adapter, parse_query(YOUNG_AND_DUMB))
 
     assert urls(seen) == [YOUNG_AND_DUMB]
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.labels[0].name == "Everything But The Girl"
 
 

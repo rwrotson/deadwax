@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md). Closed v2 stages (8–17, 19, R-1–R-5), their evidence, and the v2 decision log are archived in [`plans/v2.md`](plans/v2.md).
 
-- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1–R-6 done. Stages M-1–M-3 (2026-11-20, requests and data for the mixhound consumer) run before Stage 20; M-1–M-3 done. Stage 20 done on 2026-11-20; v0.1.0 is the first tagged release (GitHub only, no PyPI). Stages E-1–E-3 (2026-11-21, artist, label, and other record kinds) defined; E-1 done.
+- **Status:** v1 complete and committed. v2 source scope recorded (`## v2 sources`); v2 stages 8–20 defined; Stages 8–17 and 19 done, Stage 18 deferred until RYM is accessible (Boomkat and Norman Records remain access-limited). Structural refactoring stages R-1–R-6 (2026-11-19) run before Stage 20; R-1–R-6 done. Stages M-1–M-3 (2026-11-20, requests and data for the mixhound consumer) run before Stage 20; M-1–M-3 done. Stage 20 done on 2026-11-20; v0.1.0 is the first tagged release (GitHub only, no PyPI). Stages E-1–E-3 (2026-11-21, artist, label, and other record kinds) defined; E-1 and E-2 done.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` and `docs/architecture.md` (import rules R1–R9) before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -20,7 +20,7 @@ This is the active specification and multi-session handoff for deadwax. deadwax 
 | Streaming links | MusicBrainz URL relations, iTunes Search, and Deezer in the first two passes; Odesli reads the song.link page in the links pass. |
 | Language | Code, docs, plan journal, commit messages in English. |
 | Requests | Applications ask for facets (`Capability`), not sources; configuration decides which sources may run. One `Deadwax` client shares cache, rate limiters, and browsers across lookups; adapters are built per lookup (2026-11-20, `docs/requests.md`). |
-| Record kinds | Adapters dispatch by record kind through `Lookups`, one optional slot per kind (`track`, `album`, `unresolved`; `artist`, `label` from E-2): a typed visitor whose methods may be absent, so a new kind breaks no adapter and the orchestrator sees which kinds a source supports. Classic Visitor, `singledispatch`, and a global dispatch table were weighed and rejected (2026-11-21). |
+| Record kinds | Adapters dispatch by record kind through `Lookups`, one optional slot per kind (`track`, `album`, `artist`, `label`, `unresolved`), each typed by its query; identities and candidates are unions by kind (2026-11-21): a typed visitor whose methods may be absent, so a new kind breaks no adapter and the orchestrator sees which kinds a source supports. Classic Visitor, `singledispatch`, and a global dispatch table were weighed and rejected (2026-11-21). |
 | Git | No agent commits; stop after each stage with a Conventional Commit suggestion (AGENTS.md "Commit Handoff"). |
 
 ### Product contract
@@ -130,7 +130,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Sections of closed
 | M-3 | Done | Bandcamp stream previews, ISRC in queries. |
 | 20 | Done (RYM blocked, Forced Exposure HTTP 403, Norman disabled by the local allowlist) | Qualification; release v0.1.0. |
 | E-1 | Done | Per-kind lookup slots (`Lookups`), dispatch by the kind known in each pass, `SourceInfo.kinds`. |
-| E-2 | Planned | Typed queries per kind, a model for artists and labels, CLI `--artist` and `--label`. |
+| E-2 | Done | Typed queries per kind, a model for artists and labels, CLI `--artist` and `--label`. |
 | E-3 | Planned | Artist and label lookups, MusicBrainz, Discogs, Last.fm, Wikipedia, and Bandcamp first. |
 
 Common acceptance for source stages 9–19, in addition to each stage's own:
@@ -204,7 +204,7 @@ Agreed with the user on 2026-11-21. deadwax will look up artists and labels, and
   - URL rules for artist and label pages; CLI `--artist`, `--label`; README, docs, `.env.example`.
 - **E-3 (sources).** `artist` and `label` slots, MusicBrainz, Discogs, Last.fm, Wikipedia, and Bandcamp first; live invariants for the new kinds in `tests/integration`.
 
-**Suggested messages:** `refactor!: dispatch adapter lookups by record kind`; E-2 and E-3 at their end.
+**Suggested messages:** `refactor!: dispatch adapter lookups by record kind`; `feat!: add typed queries and a model for artists and labels`; E-3 at its end.
 
 ### Later, unscheduled: automation masking for Cloudflare-protected sources
 
@@ -231,6 +231,28 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 ## Progress evidence and decision log
 
 Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
+
+### 2026-11-21 — E-2 evidence (typed queries, artists and labels)
+
+Decisions (user, 2026-11-21):
+- `Identity` and the candidate are unions discriminated by `kind` with a common base (`IdentityBase`: `kind`, `external_ids`, `discrepancies`), not one identity with nested per-kind parts and not a flat identity with an extra `name`.
+- Artists and labels get a base field set now, before any source fills it: `name`, `disambiguation`, `country`, `begin`, `end`; artists also `type` (`ArtistType`).
+- `--artist` and `--label` take the whole text as the name. A query of a kind no selected source looks up gets an explicit `unsupported` error (source `deadwax`) instead of an empty dossier.
+
+Changed:
+- `core/query.py`: `EntityKind.ARTIST`, `LABEL`; `IdKind.BEATPORT_ARTIST`, `BEATPORT_LABEL`; `Query` is a discriminated union of `TrackQuery`, `AlbumQuery`, `ArtistQuery`, `LabelQuery`, `UnresolvedQuery` (callable discriminator, since `None` cannot be a literal tag); `with_kind` promotes a URL query to the kind found later (dropping an ISRC that does not fit), `url_query`; `text_query` builds every kind; an ISRC is rejected on all but tracks.
+- `core/models.py`: `RecordIdentity`, `ArtistIdentity`, `LabelIdentity` (`Identity` union, `found` per class); `RecordCandidate` (kind checked to be track, album, or unknown), `ArtistCandidate`, `LabelCandidate` (`Candidate` union); `ErrorKind.UNSUPPORTED`.
+- `core/adapter.py`: slots typed by their query (`TrackLookup` … `UnresolvedLookup`), `Lookups.artist`, `label`; `Lookups.bind(query)` replaces `get`, `supports(kind)`; `Capability` meanings for artists and labels.
+- `core/matching.py`: `NameKey`, `compare_names` (a shared identifier namespace decides, else name similarity; `MATCH` or `NO_MATCH` only). `core/merge.py`: reference and judgement per family, a record and a name never match; name identities by consensus with discrepancies on name, disambiguation, country, begin, end, type, and ids; scope and link orders for artists and labels. `core/orchestrator.py`: `unsupported` error, each pass's context query promoted with `with_kind`, `pass.start` identity summary per class.
+- `sources`: URL rules for MusicBrainz and Discogs artist and label pages, Spotify, Deezer, and Apple Music artist pages, Beatport artist and label pages; `link_target` maps them. Last.fm and Resident Advisor have no service entry, so their artist URLs wait for E-3; Bandcamp subdomain roots stay unresolved (artist or label). `search_key`, Spotify, Deezer, 1001Tracklists narrowed to record types; adapters keep `query: Query` signatures, which fit the typed slots.
+- CLI: `--artist`, `--label`, mutually exclusive with `--track` and `--album`; pretty and Markdown output of artist and label identities (`cli/text.py`: `identity_title`, `query_text`, `name_fields`). Run journal names artists and labels.
+- Tests: typed constructors throughout; new tests for query kinds and promotion, JSON round trips per kind, name matching, name merges, `unsupported`, URL rules, CLI flags and rendering, run records. Docs: output, requests, architecture, runs, getting started, README.
+
+Checks: `uv run poe check` passed (fmt-check, lint, lint-imports 16 kept, mypy 297 files, 1220 tests, coverage 97.04%); `uv run --group docs properdocs build --strict` passed. Manual: `deadwax --artist "Aphex Twin"` and a MusicBrainz artist URL end with `deadwax  unsupported` and exit 3; `--artist … --isrc …` and `--artist --label` exit 2; `deadwax --track "Burial - Archangel" --sources musicbrainz,itunes,lastfm,discogs --no-cache` gives the same identity as before (live).
+
+Remaining: E-3 (artist and label slots in MusicBrainz, Discogs, Last.fm, Wikipedia, Bandcamp; their URL rules; live invariants).
+
+**Suggested message:** `feat!: add typed queries and a model for artists and labels`.
 
 ### 2026-11-21 — E-1 evidence (per-kind lookup slots)
 

@@ -16,8 +16,10 @@ from deadwax.core import (
     NotFoundError,
     Provenance,
     Query,
+    RecordCandidate,
     RelationKind,
     SourceError,
+    UnresolvedQuery,
 )
 from deadwax.sources import LookupConfig, parse_query
 from deadwax.sources._http import HttpResources
@@ -125,6 +127,7 @@ async def test_query_url_is_read_with_the_mobile_api() -> None:
     assert found.resolves(query)
     assert partial.candidate is not None
     assert partial.candidate.ids == {IdKind.BANDCAMP_ALBUM: "1"}
+    assert isinstance(partial.candidate, RecordCandidate)
     assert [label.name for label in partial.candidate.labels] == ["Label"]
     assert [tag.name for tag in partial.tags] == ["drone"]
 
@@ -182,7 +185,7 @@ async def test_page_without_release_data() -> None:
 
 @pytest.mark.asyncio
 async def test_nothing_to_search_for() -> None:
-    query = Query(url="https://example.com/x")
+    query = UnresolvedQuery(url="https://example.com/x")
 
     with pytest.raises(NotFoundError, match="neither the query"):
         await adapter({}).lookup(query, LookupContext(query=query))
@@ -213,7 +216,7 @@ async def test_html_search_when_the_endpoint_fails() -> None:
 
     partial = await found.lookup(query, LookupContext(query=query))
 
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.title == "Record"
 
 

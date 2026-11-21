@@ -1,7 +1,15 @@
 import httpx
 import pytest
 
-from deadwax import EntityKind, ErrorKind, MetricKind, Query, RelationKind, TagKind, TextKind
+from deadwax import (
+    AlbumQuery,
+    EntityKind,
+    ErrorKind,
+    MetricKind,
+    RelationKind,
+    TagKind,
+    TextKind,
+)
 from deadwax.core import RecordKey, SourceError
 from deadwax.sources import PerSourceSettings, RateYourMusicSettings, parse_query
 from deadwax.sources._http import HttpResources
@@ -110,7 +118,7 @@ async def test_lookup_failure_and_version_gate(
         return httpx.Response(status, content=content)
 
     dossier = await lookup(
-        Query(kind=EntityKind.ALBUM, artist="Radiohead", title="OK Computer"),
+        AlbumQuery(artist="Radiohead", title="OK Computer"),
         config,
         include=["rateyourmusic"],
         transport=httpx.MockTransport(respond),

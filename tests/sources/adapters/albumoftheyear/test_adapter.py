@@ -6,13 +6,14 @@ import pytest
 from deadwax import (
     EntityKind,
     MetricKind,
-    Query,
     Rating,
     RelationKind,
     Scope,
+    TrackQuery,
 )
 from deadwax.core import (
     NotFoundError,
+    RecordCandidate,
     RecordKey,
 )
 from deadwax.sources import AlbumOfTheYearSettings, PerSourceSettings
@@ -39,7 +40,7 @@ def test_albumoftheyear_real_page_structure() -> None:
     )
 
     assert (hits[0].key.artist, hits[0].key.title) == ("Radiohead", "OK Computer")
-    assert result.candidate is not None
+    assert isinstance(result.candidate, RecordCandidate)
     assert (result.candidate.artist, result.candidate.title) == ("Radiohead", "OK Computer")
     assert len(result.texts) == 16
     assert result.metrics[0].kind is MetricKind.USER_SCORE
@@ -74,7 +75,7 @@ def test_albumoftheyear_single_page_gives_the_track_on_its_release() -> None:
         key,
     )
 
-    assert result.candidate is not None
+    assert isinstance(result.candidate, RecordCandidate)
     assert (result.candidate.kind, result.candidate.artist, result.candidate.title) == (
         EntityKind.TRACK,
         "Radiohead",
@@ -108,7 +109,7 @@ async def test_albumoftheyear_track_query_finds_its_single() -> None:
         return httpx.Response(200, content=single)
 
     dossier = await lookup(
-        Query(kind=EntityKind.TRACK, artist="Radiohead", title="There There"),
+        TrackQuery(artist="Radiohead", title="There There"),
         LookupConfig(
             sources=PerSourceSettings(
                 albumoftheyear=AlbumOfTheYearSettings(html_transports=(Escalation.HTTPX,)),

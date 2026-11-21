@@ -13,6 +13,8 @@ from deadwax.core import (
     Partial,
     Provenance,
     Query,
+    RecordCandidate,
+    RecordIdentity,
     Sourced,
     VersionKind,
 )
@@ -63,7 +65,7 @@ async def lookup(
     resources = HttpResources(transport=httpx.MockTransport(respond(routes)))
     config = LookupConfig(sources=PerSourceSettings(musicbrainz=MusicBrainzSettings(rate=1000)))
     adapter = MusicBrainzAdapter(config, resources)
-    context = LookupContext(query=query, identity=identity or Identity(), facets=facets)
+    context = LookupContext(query=query, identity=identity or RecordIdentity(), facets=facets)
     try:
         return await adapter.lookup(query, context)
     finally:
@@ -83,6 +85,7 @@ async def test_recording_url_is_read_directly() -> None:
 
     assert partial.candidate is not None
     assert partial.candidate.ids[IdKind.MUSICBRAINZ_RECORDING] == RECORDING["id"]
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.labels == []
 
 
@@ -155,7 +158,7 @@ async def test_unknown_url_without_earlier_results_is_not_found() -> None:
 @pytest.mark.asyncio
 async def test_isrc_from_an_earlier_pass_finds_the_recording() -> None:
     query = parse_query("https://music.apple.com/us/song/missing/1")
-    identity = Identity(
+    identity = RecordIdentity(
         kind=EntityKind.TRACK,
         artist=Sourced(value="Everything but the Girl", sources=SOURCES),
         title=Sourced(value="Missing", sources=SOURCES),
@@ -207,7 +210,7 @@ async def test_version_only_in_the_comment_is_found_with_the_base_title() -> Non
 
     partial = await lookup(query, routes)
 
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.version is not None
     assert partial.candidate.version.kind is VersionKind.REMIX
 

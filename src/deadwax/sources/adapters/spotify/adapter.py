@@ -14,6 +14,7 @@ from deadwax.core import (
     Pass,
     Query,
     RateLimitedError,
+    RecordIdentity,
     RecordKey,
     Requirement,
     SourceError,
@@ -169,7 +170,9 @@ class SpotifyAdapter(HttpAdapter):
         if kind is EntityKind.TRACK:
             codes = context.isrcs()
         else:
-            codes = [upc.value for upc in context.identity.upcs]
+            identity = context.identity
+            upcs = identity.upcs if isinstance(identity, RecordIdentity) else []
+            codes = [upc.value for upc in upcs]
         if not codes:
             return None
         field = "isrc" if kind is EntityKind.TRACK else "upc"

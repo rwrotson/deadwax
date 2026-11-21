@@ -13,6 +13,7 @@ from deadwax.core import (
     NotFoundError,
     Partial,
     Query,
+    RecordCandidate,
     RelationKind,
     Scope,
     SourceError,
@@ -98,7 +99,7 @@ async def test_release_by_search_with_full_shop_text() -> None:
     assert urls(seen) == [SEARCH, UNTRUE]
     assert seen[0].url.params["query"] == "Burial Untrue"
     candidate = partial.candidate
-    assert candidate is not None
+    assert isinstance(candidate, RecordCandidate)
     assert (candidate.kind, candidate.artist, candidate.title, candidate.date) == (
         EntityKind.ALBUM,
         "Burial",
@@ -191,7 +192,7 @@ async def test_facts_from_the_page_when_json_ld_is_missing() -> None:
 
     partial = await looked_up(adapter, parse_query(UNTRUE))
 
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert (partial.candidate.date, partial.candidate.labels) == (None, [])
     assert [t.name for t in partial.tags] == ["Dub"]
     assert [t.body for t in partial.texts] == ["One line"]

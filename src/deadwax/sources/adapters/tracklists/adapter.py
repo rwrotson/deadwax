@@ -14,6 +14,7 @@ from deadwax.core import (
     Pass,
     Provenance,
     Query,
+    RecordCandidate,
     RecordKey,
     Relation,
     RelationKind,
@@ -132,7 +133,7 @@ class TracklistsAdapter(SearchPageAdapter):
                 if set_url not in sets:
                     sets.append(set_url)
         candidate = partial.candidate
-        if candidate is None:
+        if not isinstance(candidate, RecordCandidate):
             raise SourceError("1001Tracklists page names no track", url=response.url)
         confirmed = RecordKey(
             artist=candidate.artist,

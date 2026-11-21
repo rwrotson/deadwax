@@ -1,13 +1,18 @@
+from collections.abc import Callable
+
 import pytest
 
 from deadwax.core import (
     EntityKind,
+    IdKind,
+    NameKey,
     RecordKey,
     Verdict,
     VersionInfo,
     VersionKind,
     artist_similarity,
     compare,
+    compare_names,
     title_similarity,
 )
 from deadwax.core.matching import key_similarity, same_version
@@ -144,3 +149,63 @@ def test_non_latin_titles_compare_by_their_own_script() -> None:
     assert title_similarity("Группа крови", "ГРУППА КРОВИ") == 1.0
     assert title_similarity("Группа крови", "Gruppa krovi") < 0.5
     assert title_similarity("風をあつめて", "風をあつめて (Remastered)") == 1.0
+
+
+MBID = {IdKind.MUSICBRAINZ_ARTIST: "f22942a1"}
+
+
+@pytest.mark.parametrize(
+    ("reference", "candidate", "verdict"),
+    [
+        (
+            NameKey("Aphex Twin", EntityKind.ARTIST),
+            NameKey("aphex twin", EntityKind.ARTIST),
+            Verdict.MATCH,
+        ),
+        (
+            NameKey("Aphex Twin", EntityKind.ARTIST),
+            NameKey("Autechre", EntityKind.ARTIST),
+            Verdict.NO_MATCH,
+        ),
+        (
+            NameKey("Aphex Twin", EntityKind.ARTIST),
+            NameKey("Aphex Twin & Squarepusher", EntityKind.ARTIST),
+            Verdict.MATCH,
+        ),
+        (NameKey("Warp", EntityKind.LABEL), NameKey("Warp", EntityKind.ARTIST), Verdict.NO_MATCH),
+        (NameKey("Warp", EntityKind.LABEL), NameKey("WARP", EntityKind.LABEL), Verdict.MATCH),
+        (
+            NameKey("Aphex Twin", EntityKind.ARTIST, MBID),
+            NameKey("AFX", EntityKind.ARTIST, MBID),
+            Verdict.MATCH,
+        ),
+        (
+            NameKey("Aphex Twin", EntityKind.ARTIST, MBID),
+            NameKey("Aphex Twin", EntityKind.ARTIST, {IdKind.MUSICBRAINZ_ARTIST: "other"}),
+            Verdict.NO_MATCH,
+        ),
+        (
+            NameKey("Aphex Twin", EntityKind.ARTIST, MBID),
+            NameKey("Aphex Twin", EntityKind.ARTIST, {IdKind.DISCOGS_ARTIST: "45"}),
+            Verdict.MATCH,
+        ),
+    ],
+)
+def test_names_match_by_shared_ids_else_by_name(
+    reference: NameKey,
+    candidate: NameKey,
+    verdict: Verdict,
+) -> None:
+    assert compare_names(reference, candidate).verdict is verdict
+
+
+def test_name_comparison_is_traced(traced: Callable[[str], list[dict[str, object]]]) -> None:
+    compare_names(
+        NameKey("Aphex Twin", EntityKind.ARTIST, MBID),
+        NameKey("Aphex Twin", EntityKind.ARTIST, {IdKind.MUSICBRAINZ_ARTIST: "other"}),
+    )
+
+    [event] = traced("match.compare")
+    assert event["failed"] == ["ids"]
+    assert event["name_score"] == 1.0
+    assert event["reference"] == {"name": "Aphex Twin", "kind": "artist", "ids": MBID}

@@ -1,8 +1,10 @@
 from enum import StrEnum
+from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Discriminator, Field, field_validator
+from pydantic import Tag as Variant
 
-from deadwax.core.query import EntityKind, IdKind, Query
+from deadwax.core.query import EntityKind, IdKind, Query, kind_tag
 
 
 class _Model(BaseModel):
@@ -145,10 +147,25 @@ class LinkTarget(StrEnum):
     OTHER = "other"
 
 
+class ArtistType(StrEnum):
+    """What kind of performer an artist is."""
+
+    PERSON = "person"
+    GROUP = "group"
+    ORCHESTRA = "orchestra"
+    CHOIR = "choir"
+    CHARACTER = "character"
+    OTHER = "other"
+
+
 class ErrorKind(StrEnum):
     """Why an adapter contributed nothing or only part of its data."""
 
     SKIPPED = "skipped"
+
+    # No selected source looks up records of the query's kind.
+    UNSUPPORTED = "unsupported"
+
     FAILED = "failed"
     TIMEOUT = "timeout"
     BLOCKED = "blocked"
@@ -211,10 +228,24 @@ class Discrepancy(_Model):
     values: list[Sourced[str]]
 
 
-class Identity(_Model):
-    """Canonical identity of the record and disagreements between sources."""
+def _record_kind(kind: EntityKind | None) -> EntityKind | None:
+    if kind not in {EntityKind.TRACK, EntityKind.ALBUM, None}:
+        raise ValueError(f"a {kind} is not a track or album")
+    return kind
+
+
+class IdentityBase(_Model):
+    """Parts of an identity shared by every record kind."""
 
     kind: EntityKind | None = None
+    external_ids: list[ExternalId] = []
+    discrepancies: list[Discrepancy] = []
+
+
+class RecordIdentity(IdentityBase):
+    """Canonical identity of a track or album and disagreements between sources."""
+
+    kind: EntityKind | None = Field(default=None, description="Track, album, or unknown")
     artist: Sourced[str] | None = None
     title: Sourced[str] | None = None
     version: VersionInfo = VersionInfo()
@@ -228,8 +259,62 @@ class Identity(_Model):
         default=[],
         description="Copyright (©) and phonographic copyright (℗) lines",
     )
-    external_ids: list[ExternalId] = []
-    discrepancies: list[Discrepancy] = []
+
+    @field_validator("kind")
+    @classmethod
+    def _record_kind(cls, kind: EntityKind | None) -> EntityKind | None:
+        return _record_kind(kind)
+
+    @property
+    def found(self) -> bool:
+        """Whether any source identified the record."""
+        return self.title is not None
+
+
+class _NameIdentity(IdentityBase):
+    name: Sourced[str] | None = None
+    disambiguation: Sourced[str] | None = Field(
+        default=None,
+        description="Comment that tells namesakes apart",
+    )
+    country: Sourced[str] | None = Field(default=None, description="Country as a source gives it")
+    begin: Sourced[str] | None = Field(default=None, description="ISO date, possibly partial")
+    end: Sourced[str] | None = Field(default=None, description="ISO date, possibly partial")
+
+    @property
+    def found(self) -> bool:
+        """Whether any source identified the record."""
+        return self.name is not None
+
+
+class ArtistIdentity(_NameIdentity):
+    """Canonical identity of an artist and disagreements between sources."""
+
+    kind: Literal[EntityKind.ARTIST] = EntityKind.ARTIST
+    type: Sourced[ArtistType] | None = None
+
+
+class LabelIdentity(_NameIdentity):
+    """Canonical identity of a label and disagreements between sources."""
+
+    kind: Literal[EntityKind.LABEL] = EntityKind.LABEL
+
+
+# Tag of the identity or candidate variant of a track, an album, or a record of unknown kind.
+_RECORD = "record"
+
+
+def _record_tag(value: object) -> str:
+    tag = kind_tag(value)
+    return tag if tag in {EntityKind.ARTIST, EntityKind.LABEL} else _RECORD
+
+
+type Identity = Annotated[
+    Annotated[RecordIdentity, Variant(_RECORD)]
+    | Annotated[ArtistIdentity, Variant(EntityKind.ARTIST)]
+    | Annotated[LabelIdentity, Variant(EntityKind.LABEL)],
+    Discriminator(_record_tag),
+]
 
 
 class Tag(Fact):
@@ -364,9 +449,9 @@ class CandidateLabel(_Model):
 
 
 class RecordCandidate(_Model):
-    """One adapter's view of the record it found."""
+    """One adapter's view of the track or album it found."""
 
-    kind: EntityKind | None = None
+    kind: EntityKind | None = Field(default=None, description="Track, album, or unknown")
     artist: str
     title: str
     version: VersionInfo | None = Field(
@@ -382,6 +467,44 @@ class RecordCandidate(_Model):
     copyrights: list[str] = []
     ids: dict[IdKind, str] = {}
     url: str | None = None
+
+    @field_validator("kind")
+    @classmethod
+    def _record_kind(cls, kind: EntityKind | None) -> EntityKind | None:
+        return _record_kind(kind)
+
+
+class _NameCandidate(_Model):
+    name: str
+    disambiguation: str | None = None
+    country: str | None = None
+    begin: str | None = Field(default=None, description="ISO date, possibly partial")
+    end: str | None = Field(default=None, description="ISO date, possibly partial")
+    ids: dict[IdKind, str] = {}
+    url: str | None = None
+
+
+class ArtistCandidate(_NameCandidate):
+    """One adapter's view of the artist it found."""
+
+    kind: Literal[EntityKind.ARTIST] = EntityKind.ARTIST
+    type: ArtistType | None = None
+
+
+class LabelCandidate(_NameCandidate):
+    """One adapter's view of the label it found."""
+
+    kind: Literal[EntityKind.LABEL] = EntityKind.LABEL
+
+
+type NameCandidate = ArtistCandidate | LabelCandidate
+
+type Candidate = Annotated[
+    Annotated[RecordCandidate, Variant(_RECORD)]
+    | Annotated[ArtistCandidate, Variant(EntityKind.ARTIST)]
+    | Annotated[LabelCandidate, Variant(EntityKind.LABEL)],
+    Discriminator(_record_tag),
+]
 
 
 class Facts(_Model):
@@ -400,7 +523,7 @@ class Partial(Facts):
     """Everything one adapter found; facts are kept only if the candidate matches the query."""
 
     source: str
-    candidate: RecordCandidate | None = None
+    candidate: Candidate | None = None
     errors: list[AdapterError] = []
 
 
@@ -415,4 +538,4 @@ class Dossier(Facts):
     @property
     def found(self) -> bool:
         """Whether any source identified the record."""
-        return self.identity.title is not None
+        return self.identity.found

@@ -1,12 +1,30 @@
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import partial
 from typing import Protocol, assert_never
 
 from pydantic import BaseModel, ConfigDict
 
-from deadwax.core.models import Identity, Link, Partial, ReviewLink, SourceAccess
-from deadwax.core.query import EntityKind, IdKind, Query, normalize_code
+from deadwax.core.models import (
+    Identity,
+    Link,
+    Partial,
+    RecordIdentity,
+    ReviewLink,
+    SourceAccess,
+)
+from deadwax.core.query import (
+    AlbumQuery,
+    ArtistQuery,
+    EntityKind,
+    IdKind,
+    LabelQuery,
+    Query,
+    TrackQuery,
+    UnresolvedQuery,
+    normalize_code,
+)
 
 
 class _Model(BaseModel):
@@ -24,7 +42,12 @@ class Pass(StrEnum):
 
 
 class Capability(StrEnum):
-    """Kind of facts an adapter can contribute."""
+    """Kind of facts an adapter can contribute.
+
+    For artists and labels, texts are biographies and profiles, tags are genres, relations
+    are members, labels, and similar artists, metrics are listener counts, and links are
+    service pages; credits and previews apply only to tracks and albums.
+    """
 
     IDENTITY = "identity"
     LINKS = "links"
@@ -102,7 +125,7 @@ class LookupContext(_Model):
     """What earlier passes established about the record."""
 
     query: Query
-    identity: Identity = Identity()
+    identity: Identity = RecordIdentity()
     links: list[Link] = []
     review_links: list[ReviewLink] = []
 
@@ -127,7 +150,8 @@ class LookupContext(_Model):
     def isrcs(self) -> list[str]:
         """Return the known ISRCs: the query's first, then those of earlier passes."""
         codes = [self.query.ids[IdKind.ISRC]] if IdKind.ISRC in self.query.ids else []
-        codes += [isrc.value for isrc in self.identity.isrcs]
+        if isinstance(self.identity, RecordIdentity):
+            codes += [isrc.value for isrc in self.identity.isrcs]
         unique: dict[str, str] = {}
         for code in codes:
             unique.setdefault(normalize_code(code), code)
@@ -138,40 +162,97 @@ class LookupContext(_Model):
         return [link.url for link in self.links if link.service == service]
 
 
-class KindLookup(Protocol):
-    """Lookup of one kind of record by one source."""
+class TrackLookup(Protocol):
+    """Lookup of a track by one source."""
 
-    def __call__(self, query: Query, context: LookupContext, /) -> Awaitable[Partial]:
-        """Find the record and return what the source knows about it."""
+    def __call__(self, query: TrackQuery, context: LookupContext, /) -> Awaitable[Partial]:
+        """Find the track and return what the source knows about it."""
         ...
+
+
+class AlbumLookup(Protocol):
+    """Lookup of an album by one source."""
+
+    def __call__(self, query: AlbumQuery, context: LookupContext, /) -> Awaitable[Partial]:
+        """Find the album and return what the source knows about it."""
+        ...
+
+
+class ArtistLookup(Protocol):
+    """Lookup of an artist by one source."""
+
+    def __call__(self, query: ArtistQuery, context: LookupContext, /) -> Awaitable[Partial]:
+        """Find the artist and return what the source knows about them."""
+        ...
+
+
+class LabelLookup(Protocol):
+    """Lookup of a label by one source."""
+
+    def __call__(self, query: LabelQuery, context: LookupContext, /) -> Awaitable[Partial]:
+        """Find the label and return what the source knows about it."""
+        ...
+
+
+class UnresolvedLookup(Protocol):
+    """Lookup of a page whose record kind is not known yet."""
+
+    def __call__(self, query: UnresolvedQuery, context: LookupContext, /) -> Awaitable[Partial]:
+        """Read the page and return what the source knows about its record."""
+        ...
+
+
+type BoundLookup = Callable[[LookupContext], Awaitable[Partial]]
 
 
 @dataclass(frozen=True, slots=True)
 class Lookups:
     """Lookups of an adapter by record kind; an unset slot means the source does not look it up."""
 
-    track: KindLookup | None = None
-    album: KindLookup | None = None
+    track: TrackLookup | None = None
+    album: AlbumLookup | None = None
+    artist: ArtistLookup | None = None
+    label: LabelLookup | None = None
 
     # Reads a query whose kind neither the query nor earlier passes established.
-    unresolved: KindLookup | None = None
+    unresolved: UnresolvedLookup | None = None
 
     @property
     def kinds(self) -> frozenset[EntityKind]:
         """Record kinds the adapter looks up."""
-        return frozenset(kind for kind in EntityKind if self.get(kind) is not None)
+        return frozenset(kind for kind in EntityKind if self.supports(kind))
 
-    def get(self, kind: EntityKind | None) -> KindLookup | None:
-        """Return the lookup of a record kind, or of an unknown kind for None."""
+    def supports(self, kind: EntityKind | None) -> bool:
+        """Whether the adapter looks up a record kind, or a record of unknown kind for None."""
         match kind:
             case EntityKind.TRACK:
-                return self.track
+                return self.track is not None
             case EntityKind.ALBUM:
-                return self.album
+                return self.album is not None
+            case EntityKind.ARTIST:
+                return self.artist is not None
+            case EntityKind.LABEL:
+                return self.label is not None
             case None:
-                return self.unresolved
+                return self.unresolved is not None
             case _:
                 assert_never(kind)
+
+    def bind(self, query: Query) -> BoundLookup | None:
+        """Return the lookup of the query's kind applied to the query, if the adapter has one."""
+        match query:
+            case TrackQuery():
+                return None if self.track is None else partial(self.track, query)
+            case AlbumQuery():
+                return None if self.album is None else partial(self.album, query)
+            case ArtistQuery():
+                return None if self.artist is None else partial(self.artist, query)
+            case LabelQuery():
+                return None if self.label is None else partial(self.label, query)
+            case UnresolvedQuery():
+                return None if self.unresolved is None else partial(self.unresolved, query)
+            case _:
+                assert_never(query)
 
 
 class Adapter(Protocol):

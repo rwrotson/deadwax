@@ -7,12 +7,13 @@ import pytest
 from deadwax.core import (
     EntityKind,
     ExternalId,
-    Identity,
     IdKind,
     LookupContext,
     NotFoundError,
     Provenance,
     Query,
+    RecordCandidate,
+    RecordIdentity,
     Scope,
     TextKind,
 )
@@ -122,7 +123,7 @@ def make(seen: list[httpx.Request] | None = None, **overrides: Handler) -> Wikip
 
 def with_qid(query: Query, qid: str) -> LookupContext:
     ids = [ExternalId(kind=IdKind.WIKIDATA, value=qid, sources=[Provenance(source="musicbrainz")])]
-    return LookupContext(query=query, identity=Identity(external_ids=ids))
+    return LookupContext(query=query, identity=RecordIdentity(external_ids=ids))
 
 
 TRACK = parse_query("Группа - Песня", EntityKind.TRACK)
@@ -136,7 +137,7 @@ async def test_song_from_an_earlier_pass_with_its_russian_article() -> None:
     partial = await adapter.lookup(TRACK, with_qid(TRACK, "Q1"))
     await adapter.aclose()
 
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert (partial.candidate.artist, partial.candidate.title) == ("Группа", "Песня")
     assert [t.name for t in partial.tags] == ["post-punk"]
     assert [(r.target.name, r.scope) for r in partial.relations] == [("Record", Scope.RECORDING)]
@@ -180,7 +181,7 @@ async def test_track_found_by_search() -> None:
 @pytest.mark.asyncio
 async def test_search_without_kind_or_results() -> None:
     query = parse_query("https://example.com/x")
-    identity = Identity.model_validate(
+    identity = RecordIdentity.model_validate(
         {"artist": {"value": "Группа", "sources": []}, "title": {"value": "Песня", "sources": []}},
     )
     seen: list[httpx.Request] = []

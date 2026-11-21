@@ -12,6 +12,7 @@ from deadwax.core import (
     MetricKind,
     NotFoundError,
     Provenance,
+    RecordCandidate,
     RelationKind,
     SourceError,
     SourceState,
@@ -126,7 +127,7 @@ async def test_track_by_search() -> None:
     assert seen[0].url.params["q"] == "Burial Archangel"
 
     candidate = partial.candidate
-    assert candidate is not None
+    assert isinstance(candidate, RecordCandidate)
     assert (candidate.artist, candidate.title, candidate.date) == (
         "Burial",
         "Archangel",
@@ -178,7 +179,7 @@ async def test_official_upload_beats_a_reupload() -> None:
     await adapter.aclose()
 
     assert seen[1].url.params["url"] == "https://soundcloud.com/hyperdub/burial-archangel"
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.date == "2007-11-05"
 
 
@@ -194,7 +195,7 @@ async def test_album_url_resolves_without_reposters() -> None:
 
     assert [r.url.path for r in seen] == ["/resolve", "/playlists/201/reposters"]
     candidate = partial.candidate
-    assert candidate is not None
+    assert isinstance(candidate, RecordCandidate)
     assert (candidate.kind, candidate.artist, candidate.title) == (
         EntityKind.ALBUM,
         "Burial",
@@ -245,7 +246,7 @@ async def test_merge_drops_an_edit() -> None:
     await adapter.aclose()
     dossier = merge(query, [partial], generated_at=datetime.now(UTC))
 
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.artist == "Burial"
     assert not dossier.tags
     assert not dossier.metrics

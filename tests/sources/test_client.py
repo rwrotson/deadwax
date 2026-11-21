@@ -12,6 +12,7 @@ from deadwax import (
     EntityKind,
     LinkTarget,
     LookupConfig,
+    RecordIdentity,
     Request,
     lookup,
     parse_query,
@@ -104,6 +105,7 @@ async def test_request_trims_the_dossier_to_its_facets(
     assert dossier.found
     assert dossier.tags
     assert (dossier.links, dossier.relations, dossier.texts) == ([], [], [])
+    assert isinstance(dossier.identity, RecordIdentity)
     assert dossier.identity.title is not None
     contributors = {source.source for source in dossier.identity.title.sources}
     assert "odesli" not in contributors

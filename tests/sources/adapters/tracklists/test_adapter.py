@@ -3,7 +3,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from deadwax import EntityKind, ErrorKind, Query, RelationKind
+from deadwax import ErrorKind, RelationKind, TrackQuery, UnresolvedQuery
 from deadwax.sources import PerSourceSettings, TracklistsSettings
 from deadwax.sources.config import Escalation, LookupConfig
 from deadwax.sources.lookup import lookup
@@ -29,7 +29,7 @@ async def test_search_track_and_verified_set() -> None:
         return httpx.Response(200, content=dj_set if "/tracklist/" in request.url.path else track)
 
     dossier = await lookup(
-        Query(kind=EntityKind.TRACK, artist="Daft Punk", title="One More Time"),
+        TrackQuery(artist="Daft Punk", title="One More Time"),
         config,
         include=["tracklists"],
         transport=httpx.MockTransport(respond),
@@ -51,7 +51,7 @@ async def test_missing_track() -> None:
         ),
     )
     dossier = await lookup(
-        Query(kind=EntityKind.TRACK, artist="Daft Punk", title="One More Time"),
+        TrackQuery(artist="Daft Punk", title="One More Time"),
         config,
         include=["tracklists"],
         transport=httpx.MockTransport(
@@ -69,7 +69,7 @@ async def test_blocked_page() -> None:
         ),
     )
     dossier = await lookup(
-        Query(kind=EntityKind.TRACK, artist="Daft Punk", title="One More Time"),
+        TrackQuery(artist="Daft Punk", title="One More Time"),
         config,
         include=["tracklists"],
         transport=httpx.MockTransport(
@@ -92,7 +92,7 @@ async def test_another_version_adds_no_set_relations() -> None:
         ),
     )
     dossier = await lookup(
-        Query(kind=EntityKind.TRACK, artist="Daft Punk", title="One More Time (Extended Mix)"),
+        TrackQuery(artist="Daft Punk", title="One More Time (Extended Mix)"),
         config,
         include=["tracklists"],
         transport=httpx.MockTransport(lambda request: httpx.Response(200, content=track)),
@@ -116,7 +116,9 @@ async def test_direct_track_url_needs_no_search() -> None:
         return httpx.Response(200, content=dj_set if "/tracklist/" in request.url.path else track)
 
     dossier = await lookup(
-        Query(url="https://www.1001tracklists.com/track/j4rvgx/daft-punk-one-more-time/index.html"),
+        UnresolvedQuery(
+            url="https://www.1001tracklists.com/track/j4rvgx/daft-punk-one-more-time/index.html",
+        ),
         config,
         include=["tracklists"],
         transport=httpx.MockTransport(respond),

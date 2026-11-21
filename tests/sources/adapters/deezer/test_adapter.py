@@ -10,6 +10,7 @@ from deadwax.core import (
     LookupContext,
     NotFoundError,
     Query,
+    RecordCandidate,
     SourceError,
 )
 from deadwax.sources import LookupConfig, parse_query
@@ -75,7 +76,7 @@ async def test_album_url_reads_html_identity_and_tags() -> None:
 
     partial = await adapter({ALBUM_URL: (200, album_page())}, seen).lookup(query, context(query))
 
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.title == "OK Computer"
     assert partial.candidate.upcs == ["634904078164"]
     assert [tag.name for tag in partial.tags] == ["Rock"]
@@ -88,7 +89,7 @@ async def test_track_url_reads_html_identity_and_links() -> None:
 
     partial = await adapter({TRACK_URL: (200, track_page())}).lookup(query, context(query))
 
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.isrcs == ["GBAYE9701376"]
     assert {link.url for link in partial.links} == {
         TRACK_URL,

@@ -9,6 +9,7 @@ from deadwax.core import (
     EntityType,
     IdKind,
     Provenance,
+    RecordCandidate,
     RecordKey,
     RelationKind,
     Scope,
@@ -188,7 +189,7 @@ def test_compilation_track_keeps_only_its_own_facts() -> None:
 
     assert p.on_compilation(record)
     assert partial.tags == []
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.date is None
     assert partial.candidate.labels == []
     assert [r.kind for r in partial.relations] == [RelationKind.COMPILATION]

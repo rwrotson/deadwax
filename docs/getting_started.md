@@ -29,11 +29,12 @@ deadwax --track "Radiohead - Paranoid Android"          # pretty output in the t
 deadwax https://open.spotify.com/track/6LgJvl0Xdtc73RJ1mmpotq
 deadwax --album "Huerco S. - For Those of You Who Have Never (And Also Those Who Have)" --format json
 deadwax --track "Кино - Группа крови" --sources musicbrainz --no-cache
+deadwax --label "Hyperdub"
 deadwax sources                                          # what each source contributes and whether it can run
 deadwax runs                                             # journaled runs; deadwax runs ID shows one run's timeline
 ```
 
-A text query must state `--album` or `--track`; a URL implies its kind. Options: `--sources` and `--exclude` (comma-separated names), `--facets` (kinds of facts), `--isrc CODE` (the track's ISRC), `--format pretty|json|markdown`, `--no-cache`, `--timeout SECONDS` per source, `--config PATH` (TOML), `--verbose` or `--debug` for diagnostic stderr logs. Normal runs print the dossier and its error summary without logs. Settings come from flags, `DEADWAX_*` variables, `.env`, and a TOML file, in that order of precedence; see [Configuration](configuration.md).
+A text query must state `--track`, `--album`, `--artist`, or `--label`; a track or album is written `Artist - Title`, an artist or label by its name; a URL implies its kind. No source looks up artists and labels yet: such a query ends with an `unsupported` error and exit code 3. Options: `--sources` and `--exclude` (comma-separated names), `--facets` (kinds of facts), `--isrc CODE` (the track's ISRC), `--format pretty|json|markdown`, `--no-cache`, `--timeout SECONDS` per source, `--config PATH` (TOML), `--verbose` or `--debug` for diagnostic stderr logs. Normal runs print the dossier and its error summary without logs. Settings come from flags, `DEADWAX_*` variables, `.env`, and a TOML file, in that order of precedence; see [Configuration](configuration.md).
 
 [Sources](sources.md) describes what each source contributes and needs; [Output](output.md) describes the dossier and its errors.
 

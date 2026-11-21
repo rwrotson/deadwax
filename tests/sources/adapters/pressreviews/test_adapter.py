@@ -1,7 +1,15 @@
 import httpx
 import pytest
 
-from deadwax import EntityKind, HttpSettings, LookupConfig, Provenance, Query, ReviewLink, TextKind
+from deadwax import (
+    AlbumQuery,
+    EntityKind,
+    HttpSettings,
+    LookupConfig,
+    Provenance,
+    ReviewLink,
+    TextKind,
+)
 from deadwax.core import BlockedError, LookupContext, RecordKey
 from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.pressreviews import PressAdapter, parse
@@ -101,7 +109,7 @@ def test_current_wire_markup() -> None:
 @pytest.mark.asyncio
 async def test_blocked_press_page() -> None:
     url = "https://pitchfork.com/reviews/albums/example/"
-    query = Query(kind=EntityKind.ALBUM, artist="Burial", title="Untrue")
+    query = AlbumQuery(artist="Burial", title="Untrue")
     context = LookupContext(
         query=query,
         review_links=[ReviewLink(url=url, sources=[Provenance(source="test", url=url)])],

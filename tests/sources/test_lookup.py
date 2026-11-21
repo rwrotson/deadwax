@@ -18,11 +18,13 @@ from deadwax import (
     Pass,
     Query,
     Rating,
+    RecordIdentity,
     RelationKind,
     Scope,
     SourceGroup,
     SourceState,
     TextKind,
+    TrackQuery,
     VersionKind,
     describe_sources,
     lookup,
@@ -68,6 +70,7 @@ async def test_mainstream_track(replay: Replay, config: LookupConfig) -> None:
     dossier = await replayed(PARANOID_ANDROID, "paranoid_android", replay, config)
 
     identity = dossier.identity
+    assert isinstance(identity, RecordIdentity)
     assert identity.title is not None
     assert identity.title.value == "Paranoid Android"
     assert {source.source for source in identity.title.sources} == {
@@ -183,6 +186,7 @@ async def test_cyrillic_track_is_not_transliterated(replay: Replay, config: Look
 
     dossier = await replayed(query, "kino", replay, config)
 
+    assert isinstance(dossier.identity, RecordIdentity)
     assert dossier.identity.artist is not None
     assert dossier.identity.artist.value == "Кино"
     assert [
@@ -206,6 +210,7 @@ async def test_remix_is_not_merged_with_the_original(replay: Replay, config: Loo
 
     dossier = await replayed(query, "missing_remix", replay, config)
 
+    assert isinstance(dossier.identity, RecordIdentity)
     version = dossier.identity.version
     assert version.kind is VersionKind.REMIX
     assert version.detail is not None
@@ -271,10 +276,12 @@ async def test_spotify_resolves_its_urls_when_it_has_credentials(
     without_spotify = await replayed(query, "spotify_url", replay, without)
 
     for dossier, resolver in ((with_spotify, "spotify"), (without_spotify, "musicbrainz")):
+        assert isinstance(dossier.identity, RecordIdentity)
         assert dossier.identity.title is not None
         assert dossier.identity.title.sources[0].source == resolver
         assert ids(dossier)[IdKind.MUSICBRAINZ_RECORDING] == ORIGINAL_RECORDING
     assert errors(without_spotify)["spotify"] is ErrorKind.SKIPPED
+    assert isinstance(with_spotify.identity, RecordIdentity)
     copyrights = {line.value for line in with_spotify.identity.copyrights}
     assert copyrights == {"© 1997 XL Recordings Ltd", "℗ 1997 XL Recordings Ltd"}
 
@@ -286,6 +293,7 @@ async def test_youtube_links_official_uploads(replay: Replay, config: LookupConf
     youtube = [link for link in dossier.links if link.service == "youtube"]
     assert 0 < len(youtube) <= 3
     assert {link.sources[0].source for link in youtube} == {"youtube"}
+    assert isinstance(dossier.identity, RecordIdentity)
     assert dossier.identity.title is not None
     assert "youtube" not in {s.source for s in dossier.identity.title.sources}
 
@@ -345,6 +353,7 @@ async def test_selection_and_cache(replay: Replay, config: LookupConfig, tmp_pat
         transport=replay("no_match"),
     )
 
+    assert isinstance(first.identity, RecordIdentity)
     assert first.identity.title is not None
     assert second.identity == first.identity
     assert first.errors == second.errors == []
@@ -392,6 +401,7 @@ async def test_default_sources_run_without_include(replay: Replay, config: Looku
         transport=replay("apple_url", seen),
     )
 
+    assert isinstance(dossier.identity, RecordIdentity)
     assert dossier.identity.title is not None
     assert dossier.errors == []
     assert seen
@@ -647,6 +657,7 @@ async def test_explicit_recording_is_the_original(replay: Replay, config: Lookup
     dossier = await lookup(query, config, exclude=["lastfm"], transport=replay("stronger_samples"))
 
     assert ids(dossier)[IdKind.MUSICBRAINZ_RECORDING].startswith("8009d470")
+    assert isinstance(dossier.identity, RecordIdentity)
     assert dossier.identity.version.kind is VersionKind.ORIGINAL
     samples = [r.target for r in dossier.relations if r.kind is RelationKind.SAMPLES]
     assert ("Daft Punk", "Harder, Better, Faster, Stronger") in {
@@ -675,7 +686,7 @@ async def test_radio_search_drops_other_versions_and_missing_artists() -> None:
         return httpx.Response(200, text='<button name="id" value="1">Another Artist</button>')
 
     dossier = await lookup(
-        Query(kind=EntityKind.TRACK, artist="Burial", title="Archangel"),
+        TrackQuery(artist="Burial", title="Archangel"),
         LookupConfig(http=HttpSettings(escalation=())),
         include=("nts", "wfmu"),
         transport=httpx.MockTransport(respond),
@@ -695,7 +706,7 @@ async def test_radio_search_reports_blocked_source(source: str) -> None:
         return httpx.Response(403, headers={"cf-mitigated": "challenge"})
 
     dossier = await lookup(
-        Query(kind=EntityKind.TRACK, artist="Burial", title="Archangel"),
+        TrackQuery(artist="Burial", title="Archangel"),
         LookupConfig(http=HttpSettings(escalation=(), retries=0)),
         include=(source,),
         transport=httpx.MockTransport(respond),

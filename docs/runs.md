@@ -55,7 +55,7 @@ Each event line holds `event`, `level`, `logger`, `timestamp`, `run_id`, and the
 | `http.request` | method, URL, status, cache `hit`/`miss`/`blocked`/`off`, transports, attempts, duration, size, SHA-256, error |
 | `http.retry`, `http.challenge`, `http.step_dropped`, `http.step_failed` | retries with their cause and delay; bot challenges; unavailable transports; transports that failed to start |
 | `http.headed_fallback`, `http.page_incomplete` | a challenge retried in a visible browser; a page without its required state |
-| `match.compare` | reference and candidate (artist, title, kind, version), scores, verdict, failed checks (`artist`, `title`, `kind`) |
+| `match.compare` | reference and candidate (artist, title, kind, version; for an artist or label: name, kind, ids), scores (`artist_score` and `title_score`, or `name_score`), verdict, failed checks (`artist`, `title`, `kind`; `name`, `ids`) |
 | `search.pick`, `search.ranked` | search hits with their verdicts and the one picked |
 | `parse.unrecognized`, `wfmu.truncated` | URL, title, and a snippet of a page the parser does not recognize; WFMU playlists left unread when time runs out |
 | `adapter.end` | outcome, errors, candidate, fact counts, duration, time waited for a slot |

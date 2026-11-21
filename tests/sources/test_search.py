@@ -5,7 +5,6 @@ import pytest
 
 from deadwax.core import (
     EntityKind,
-    Identity,
     Link,
     LinkTarget,
     LookupContext,
@@ -15,6 +14,7 @@ from deadwax.core import (
     Provenance,
     Query,
     RecordCandidate,
+    RecordIdentity,
     RecordKey,
     Sourced,
     SourceGroup,
@@ -98,7 +98,7 @@ def test_search_key_prefers_the_query_text() -> None:
 def test_search_key_of_a_url_query_comes_from_earlier_passes() -> None:
     query = parse_query("https://example.org/record")
     remix = VersionInfo(kind=VersionKind.REMIX, detail="Todd Terry remix")
-    identity = Identity(
+    identity = RecordIdentity(
         kind=EntityKind.TRACK,
         artist=Sourced(value="Everything but the Girl", sources=SOURCES),
         title=Sourced(value="Missing (Todd Terry remix)", sources=SOURCES),
@@ -124,7 +124,7 @@ async def test_search_page_adapter_searches_picks_and_reads_the_page(
 
     partial = await looked_up(shop(config, pages, requested))
 
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.title == "Archangel"
     assert partial.candidate.url == "https://shop.example/archangel"
     assert requested == [f"{SEARCH}?q=Burial+Archangel", "https://shop.example/archangel"]

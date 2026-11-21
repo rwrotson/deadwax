@@ -7,11 +7,12 @@ from deadwax.core import (
     EntityKind,
     EntityType,
     ExternalId,
-    Identity,
     IdKind,
     LookupContext,
     NotFoundError,
     Provenance,
+    RecordCandidate,
+    RecordIdentity,
     RelationKind,
     Scope,
     TextKind,
@@ -57,7 +58,9 @@ def make(
 def context(kind: EntityKind, *ids: tuple[IdKind, str]) -> LookupContext:
     query = parse_query("Band - Song" if kind is EntityKind.TRACK else "Band - Record", kind)
     sources = [Provenance(source="musicbrainz")]
-    identity = Identity(external_ids=[ExternalId(kind=k, value=v, sources=sources) for k, v in ids])
+    identity = RecordIdentity(
+        external_ids=[ExternalId(kind=k, value=v, sources=sources) for k, v in ids],
+    )
     return LookupContext(query=query, identity=identity)
 
 
@@ -72,7 +75,7 @@ async def test_track_plays_by_recording_id() -> None:
 
     assert dict(seen[0].url.params) == {"recording_id": "rec", "limit": "25"}
     assert [r.url.path for r in seen[1:]] == ["/v2/shows/10/"]
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert (partial.candidate.artist, partial.candidate.title) == ("Band", "Song")
     assert partial.candidate.url == "https://www.kexp.org/playlist/2026/9/15/11pm/"
     assert {(r.kind, r.target.type) for r in partial.relations} == {
@@ -107,7 +110,7 @@ async def test_album_plays_by_text_even_with_a_release_group_id() -> None:
     partial = await make(seen=seen).lookup(found.query, found)
 
     assert dict(seen[0].url.params) == {"artist": "Band", "album": "Record", "limit": "25"}
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.title == "Record"
     assert {r.scope for r in partial.relations} == {Scope.RELEASE_GROUP}
     assert len(partial.relations) == 3

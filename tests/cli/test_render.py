@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -6,18 +7,25 @@ from rich.console import Console
 
 from deadwax import (
     AdapterError,
+    ArtistIdentity,
+    ArtistQuery,
+    ArtistType,
     Capability,
     Dossier,
     EntityKind,
     ErrorKind,
+    LabelIdentity,
+    LabelQuery,
     Pass,
-    Query,
+    Provenance,
     Requirement,
     SourceAccess,
+    Sourced,
     SourceGroup,
     SourceInfo,
     SourceState,
     SourceStatus,
+    UnresolvedQuery,
 )
 from deadwax.cli.render import (
     OutputFormat,
@@ -67,7 +75,7 @@ def test_each_source_is_named_once_per_fact(dossier: Dossier) -> None:
 
 def test_nothing_matched(dossier: Dossier) -> None:
     empty = Dossier(
-        query=Query(url="https://example.org/x"),
+        query=UnresolvedQuery(url="https://example.org/x"),
         identity={},  # type: ignore[arg-type]
         generated_at=dossier.generated_at,
     )
@@ -399,3 +407,37 @@ def test_no_runs() -> None:
     print_runs([], OutputFormat.PRETTY, Path("journal"), console)
 
     assert console.export_text() == "No runs journaled in journal.\n"
+
+
+def test_pretty_artist_and_label_dossiers() -> None:
+    musicbrainz = [Provenance(source="musicbrainz")]
+    artist = Dossier(
+        query=ArtistQuery(name="Aphex Twin"),
+        identity=ArtistIdentity(
+            name=Sourced(value="Aphex Twin", sources=musicbrainz),
+            type=Sourced(value=ArtistType.PERSON, sources=musicbrainz),
+            end=Sourced(value="2100", sources=musicbrainz),
+        ),
+        generated_at=datetime(2026, 11, 12, tzinfo=UTC),
+    )
+    label = Dossier(
+        query=LabelQuery(name="Warp"),
+        identity=LabelIdentity(),
+        errors=[
+            AdapterError(
+                source="deadwax",
+                kind=ErrorKind.UNSUPPORTED,
+                reason="no selected source looks up a record of kind label",
+            ),
+        ],
+        generated_at=datetime(2026, 11, 12, tzinfo=UTC),
+    )
+
+    artist_text = rendered(artist)
+    label_text = rendered(label)
+
+    assert artist_text.startswith("Aphex Twin\n")
+    for row in ("kind  artist", "name  Aphex Twin  musicbrainz", "type  person", "end   2100"):
+        assert row in artist_text
+    assert label_text.startswith("Nothing matched the query")
+    assert "deadwax  unsupported  no selected source looks up a record of kind label" in label_text

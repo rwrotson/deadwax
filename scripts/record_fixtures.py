@@ -18,6 +18,7 @@ from deadwax import (
     LookupConfig,
     PerSourceSettings,
     Query,
+    RecordIdentity,
     SourceGroup,
     parse_query,
 )
@@ -286,7 +287,10 @@ async def main() -> None:
     for name in args.scenarios or list(SCENARIOS):
         sys.stdout.write(f"{name}\n")
         dossier = await record(name, SCENARIOS[name], live)
-        title = dossier.identity.title.value if dossier.identity.title else None
+        identity = dossier.identity
+        title = None
+        if isinstance(identity, RecordIdentity) and identity.title is not None:
+            title = identity.title.value
         errors = [(error.source, error.kind.value) for error in dossier.errors]
         sys.stdout.write(f"  -> {title!r}; errors: {errors}\n")
 

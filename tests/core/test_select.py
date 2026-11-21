@@ -7,12 +7,12 @@ from deadwax.core import (
     Entity,
     EntityKind,
     EntityType,
-    Identity,
     Link,
     LinkTarget,
     Metric,
     MetricKind,
     Provenance,
+    RecordIdentity,
     Relation,
     RelationKind,
     RelationLimit,
@@ -59,7 +59,7 @@ def link(url: str, preview: str | None = None) -> Link:
 
 DOSSIER = Dossier(
     query=TRACK,
-    identity=Identity(title=Sourced(value="Reckoner", sources=by("musicbrainz"))),
+    identity=RecordIdentity(title=Sourced(value="Reckoner", sources=by("musicbrainz"))),
     generated_at=datetime(2026, 11, 20, tzinfo=UTC),
     tags=[tag("a", "lastfm"), tag("b", "lastfm", "musicbrainz"), tag("c", "musicbrainz"),
           tag("d", "lastfm")],

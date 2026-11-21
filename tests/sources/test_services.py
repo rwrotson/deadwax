@@ -1,6 +1,15 @@
 import pytest
 
-from deadwax.core import EntityKind, IdKind, InvalidQueryError, LinkTarget
+from deadwax.core import (
+    ArtistQuery,
+    EntityKind,
+    IdKind,
+    InvalidQueryError,
+    LabelQuery,
+    LinkTarget,
+    Query,
+    TrackQuery,
+)
 from deadwax.sources import parse_query
 from deadwax.sources.services import SERVICES, link_target, recognize, service_for_url, service_of
 
@@ -31,6 +40,8 @@ def test_service_for_url(url: str, service: str | None) -> None:
         ("https://open.spotify.com/album/1", LinkTarget.ALBUM),
         ("https://open.spotify.com/track/1", LinkTarget.TRACK),
         ("https://www.youtube.com/channel/UC1", LinkTarget.ARTIST),
+        ("https://open.spotify.com/artist/1", LinkTarget.ARTIST),
+        ("https://www.beatport.com/label/hyperdub/1234", LinkTarget.LABEL),
         ("https://tidal.com/browse/x", LinkTarget.OTHER),
     ],
 )
@@ -151,6 +162,48 @@ def test_service_of_matches_host_suffix(url: str, name: str | None) -> None:
             EntityKind.ALBUM,
             {IdKind.APPLE_MUSIC: "266476563"},
         ),
+        (
+            "https://musicbrainz.org/artist/f22942a1-6f70-4f48-866e-238cb2308fbd",
+            EntityKind.ARTIST,
+            {IdKind.MUSICBRAINZ_ARTIST: "f22942a1-6f70-4f48-866e-238cb2308fbd"},
+        ),
+        (
+            f"https://musicbrainz.org/label/{MBID}",
+            EntityKind.LABEL,
+            {IdKind.MUSICBRAINZ_LABEL: MBID},
+        ),
+        (
+            "https://www.discogs.com/artist/45-Aphex-Twin",
+            EntityKind.ARTIST,
+            {IdKind.DISCOGS_ARTIST: "45"},
+        ),
+        (
+            "https://www.discogs.com/de/label/23528-Warp",
+            EntityKind.LABEL,
+            {IdKind.DISCOGS_LABEL: "23528"},
+        ),
+        (
+            "https://open.spotify.com/artist/6kBDZFXuLrZgHnvmPu9NsG",
+            EntityKind.ARTIST,
+            {IdKind.SPOTIFY: "6kBDZFXuLrZgHnvmPu9NsG"},
+        ),
+        ("https://www.deezer.com/en/artist/1337", EntityKind.ARTIST, {IdKind.DEEZER: "1337"}),
+        (
+            "https://music.apple.com/gb/artist/aphex-twin/1452",
+            EntityKind.ARTIST,
+            {IdKind.APPLE_MUSIC: "1452"},
+        ),
+        (
+            "https://www.beatport.com/artist/burial/12345",
+            EntityKind.ARTIST,
+            {IdKind.BEATPORT_ARTIST: "12345"},
+        ),
+        (
+            "https://www.beatport.com/label/hyperdub/1234",
+            EntityKind.LABEL,
+            {IdKind.BEATPORT_LABEL: "1234"},
+        ),
+        ("https://warp.bandcamp.com/", None, {}),
         ("https://example.com/album/x", None, {}),
         (
             "https://www.1001tracklists.com/track/j4rvgx/daft-punk-one-more-time/index.html",
@@ -197,6 +250,7 @@ def test_non_http_url_is_rejected(url: str) -> None:
 def test_text_query_is_split() -> None:
     query = parse_query("  Burial - Archangel ", EntityKind.TRACK)
 
+    assert isinstance(query, TrackQuery)
     assert (query.artist, query.title, query.url) == ("Burial", "Archangel", None)
 
 
@@ -228,3 +282,32 @@ def test_bad_isrc_is_an_invalid_query(
 ) -> None:
     with pytest.raises(InvalidQueryError, match=message):
         parse_query(text, kind, isrc=isrc)
+
+
+@pytest.mark.parametrize(
+    ("text", "kind", "expected"),
+    [
+        ("Aphex Twin", EntityKind.ARTIST, ArtistQuery(name="Aphex Twin")),
+        ("Warp", EntityKind.LABEL, LabelQuery(name="Warp")),
+        (
+            "https://www.discogs.com/label/23528-Warp",
+            None,
+            LabelQuery(
+                url="https://www.discogs.com/label/23528-Warp",
+                ids={IdKind.DISCOGS_LABEL: "23528"},
+            ),
+        ),
+        (
+            "https://warp.bandcamp.com/",
+            EntityKind.LABEL,
+            LabelQuery(url="https://warp.bandcamp.com/"),
+        ),
+    ],
+)
+def test_artist_and_label_queries(text: str, kind: EntityKind | None, expected: Query) -> None:
+    assert parse_query(text, kind) == expected
+
+
+def test_artist_query_takes_no_isrc() -> None:
+    with pytest.raises(InvalidQueryError, match="not an artist"):
+        parse_query("https://www.discogs.com/artist/45", isrc="GBAYE9701376")

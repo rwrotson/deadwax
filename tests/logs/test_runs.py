@@ -8,15 +8,20 @@ import pytest
 
 from deadwax.core import (
     AdapterError,
+    ArtistIdentity,
     ConfigurationError,
     Discrepancy,
     Dossier,
     EntityKind,
     ErrorKind,
     Identity,
+    LabelIdentity,
     Provenance,
+    Query,
+    RecordIdentity,
     Sourced,
     TraceEvent,
+    UnresolvedQuery,
     text_query,
     trace,
     trace_scope,
@@ -44,7 +49,7 @@ def sourced(value: str) -> Sourced[str]:
 
 
 def dossier(*, found: bool = True) -> Dossier:
-    identity = Identity(
+    identity = RecordIdentity(
         kind=EntityKind.TRACK,
         artist=sourced("Everything but the Girl") if found else None,
         title=sourced("Missing") if found else None,
@@ -327,3 +332,35 @@ def test_find_run_by_id_prefix_or_suffix(tmp_path: Path) -> None:
         find_run(tmp_path, "zzz")
     with pytest.raises(RunNotFoundError, match="no run"):
         find_run(tmp_path, "")
+
+
+@pytest.mark.parametrize(
+    ("query", "identity", "described", "found"),
+    [
+        (
+            text_query("Aphex Twin", EntityKind.ARTIST),
+            ArtistIdentity(name=sourced("Aphex Twin")),
+            ("Aphex Twin", "Aphex Twin", "artist"),
+            True,
+        ),
+        (
+            UnresolvedQuery(url="https://warp.bandcamp.com/"),
+            LabelIdentity(),
+            ("https://warp.bandcamp.com/", None, "label"),
+            False,
+        ),
+    ],
+)
+def test_a_run_of_an_artist_or_label_names_it(
+    settings: RunLogSettings,
+    query: Query,
+    identity: Identity,
+    described: tuple[str, str | None, str],
+    found: bool,
+) -> None:
+    with run_journal(settings) as run:
+        run.record(Dossier(query=query, identity=identity, generated_at=NOW))
+
+    [record] = read_runs(settings.dir)  # type: ignore[arg-type]
+    assert (record.query, record.identity, record.kind) == described
+    assert record.found is found

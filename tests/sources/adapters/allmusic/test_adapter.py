@@ -7,6 +7,7 @@ from deadwax import (
     Rating,
 )
 from deadwax.core import (
+    RecordCandidate,
     SourceError,
 )
 from deadwax.sources.adapters.allmusic import AllMusicAdapter
@@ -27,7 +28,7 @@ def test_allmusic_real_page_structure() -> None:
     )
 
     assert (hits[0].key.artist, hits[0].key.title) == ("Radiohead", "OK Computer")
-    assert result.candidate is not None
+    assert isinstance(result.candidate, RecordCandidate)
     assert (result.candidate.artist, result.candidate.title) == ("Radiohead", "OK Computer")
     assert result.texts[0].author == "Stephen Thomas Erlewine"
     assert result.texts[0].rating == Rating(value=4.5, scale=5)

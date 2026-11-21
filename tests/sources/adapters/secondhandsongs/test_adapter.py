@@ -9,6 +9,7 @@ from deadwax.core import (
     EntityType,
     LookupContext,
     NotFoundError,
+    RecordCandidate,
     RelationKind,
     Scope,
     merge,
@@ -112,7 +113,7 @@ async def test_original_lists_covers_and_writers() -> None:
     assert seen[0].url.params["performer"] == "Band"
     assert seen[0].headers["accept"] == "application/json"
     assert "x-api-key" not in seen[0].headers
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert (partial.candidate.artist, partial.candidate.date) == ("Band", "1970-11")
     assert partial.candidate.url == "https://secondhandsongs.com/performance/1"
     assert [(c.role, c.name, c.scope) for c in partial.credits] == [
@@ -135,7 +136,7 @@ async def test_cover_names_the_work_and_the_dated_original() -> None:
 
     partial = await adapter.lookup(query, LookupContext(query=query))
 
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.date == "1999"
     cover_of = [r for r in partial.relations if r.note != "adaptation"]
     assert [(r.kind, r.target.type, r.target.artist, r.target.date, r.note) for r in cover_of] == [

@@ -23,13 +23,18 @@ from pydantic import BaseModel, ValidationError
 
 from deadwax import (
     TRACE_ATTRIBUTE,
+    AlbumQuery,
+    ArtistQuery,
     ConfigurationError,
     DeadwaxError,
     Dossier,
     ErrorKind,
+    LabelQuery,
     Query,
+    RecordIdentity,
     TraceEvent,
     TraceFilter,
+    TrackQuery,
 )
 from deadwax.logs.settings import RunLogSettings
 from deadwax.logs.setup import add_trace_fields
@@ -229,8 +234,17 @@ def _new_run_id(now: datetime) -> str:
 
 
 def _describe_query(query: Query) -> str:
-    if query.artist and query.title:
-        return f"{query.artist} - {query.title}"
+    match query:
+        case (
+            TrackQuery(artist=str(artist), title=str(title))
+            | AlbumQuery(
+                artist=str(artist),
+                title=str(title),
+            )
+        ):
+            return f"{artist} - {title}"
+        case ArtistQuery(name=str(name)) | LabelQuery(name=str(name)):
+            return name
     return query.url or ""
 
 
@@ -415,8 +429,11 @@ class RunJournal:
         kind = identity.kind or dossier.query.kind
         record.kind = None if kind is None else str(kind)
         record.found = dossier.found
-        if identity.artist is not None and identity.title is not None:
-            record.identity = f"{identity.artist.value} - {identity.title.value}"
+        if isinstance(identity, RecordIdentity):
+            if identity.artist is not None and identity.title is not None:
+                record.identity = f"{identity.artist.value} - {identity.title.value}"
+        elif identity.name is not None:
+            record.identity = identity.name.value
         record.discrepancies = [discrepancy.field for discrepancy in identity.discrepancies]
         return record
 

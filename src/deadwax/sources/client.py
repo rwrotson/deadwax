@@ -72,7 +72,7 @@ class Deadwax:
         """
         if self._resources is None:
             raise RuntimeError("the client is not open; use 'async with Deadwax(...)'")
-        if isinstance(request, Query):
+        if not isinstance(request, Request):
             request = Request(query=request)
         adapters = build_adapters(self._config, self._resources)
         options = LookupOptions(

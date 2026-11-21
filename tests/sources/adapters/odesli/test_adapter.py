@@ -12,6 +12,7 @@ from deadwax.core import (
     NotFoundError,
     Pass,
     Provenance,
+    RecordCandidate,
     SourceError,
     SourceState,
 )
@@ -91,7 +92,7 @@ async def test_links_on_every_platform_from_a_curated_link() -> None:
 
     assert str(requests[0].url) == f"https://song.link/{quote(SPOTIFY, safe='')}"
     assert "Mozilla" in requests[0].headers["user-agent"]
-    assert found.candidate is not None
+    assert isinstance(found.candidate, RecordCandidate)
     assert (found.candidate.title, found.candidate.isrcs) == ("Paranoid Android", ["GBAYE9701376"])
     assert [(link.service, link.target) for link in found.links] == [
         ("spotify", LinkTarget.TRACK),
@@ -115,7 +116,7 @@ async def test_query_url_is_the_seed_and_albums_have_album_links() -> None:
     )
 
     assert str(requests[0].url).endswith("open.spotify.com%2Falbum%2F6dVIqQ8qmQ5GBnJ9shOYGE")
-    assert found.candidate is not None
+    assert isinstance(found.candidate, RecordCandidate)
     assert (found.candidate.kind, found.candidate.upcs) == (EntityKind.ALBUM, ["634904078164"])
     assert {link.target for link in found.links} == {LinkTarget.ALBUM}
 

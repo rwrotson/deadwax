@@ -8,6 +8,7 @@ from deadwax import (
     Link,
     Metric,
     Provenance,
+    RecordIdentity,
     Relation,
     ReviewLink,
     Sourced,
@@ -15,7 +16,16 @@ from deadwax import (
     Text,
     VersionKind,
 )
-from deadwax.cli.text import access_label, number, rating, relation_details, version_text
+from deadwax.cli.text import (
+    access_label,
+    identity_title,
+    name_fields,
+    number,
+    query_text,
+    rating,
+    relation_details,
+    version_text,
+)
 
 
 def _sources(sources: Iterable[Provenance]) -> str:
@@ -28,17 +38,33 @@ def _sourced(label: str, value: Sourced[str] | None) -> list[str]:
     return [] if value is None else [f"- **{label}:** {value.value} ({_sources(value.sources)})"]
 
 
-def _heading(identity: Identity, fallback: str) -> str:
-    if identity.artist is None or identity.title is None:
-        return f"# {fallback}"
-    return f"# {identity.artist.value} — {identity.title.value}"
-
-
 def _identity(identity: Identity) -> list[str]:
     lines = ["## Identity", ""]
     if identity.kind is not None:
         lines.append(f"- **Kind:** {identity.kind}")
-    lines += _sourced("Artist", identity.artist) + _sourced("Title", identity.title)
+    if isinstance(identity, RecordIdentity):
+        lines += _record(identity)
+    else:
+        lines += [
+            line
+            for label, value in name_fields(identity)
+            for line in _sourced(label.capitalize(), value)
+        ]
+    lines += [
+        f"- **{item.kind}:** {item.value} ({_sources(item.sources)})"
+        for item in identity.external_ids
+    ]
+
+    for discrepancy in identity.discrepancies:
+        values = "; ".join(
+            f"{value.value} ({_sources(value.sources)})" for value in discrepancy.values
+        )
+        lines.append(f"- **Sources disagree on {discrepancy.field}:** {values}")
+    return lines
+
+
+def _record(identity: RecordIdentity) -> list[str]:
+    lines = _sourced("Artist", identity.artist) + _sourced("Title", identity.title)
     if identity.version.kind is not VersionKind.ORIGINAL or identity.version.detail:
         lines.append(f"- **Version:** {version_text(identity.version)}")
     lines += _sourced("Date", identity.date)
@@ -57,16 +83,6 @@ def _identity(identity: Identity) -> list[str]:
     lines += [
         f"- **Copyright:** {line.value} ({_sources(line.sources)})" for line in identity.copyrights
     ]
-    lines += [
-        f"- **{item.kind}:** {item.value} ({_sources(item.sources)})"
-        for item in identity.external_ids
-    ]
-
-    for discrepancy in identity.discrepancies:
-        values = "; ".join(
-            f"{value.value} ({_sources(value.sources)})" for value in discrepancy.values
-        )
-        lines.append(f"- **Sources disagree on {discrepancy.field}:** {values}")
     return lines
 
 
@@ -150,9 +166,8 @@ def _errors(errors: list[AdapterError]) -> list[str]:
 
 def to_markdown(dossier: Dossier) -> str:
     """Render a dossier as Markdown with the source of every fact."""
-    fallback = dossier.query.url or f"{dossier.query.artist} - {dossier.query.title}"
     lines = [
-        _heading(dossier.identity, fallback),
+        f"# {identity_title(dossier.identity) or query_text(dossier.query)}",
         "",
         *_identity(dossier.identity),
         *_section("Tags", dossier.tags, _tag),

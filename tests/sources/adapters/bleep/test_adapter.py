@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from deadwax.core import EntityKind, RecordKey, SourceError, TextKind
+from deadwax.core import EntityKind, RecordCandidate, RecordKey, SourceError, TextKind
 from deadwax.sources._search import pick_hit
 from deadwax.sources.adapters.bleep.parse import page_partial as bleep_page
 from deadwax.sources.adapters.bleep.parse import search_hits as bleep_hits
@@ -19,7 +19,7 @@ def test_bleep_saved_pages() -> None:
 
     page = (FIXTURES / "bleep/pages/untrue.html").read_bytes()
     partial = bleep_page(page, "https://bleep.com/release/288787-burial-untrue", key)
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.title == "Untrue"
     assert partial.candidate.date == "2007-11-05"
     assert partial.texts[0].kind is TextKind.SHOP

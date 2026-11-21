@@ -87,8 +87,9 @@ def _show_browser_notices(show: bool) -> None:
 
 app = typer.Typer(
     cls=_LookupByDefault,
-    help="Collect what open sources know about a track or album.\n\n"
-    'Usage: deadwax --track "Artist - Title", deadwax URL, or deadwax sources.',
+    help="Collect what open sources know about a track, album, artist, or label.\n\n"
+    'Usage: deadwax --track "Artist - Title", deadwax --artist "Name", deadwax URL, '
+    "or deadwax sources.",
     add_completion=False,
     no_args_is_help=True,
 )
@@ -112,7 +113,7 @@ def root(
         ),
     ] = False,
 ) -> None:
-    """Collect what open sources know about a track or album."""
+    """Collect what open sources know about a track, album, artist, or label."""
 
 
 def _usage_error(message: str) -> typer.Exit:
@@ -222,10 +223,15 @@ FormatOption = Annotated[OutputFormat, typer.Option("--format", "-f", help="Outp
 @app.command("lookup")
 def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
     ctx: typer.Context,
-    query: Annotated[str, typer.Argument(help="'Artist - Title' or a record page URL.")],
+    query: Annotated[
+        str,
+        typer.Argument(help="'Artist - Title', an artist or label name, or a record page URL."),
+    ],
     *,
     album: Annotated[bool, typer.Option("--album", help="The query names an album.")] = False,
     track: Annotated[bool, typer.Option("--track", help="The query names a track.")] = False,
+    artist: Annotated[bool, typer.Option("--artist", help="The query names an artist.")] = False,
+    label: Annotated[bool, typer.Option("--label", help="The query names a label.")] = False,
     sources: Annotated[
         str | None,
         typer.Option(
@@ -275,7 +281,7 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
     config: ConfigOption = None,
     verbose: VerboseOption = False,
 ) -> None:
-    """Look up a track or album (the default command)."""
+    """Look up a track, album, artist, or label (the default command)."""
     overrides: dict[str, object] = {}
     if no_cache:
         overrides["cache"] = {"enabled": False}
@@ -285,9 +291,16 @@ def lookup_command(  # noqa: PLR0913 -- one parameter per command-line option
     settings = _settings(config, verbose, **overrides)
 
     with _journal(ctx, settings, "lookup") as journal:
-        if album and track:
-            raise _usage_error("--album and --track are mutually exclusive")
-        kind = EntityKind.ALBUM if album else EntityKind.TRACK if track else None
+        flags = {
+            EntityKind.TRACK: track,
+            EntityKind.ALBUM: album,
+            EntityKind.ARTIST: artist,
+            EntityKind.LABEL: label,
+        }
+        kinds = [kind for kind, given in flags.items() if given]
+        if len(kinds) > 1:
+            raise _usage_error("--track, --album, --artist, and --label are mutually exclusive")
+        kind = kinds[0] if kinds else None
         try:
             parsed = parse_query(query, kind, isrc=isrc)
             request = Request(query=parsed, facets=_facets(facets))

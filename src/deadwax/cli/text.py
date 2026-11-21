@@ -1,4 +1,19 @@
-from deadwax import Rating, Relation, SourceAccess, VersionInfo
+from deadwax import (
+    AlbumQuery,
+    ArtistIdentity,
+    ArtistQuery,
+    Identity,
+    LabelIdentity,
+    LabelQuery,
+    Query,
+    Rating,
+    RecordIdentity,
+    Relation,
+    SourceAccess,
+    Sourced,
+    TrackQuery,
+    VersionInfo,
+)
 
 # HTML transports that drive a browser and so run headless or headed.
 _BROWSER_TRANSPORTS = frozenset({"patchright", "nodriver"})
@@ -41,6 +56,48 @@ def rating(value: Rating | None) -> str:
 def version_text(version: VersionInfo) -> str:
     """Write a version kind with its title marker."""
     return f"{version.kind} ({version.detail})" if version.detail else str(version.kind)
+
+
+def identity_title(identity: Identity) -> str | None:
+    """Name the identified record: artist and title of a track or album, else its name."""
+    if isinstance(identity, RecordIdentity):
+        if identity.title is None:
+            return None
+        artist = f"{identity.artist.value} — " if identity.artist is not None else ""
+        return f"{artist}{identity.title.value}"
+    return None if identity.name is None else identity.name.value
+
+
+def query_text(query: Query) -> str:
+    """Write what a query asks for: its URL, 'Artist - Title', or a name."""
+    match query:
+        case (
+            TrackQuery(url=None, artist=str(artist), title=str(title))
+            | AlbumQuery(
+                url=None,
+                artist=str(artist),
+                title=str(title),
+            )
+        ):
+            return f"{artist} - {title}"
+        case ArtistQuery(url=None, name=str(name)) | LabelQuery(url=None, name=str(name)):
+            return name
+    return query.url or ""
+
+
+def name_fields(identity: ArtistIdentity | LabelIdentity) -> list[tuple[str, Sourced[str]]]:
+    """List the identified fields of an artist or label with their labels."""
+    fields = [
+        ("name", identity.name),
+        ("disambiguation", identity.disambiguation),
+        ("country", identity.country),
+        ("begin", identity.begin),
+        ("end", identity.end),
+    ]
+    if isinstance(identity, ArtistIdentity) and identity.type is not None:
+        artist_type = Sourced(value=str(identity.type.value), sources=identity.type.sources)
+        fields.insert(2, ("type", artist_type))
+    return [(label, value) for label, value in fields if value is not None]
 
 
 def relation_details(relation: Relation) -> list[str]:

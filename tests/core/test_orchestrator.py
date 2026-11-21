@@ -7,13 +7,21 @@ from datetime import UTC, datetime
 import pytest
 
 from deadwax.core import (
+    LOOKUP_SOURCE,
     Adapter,
+    AlbumQuery,
+    ArtistCandidate,
+    ArtistIdentity,
+    ArtistQuery,
     BlockedError,
     Capability,
     ConfigurationError,
     EntityKind,
     ErrorKind,
     IdKind,
+    LabelCandidate,
+    LabelIdentity,
+    LabelQuery,
     Link,
     LinkTarget,
     LookupContext,
@@ -26,6 +34,7 @@ from deadwax.core import (
     Query,
     RateLimitedError,
     RecordCandidate,
+    RecordIdentity,
     Requirement,
     Scope,
     SourceError,
@@ -33,6 +42,8 @@ from deadwax.core import (
     SourceState,
     SourceStatus,
     Tag,
+    TrackQuery,
+    UnresolvedQuery,
     adapter_time_left,
     expand_names,
     pause_adapter_timeout,
@@ -68,6 +79,8 @@ class FakeAdapter:
         return Lookups(
             track=self.lookup if EntityKind.TRACK in self.kinds else None,
             album=self.lookup if EntityKind.ALBUM in self.kinds else None,
+            artist=self.lookup if EntityKind.ARTIST in self.kinds else None,
+            label=self.lookup if EntityKind.LABEL in self.kinds else None,
             unresolved=self.lookup if self.unresolved else None,
         )
 
@@ -138,6 +151,7 @@ async def test_identity_pass_runs_before_enrichment_and_feeds_its_context() -> N
 
     [(_, first_context)] = musicbrainz.calls
     [(_, context)] = wikipedia.calls
+    assert isinstance(first_context.identity, RecordIdentity)
     assert first_context.identity.title is None
     assert context.id(IdKind.WIKIDATA) == "Q1"
     assert context.urls("spotify") == ["https://open.spotify.com/track/1"]
@@ -179,7 +193,7 @@ async def test_other_version_found_in_identity_pass_gives_no_context() -> None:
 
 
 async def test_url_resolver_runs_first_and_sets_the_kind() -> None:
-    query = Query(url="https://artist.bandcamp.com/x")
+    query = UnresolvedQuery(url="https://artist.bandcamp.com/x")
     page = found("bandcamp", kind=EntityKind.ALBUM, url="https://artist.bandcamp.com/x")
     bandcamp = FakeAdapter("bandcamp", Pass.ENRICH, returning(page), resolves_urls=True)
     musicbrainz = FakeAdapter("musicbrainz", Pass.IDENTITY)
@@ -189,6 +203,7 @@ async def test_url_resolver_runs_first_and_sets_the_kind() -> None:
     [(passed_query, context)] = musicbrainz.calls
     assert len(bandcamp.calls) == 1
     assert passed_query.kind is EntityKind.ALBUM
+    assert isinstance(context.identity, RecordIdentity)
     assert context.identity.title is not None
     assert context.identity.title.value == "Missing"
     assert dossier.query == query
@@ -196,7 +211,7 @@ async def test_url_resolver_runs_first_and_sets_the_kind() -> None:
 
 
 async def test_resolver_without_kind_leaves_the_query_unchanged() -> None:
-    query = Query(url="https://song.link/x")
+    query = UnresolvedQuery(url="https://song.link/x")
     odesli = FakeAdapter(
         "odesli",
         Pass.IDENTITY,
@@ -212,7 +227,7 @@ async def test_resolver_without_kind_leaves_the_query_unchanged() -> None:
 
 
 async def test_kind_given_by_the_url_is_kept() -> None:
-    query = Query(url="https://artist.bandcamp.com/track/x", kind=EntityKind.TRACK)
+    query = TrackQuery(url="https://artist.bandcamp.com/track/x")
     page = found("bandcamp", kind=EntityKind.ALBUM)
     bandcamp = FakeAdapter("bandcamp", Pass.ENRICH, returning(page), resolves_urls=True)
     discogs = FakeAdapter("discogs")
@@ -538,7 +553,7 @@ async def test_lookup_traces_selection_passes_and_adapter_outcomes(traced: Trace
 
 
 async def test_url_lookup_traces_its_resolver_and_adopted_kind(traced: Traced) -> None:
-    query = Query(url="https://artist.bandcamp.com/x")
+    query = UnresolvedQuery(url="https://artist.bandcamp.com/x")
     page = found("bandcamp", kind=EntityKind.ALBUM)
     bandcamp = FakeAdapter("bandcamp", Pass.ENRICH, returning(page), resolves_urls=True)
 
@@ -570,7 +585,7 @@ async def test_facets_select_adapters_that_contribute_them() -> None:
 
 
 async def test_facets_keep_the_resolver_of_a_url_query() -> None:
-    query = Query(url="https://song.link/x")
+    query = UnresolvedQuery(url="https://song.link/x")
     odesli = FakeAdapter(
         "odesli",
         Pass.LINKS,
@@ -608,7 +623,7 @@ async def test_adapters_without_a_lookup_of_the_query_kind_do_not_run(traced: Tr
 
 
 async def test_each_pass_dispatches_on_the_kind_known_so_far(traced: Traced) -> None:
-    query = Query(url="https://example.org/x")
+    query = UnresolvedQuery(url="https://example.org/x")
     page = found("musicbrainz", kind=EntityKind.ALBUM)
     musicbrainz = FakeAdapter("musicbrainz", Pass.IDENTITY, returning(page))
     lastfm = FakeAdapter("lastfm", unresolved=False)
@@ -617,6 +632,9 @@ async def test_each_pass_dispatches_on_the_kind_known_so_far(traced: Traced) -> 
     await lookup([musicbrainz, lastfm, genius], query)
 
     assert (len(musicbrainz.calls), len(lastfm.calls), len(genius.calls)) == (1, 1, 0)
+    [(passed_query, context)] = lastfm.calls
+    assert passed_query == AlbumQuery(url=query.url)
+    assert context.query == passed_query
     starts = {event["pass"]: event for event in traced("pass.start")}
     assert starts["identity"]["kind"] is None
     assert starts["enrich"]["kind"] == "album"
@@ -625,10 +643,69 @@ async def test_each_pass_dispatches_on_the_kind_known_so_far(traced: Traced) -> 
 
 
 async def test_a_resolver_needs_a_lookup_of_an_unknown_kind() -> None:
-    query = Query(url="https://artist.bandcamp.com/x")
+    query = UnresolvedQuery(url="https://artist.bandcamp.com/x")
     tracks_only = FakeAdapter("shop", resolves_urls=True, unresolved=False)
     bandcamp = FakeAdapter("bandcamp", resolves_urls=True)
 
     await lookup([tracks_only, bandcamp], query)
 
     assert (len(tracks_only.calls), len(bandcamp.calls)) == (0, 1)
+
+
+RECORDS = frozenset({EntityKind.TRACK, EntityKind.ALBUM})
+
+
+async def test_a_kind_no_selected_source_looks_up_is_an_error(traced: Traced) -> None:
+    lastfm = FakeAdapter("lastfm", kinds=RECORDS)
+    genius = FakeAdapter("genius", kinds=frozenset({EntityKind.TRACK}))
+
+    dossier = await run(ArtistQuery(name="Aphex Twin"), [lastfm, genius], now=lambda: NOW)
+
+    assert (len(lastfm.calls), len(genius.calls)) == (0, 0)
+    [error] = dossier.errors
+    assert (error.source, error.kind) == (LOOKUP_SOURCE, ErrorKind.UNSUPPORTED)
+    assert "artist" in error.reason
+    [selected] = traced("lookup.selected")
+    assert selected["unsupported"] == ["lastfm", "genius"]
+
+
+async def test_a_source_of_the_kind_that_cannot_run_explains_itself() -> None:
+    lastfm = FakeAdapter("lastfm", kinds=RECORDS)
+    discogs = FakeAdapter("discogs", state=SourceState.MISSING_CREDENTIAL, detail="no token")
+
+    errors = await lookup([lastfm, discogs], LabelQuery(name="Warp"))
+
+    assert errors == ["discogs:skipped"]
+
+
+async def test_artist_query_runs_the_artist_lookups() -> None:
+    candidate = ArtistCandidate(name="Aphex Twin", ids={IdKind.MUSICBRAINZ_ARTIST: "f22942a1"})
+    musicbrainz = FakeAdapter(
+        "musicbrainz",
+        Pass.IDENTITY,
+        returning(Partial(source="musicbrainz", candidate=candidate)),
+    )
+    lastfm = FakeAdapter("lastfm")
+
+    dossier = await run(ArtistQuery(name="Aphex Twin"), [musicbrainz, lastfm], now=lambda: NOW)
+
+    [(passed_query, context)] = lastfm.calls
+    assert passed_query == ArtistQuery(name="Aphex Twin")
+    assert isinstance(context.identity, ArtistIdentity)
+    assert context.identity.name is not None
+    assert context.identity.name.value == "Aphex Twin"
+    assert isinstance(dossier.identity, ArtistIdentity)
+    assert dossier.found
+
+
+async def test_resolver_of_a_label_page_turns_the_query_into_a_label_query() -> None:
+    query = UnresolvedQuery(url="https://warp.bandcamp.com/")
+    page = Partial(source="bandcamp", candidate=LabelCandidate(name="Warp"))
+    bandcamp = FakeAdapter("bandcamp", behaviour=returning(page), resolves_urls=True)
+    discogs = FakeAdapter("discogs", unresolved=False)
+
+    dossier = await run(query, [bandcamp, discogs], now=lambda: NOW)
+
+    [(passed_query, _)] = discogs.calls
+    assert passed_query == LabelQuery(url=query.url)
+    assert isinstance(dossier.identity, LabelIdentity)

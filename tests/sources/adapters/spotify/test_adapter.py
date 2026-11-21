@@ -8,7 +8,6 @@ import pytest
 
 from deadwax.core import (
     EntityKind,
-    Identity,
     IdKind,
     Link,
     LinkTarget,
@@ -16,6 +15,8 @@ from deadwax.core import (
     MetricKind,
     NotFoundError,
     Provenance,
+    RecordCandidate,
+    RecordIdentity,
     RelationKind,
     Sourced,
     SourceError,
@@ -129,7 +130,7 @@ def make(server: Server, settings: LookupConfig | None = None) -> SpotifyAdapter
 def context(text: str, kind: EntityKind, **identity: object) -> LookupContext:
     return LookupContext(
         query=parse_query(text, kind),
-        identity=Identity.model_validate(identity),
+        identity=RecordIdentity.model_validate(identity),
     )
 
 
@@ -152,7 +153,7 @@ async def test_track_by_search_with_album_facts() -> None:
     assert [r.url.path for r in server.requests[2:]] == ["/v1/tracks/t1", "/v1/albums/al1"]
 
     candidate = partial.candidate
-    assert candidate is not None
+    assert isinstance(candidate, RecordCandidate)
     assert (candidate.artist, candidate.title, candidate.date) == (
         "Radiohead",
         "Paranoid Android",
@@ -181,7 +182,7 @@ async def test_live_query_picks_the_live_track() -> None:
     partial = await adapter.lookup(found.query, found)
     await adapter.aclose()
 
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.title == "Paranoid Android - Live"
     assert partial.candidate.isrcs == []
 
@@ -266,7 +267,7 @@ async def test_codes_without_a_key_take_the_first_hit() -> None:
     query = parse_query("https://open.spotify.com/intl-de/album/zz")
     found = LookupContext(
         query=query.model_copy(update={"ids": {}}),
-        identity=Identity(
+        identity=RecordIdentity(
             upcs=[Sourced(value="634904078164", sources=[Provenance(source="musicbrainz")])],
         ),
     )

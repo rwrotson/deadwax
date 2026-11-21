@@ -5,6 +5,11 @@ import pytest
 from deadwax.core import (
     QUERY_SOURCE,
     AdapterError,
+    AlbumQuery,
+    ArtistCandidate,
+    ArtistIdentity,
+    ArtistQuery,
+    ArtistType,
     CandidateLabel,
     Credit,
     Entity,
@@ -12,15 +17,18 @@ from deadwax.core import (
     EntityType,
     ErrorKind,
     IdKind,
+    LabelCandidate,
+    LabelIdentity,
+    LabelQuery,
     Link,
     LinkTarget,
     Metric,
     MetricKind,
     Partial,
     Provenance,
-    Query,
     Rating,
     RecordCandidate,
+    RecordIdentity,
     Relation,
     RelationKind,
     ReviewLink,
@@ -29,6 +37,8 @@ from deadwax.core import (
     TagKind,
     Text,
     TextKind,
+    TrackQuery,
+    UnresolvedQuery,
     VersionInfo,
     VersionKind,
     merge,
@@ -73,6 +83,7 @@ def test_matching_partials_merge_with_provenance() -> None:
     dossier = merge(TRACK, partials, generated_at=NOW)
 
     assert dossier.found
+    assert isinstance(dossier.identity, RecordIdentity)
     assert dossier.identity.artist is not None
     assert dossier.identity.artist.value == "Everything but the Girl"
     assert [s.source for s in dossier.identity.artist.sources] == ["musicbrainz", "discogs"]
@@ -100,6 +111,7 @@ def test_other_version_is_kept_out_and_reported() -> None:
     dossier = merge(TRACK, partials, generated_at=NOW)
 
     assert dossier.tags == []
+    assert isinstance(dossier.identity, RecordIdentity)
     assert dossier.identity.version.kind is VersionKind.ORIGINAL
     assert dossier.identity.date is not None
     assert dossier.identity.date.value == "1994"
@@ -166,6 +178,7 @@ def test_disagreements_are_recorded_not_smoothed() -> None:
 
     fields = {d.field: [v.value for v in d.values] for d in dossier.identity.discrepancies}
     assert fields == {"date": ["1994-06", "1995-01"], "ids.discogs_release": ["1", "2"]}
+    assert isinstance(dossier.identity, RecordIdentity)
     assert dossier.identity.date is not None
     assert dossier.identity.date.value == "1994-06"
     assert [i.value for i in dossier.identity.external_ids] == ["1", "2"]
@@ -181,6 +194,7 @@ def test_artist_spelling_conflict_is_a_discrepancy() -> None:
 
     dossier = merge(query, partials, generated_at=NOW)
 
+    assert isinstance(dossier.identity, RecordIdentity)
     assert dossier.identity.artist is not None
     assert dossier.identity.artist.value == "Kino"
     [discrepancy] = dossier.identity.discrepancies
@@ -188,8 +202,7 @@ def test_artist_spelling_conflict_is_a_discrepancy() -> None:
 
 
 def test_url_query_uses_first_candidate_as_reference() -> None:
-    query = Query(
-        kind=EntityKind.TRACK,
+    query = TrackQuery(
         url="https://everythingbutthegirl.bandcamp.com/track/missing",
     )
     partials = [
@@ -207,7 +220,7 @@ def test_url_query_uses_first_candidate_as_reference() -> None:
 
 
 def test_url_query_without_candidates_keeps_facts() -> None:
-    query = Query(url="https://example.com/x")
+    query = UnresolvedQuery(url="https://example.com/x")
 
     dossier = merge(query, [partial("odesli", None, links=[])], generated_at=NOW)
 
@@ -225,12 +238,13 @@ def test_explicit_version_is_used_for_identity() -> None:
 
     dossier = merge(query, partials, generated_at=NOW)
 
+    assert isinstance(dossier.identity, RecordIdentity)
     assert dossier.identity.version.kind is VersionKind.ORIGINAL
     assert dossier.relations[0].note == "live: Glastonbury 1997"
 
 
 def test_labels_codes_and_kind_are_combined() -> None:
-    query = Query(url="https://example.com/untrue")
+    query = UnresolvedQuery(url="https://example.com/untrue")
     partials = [
         partial(
             "discogs",
@@ -507,6 +521,7 @@ def test_bpm_and_key_agree_or_disagree_across_sources() -> None:
 
     identity = merge(TRACK, partials, generated_at=NOW).identity
 
+    assert isinstance(identity, RecordIdentity)
     assert identity.bpm is not None
     assert (identity.bpm.value, len(identity.bpm.sources)) == (124.0, 2)
     assert identity.key is not None
@@ -523,6 +538,7 @@ def test_unknown_key_notation_is_kept_as_text() -> None:
 
     identity = merge(TRACK, partials, generated_at=NOW).identity
 
+    assert isinstance(identity, RecordIdentity)
     assert identity.key is not None
     assert [d.field for d in identity.discrepancies] == ["key"]
     assert identity.bpm is None
@@ -544,6 +560,7 @@ def test_extended_mix_is_not_merged_into_the_original_mix() -> None:
 
     dossier = merge(query, partials, generated_at=NOW)
 
+    assert isinstance(dossier.identity, RecordIdentity)
     assert dossier.identity.title is not None
     assert [source.source for source in dossier.identity.title.sources] == ["musicbrainz"]
     assert dossier.tags == []
@@ -638,7 +655,7 @@ def test_short_or_unrelated_texts_stay_apart() -> None:
 
 
 def test_review_score_merges_and_rejected_links_do_not_leak() -> None:
-    query = Query(kind=EntityKind.ALBUM, artist="Radiohead", title="OK Computer")
+    query = AlbumQuery(artist="Radiohead", title="OK Computer")
     candidate = RecordCandidate(kind=EntityKind.ALBUM, artist="Radiohead", title="OK Computer")
     source = Provenance(source="allmusic", url="https://www.allmusic.com/album/ok-computer")
     wiki = Provenance(source="wikipedia", url="https://en.wikipedia.org/wiki/OK_Computer")
@@ -705,3 +722,128 @@ def test_same_link_keeps_a_preview_that_a_later_source_gives() -> None:
 
     assert link.preview_url == preview
     assert [source.source for source in link.sources] == ["musicbrainz", "bandcamp"]
+
+
+def artist_partial(source: str, **fields: object) -> Partial:
+    values: dict[str, object] = {"name": "Aphex Twin"}
+    return Partial(source=source, candidate=ArtistCandidate.model_validate(values | fields))
+
+
+def test_artist_identity_agrees_on_fields_and_records_disputes() -> None:
+    query = ArtistQuery(name="Aphex Twin")
+    partials = [
+        artist_partial(
+            "musicbrainz",
+            type=ArtistType.PERSON,
+            country="GB",
+            begin="1971-08-18",
+            disambiguation="Richard D. James",
+            ids={IdKind.MUSICBRAINZ_ARTIST: "f22942a1"},
+        ),
+        artist_partial("discogs", country="gb", begin="1971", ids={IdKind.DISCOGS_ARTIST: "45"}),
+        artist_partial("lastfm", type=ArtistType.GROUP, country="IE"),
+    ]
+
+    dossier = merge(query, partials, generated_at=NOW)
+
+    identity = dossier.identity
+    assert isinstance(identity, ArtistIdentity)
+    assert dossier.found
+    assert identity.name is not None
+    assert {p.source for p in identity.name.sources} == {"musicbrainz", "discogs", "lastfm"}
+    assert identity.begin is not None
+    assert identity.begin.value == "1971-08-18"
+    assert identity.country is not None
+    assert identity.country.value == "GB"
+    assert identity.type is not None
+    assert identity.type.value is ArtistType.PERSON
+    assert identity.disambiguation is not None
+    assert identity.end is None
+    assert {i.kind for i in identity.external_ids} == {
+        IdKind.MUSICBRAINZ_ARTIST,
+        IdKind.DISCOGS_ARTIST,
+    }
+    assert [d.field for d in identity.discrepancies] == ["country", "type"]
+
+
+def test_namesake_with_another_id_is_no_match() -> None:
+    query = UnresolvedQuery(url="https://musicbrainz.org/artist/f22942a1")
+    partials = [
+        artist_partial("musicbrainz", ids={IdKind.MUSICBRAINZ_ARTIST: "f22942a1"}),
+        artist_partial("listenbrainz", ids={IdKind.MUSICBRAINZ_ARTIST: "other"}),
+        artist_partial("lastfm", name="Aphex Twin"),
+    ]
+
+    dossier = merge(query, partials, generated_at=NOW)
+
+    assert isinstance(dossier.identity, ArtistIdentity)
+    assert dossier.identity.name is not None
+    assert {p.source for p in dossier.identity.name.sources} == {"musicbrainz", "lastfm"}
+    [error] = dossier.errors
+    assert (error.source, error.kind) == ("listenbrainz", ErrorKind.NO_MATCH)
+    assert "'Aphex Twin'" in error.reason
+
+
+def test_candidates_of_another_family_do_not_match() -> None:
+    record = partial("musicbrainz", candidate("Selected Ambient Works 85-92"))
+    label = Partial(source="discogs", candidate=LabelCandidate(name="Warp"))
+
+    by_name = merge(LabelQuery(name="Warp"), [record, label], generated_at=NOW)
+    by_url = merge(UnresolvedQuery(url="https://example.org/x"), [label, record], generated_at=NOW)
+
+    assert [(e.source, e.kind) for e in by_name.errors] == [("musicbrainz", ErrorKind.NO_MATCH)]
+    assert isinstance(by_name.identity, LabelIdentity)
+    assert by_name.identity.name is not None
+    assert by_name.identity.name.value == "Warp"
+    assert [(e.source, e.kind) for e in by_url.errors] == [("musicbrainz", ErrorKind.NO_MATCH)]
+    assert isinstance(by_url.identity, LabelIdentity)
+
+
+def test_label_identity_without_candidates_is_not_found() -> None:
+    dossier = merge(LabelQuery(name="Warp"), [Partial(source="discogs")], generated_at=NOW)
+
+    assert isinstance(dossier.identity, LabelIdentity)
+    assert not dossier.found
+
+
+def test_artist_facts_rank_the_artist_scope_and_pages_first() -> None:
+    sources = provenance("lastfm")
+    facts = {
+        "tags": [
+            Tag(name="idm", scope=Scope.RELEASE, sources=sources),
+            Tag(name="electronic", scope=Scope.ARTIST, sources=sources),
+        ],
+        "links": [
+            Link(
+                service="spotify",
+                url="https://s/album/1",
+                target=LinkTarget.ALBUM,
+                sources=sources,
+            ),
+            Link(
+                service="spotify",
+                url="https://s/artist/1",
+                target=LinkTarget.ARTIST,
+                sources=sources,
+            ),
+        ],
+    }
+    lastfm = artist_partial("lastfm").model_copy(update=facts)
+
+    dossier = merge(ArtistQuery(name="Aphex Twin"), [lastfm], generated_at=NOW)
+
+    assert [t.name for t in dossier.tags] == ["electronic", "idm"]
+    assert [link.target for link in dossier.links] == [LinkTarget.ARTIST, LinkTarget.ALBUM]
+
+
+def test_label_facts_rank_the_label_scope_first() -> None:
+    sources = provenance("discogs")
+    tags = [
+        Tag(name="ambient", scope=Scope.ARTIST, sources=sources),
+        Tag(name="electronic", scope=Scope.LABEL, sources=sources),
+    ]
+    label = Partial(source="discogs", candidate=LabelCandidate(name="Warp"), tags=tags)
+
+    dossier = merge(LabelQuery(name="Warp"), [label], generated_at=NOW)
+
+    assert [t.name for t in dossier.tags] == ["electronic", "ambient"]

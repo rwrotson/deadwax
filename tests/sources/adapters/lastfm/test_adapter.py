@@ -7,11 +7,12 @@ from deadwax.core import (
     Capability,
     EntityKind,
     EntityType,
-    Identity,
     LookupContext,
     NotFoundError,
     Provenance,
     Query,
+    RecordCandidate,
+    RecordIdentity,
     Scope,
     Sourced,
     SourceState,
@@ -73,7 +74,7 @@ async def test_track() -> None:
     partial = await adapter.lookup(TRACK, LookupContext(query=TRACK))
     await adapter.aclose()
 
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert (partial.candidate.artist, partial.candidate.title) == ("Band", "Song")
     assert [(t.name, t.scope, t.weight) for t in partial.tags] == [
         ("dub", Scope.RECORDING, 1.0),
@@ -122,7 +123,7 @@ async def test_album() -> None:
 @pytest.mark.asyncio
 async def test_url_query_uses_what_earlier_passes_found() -> None:
     query = parse_query("https://example.com/x", EntityKind.TRACK)
-    identity = Identity(
+    identity = RecordIdentity(
         artist=Sourced(value="Band", sources=[Provenance(source="musicbrainz")]),
         title=Sourced(value="Song", sources=[Provenance(source="musicbrainz")]),
     )

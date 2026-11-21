@@ -15,6 +15,7 @@ from deadwax.core import (
     NotFoundError,
     Partial,
     Query,
+    RecordCandidate,
     RelationKind,
     Scope,
     SourceError,
@@ -102,7 +103,7 @@ async def test_release_by_search_with_shop_text_and_label() -> None:
     assert urls(seen) == [FEED, UNTRUE]
     assert seen[1].url.query == b""
     candidate = partial.candidate
-    assert candidate is not None
+    assert isinstance(candidate, RecordCandidate)
     assert (candidate.kind, candidate.artist, candidate.title, candidate.url) == (
         EntityKind.ALBUM,
         "Burial",
@@ -134,7 +135,7 @@ async def test_track_is_found_in_the_tracklist_of_its_release() -> None:
 
     assert urls(seen) == [FEED, UNTRUE]
     candidate = partial.candidate
-    assert candidate is not None
+    assert isinstance(candidate, RecordCandidate)
     assert (candidate.kind, candidate.artist, candidate.title) == (
         EntityKind.TRACK,
         "Burial",
@@ -153,7 +154,7 @@ async def test_track_of_a_split_release_names_its_own_artist() -> None:
     partial = await looked_up(adapter, parse_query("Burial - Phoneglow", EntityKind.TRACK))
 
     candidate = partial.candidate
-    assert candidate is not None
+    assert isinstance(candidate, RecordCandidate)
     assert (candidate.artist, candidate.title) == ("Burial", "Phoneglow")
     assert partial.relations[0].target.artist == "Burial and Kode9"
 
@@ -231,7 +232,7 @@ async def test_release_without_label_or_text() -> None:
 
     partial = await looked_up(adapter, parse_query(UNTRUE))
 
-    assert partial.candidate is not None
+    assert isinstance(partial.candidate, RecordCandidate)
     assert partial.candidate.labels == []
     assert partial.texts == []
 

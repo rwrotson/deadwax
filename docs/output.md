@@ -8,11 +8,11 @@ Every fact has `sources`: a list of `Provenance(source, url)`, where `source` is
 
 ## Identity
 
-`identity` describes the exact record that was found:
+`identity` describes the exact record that was found. Its fields depend on `kind`: a track or album (or a URL whose kind no source found) has a `RecordIdentity`, an artist an `ArtistIdentity`, a label a `LabelIdentity`. All three have `kind`, `external_ids`, and `discrepancies`.
 
 | Field | Content |
 |-------|---------|
-| `kind` | `track` or `album` |
+| `kind` | `track` or `album`, or `null` when no source told |
 | `artist`, `title`, `date` | Sourced values: `{"value": …, "sources": […]}`; `date` is an ISO date, possibly partial (`1997`, `1997-05`) |
 | `version` | `kind` (`original`, `remix`, `live`, `demo`, `cover`, `instrumental`, `acoustic`, `edit`, `extended`, `dub`, `alternate`, `reissue`, `remaster`) and `detail`, the marker it came from (`Todd Terry Remix`) |
 | `bpm`, `key` | Sourced tempo in beats per minute and musical key as a source gives it (`A Minor`, `8A`) |
@@ -22,17 +22,19 @@ Every fact has `sources`: a list of `Provenance(source, url)`, where `source` is
 | `external_ids` | IDs in other namespaces: MusicBrainz, Discogs, Wikidata, Bandcamp, Spotify, Apple Music, Deezer, SoundCloud, Beatport |
 | `discrepancies` | Fields on which sources disagree, each with every value and its sources |
 
+An artist or label identity has sourced `name`, `disambiguation` (a comment that tells namesakes apart), `country` as a source gives it, and `begin` and `end` (ISO dates, possibly partial: birth and death, formation and dissolution, or a label's founding and closing); an artist also has `type` (`person`, `group`, `orchestra`, `choir`, `character`, `other`). `found` is true when a source gave the title, or the name.
+
 Candidates are compared with the query text, or for a URL query with the URL's own page. Among accepted candidates, the value given by the most sources becomes the identity, and every disagreement on artist, title, version, date, tempo, key, or an ID is kept in `discrepancies` instead of being resolved silently.
 
 ### Versions are never mixed
 
-Each source's candidate is compared with the query by artist and base title, and its version separately. A candidate for the same work in another version (the original of a remix, a live take, a remaster) contributes none of its facts. It becomes a relation of kind `other_version`, with the version in `note`, and a `version` discrepancy. A candidate that matches neither becomes an error of kind `no_match`. Album and track never match each other, and a title alone never matches.
+Each source's candidate is compared with the query by artist and base title, and its version separately. A candidate for the same work in another version (the original of a remix, a live take, a remaster) contributes none of its facts. It becomes a relation of kind `other_version`, with the version in `note`, and a `version` discrepancy. A candidate that matches neither becomes an error of kind `no_match`. Album and track never match each other, and a title alone never matches. An artist or label candidate matches by identifier when it shares a namespace with the reference (two MusicBrainz artist IDs that differ are two namesakes), otherwise by name; records, artists, and labels never match each other, and name disagreements on country, dates, type, or disambiguation are kept in `discrepancies`.
 
 Mix names are versions: `Original Mix` is the original, `Extended Mix`, `Club Mix`, and `12" Version` are `extended`, a plain `Dub` is `dub`, and `Radio Edit` or `Single Edit` is `edit`. A remixer's cut (`Todd Terry Remix`) or a named edit (`Kode9 Edit`) is a `remix` with its name as `detail`; remixes by different people, and an extended, radio, dub, instrumental, or intro cut of one remix, are different versions. Tempos agree when they round to the same whole beat; keys agree across notations (`A Minor`, `Am`, Camelot `8A`, Open Key `1m`) and enharmonic spellings.
 
 ## Facts
 
-Facts have a `scope`: `recording`, `work`, `release`, `release_group`, `artist`, or `label`. Lists are ordered with the narrowest scope for the queried kind first, so facts about this recording or release come before artist-wide ones.
+Facts have a `scope`: `recording`, `work`, `release`, `release_group`, `artist`, or `label`. Lists are ordered with the narrowest scope for the queried kind first, so facts about this recording or release come before artist-wide ones, and for an artist or label query the artist's or label's own facts come first.
 
 | List | Item fields |
 |------|-------------|
@@ -91,6 +93,7 @@ Genius song lyrics appear as a full `lyrics` text with `work` scope when the pag
 | `rate_limited` | The source kept answering 429 beyond `http.max_retry_wait` |
 | `not_found` | The source has no such record |
 | `no_match` | The source found something, but not this record |
+| `unsupported` | No selected source looks up records of the query's kind; its `source` is `deadwax` |
 
 Sources excluded with `--exclude`, left out of `--sources` or of the default set, or disabled in settings produce no error. A failing source never stops the others and never raises out of `lookup()`.
 

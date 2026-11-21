@@ -10,6 +10,7 @@ from deadwax.core import (
     Partial,
     Pass,
     Query,
+    RecordCandidate,
     RecordKey,
     SourceError,
     SourceGroup,
@@ -81,7 +82,7 @@ class DeezerAdapter(HttpAdapter):
             except NotFoundError:
                 continue
             candidate = partial.candidate
-            if candidate is not None and parse.matches(
+            if isinstance(candidate, RecordCandidate) and parse.matches(
                 key,
                 candidate.artist,
                 candidate.title,

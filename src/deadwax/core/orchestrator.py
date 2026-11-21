@@ -9,8 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from deadwax.core.adapter import (
     Adapter,
+    BoundLookup,
     Capability,
-    KindLookup,
     LookupContext,
     Pass,
     SourceGroup,
@@ -26,8 +26,11 @@ from deadwax.core.errors import (
 )
 from deadwax.core.events import TraceEvent, trace, trace_scope
 from deadwax.core.merge import merge
-from deadwax.core.models import AdapterError, Dossier, ErrorKind, Partial
-from deadwax.core.query import Query
+from deadwax.core.models import AdapterError, Dossier, ErrorKind, Partial, RecordIdentity
+from deadwax.core.query import Query, with_kind
+
+# Source of errors about the lookup as a whole rather than one adapter.
+LOOKUP_SOURCE = "deadwax"
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +76,7 @@ def _outcome(partial: Partial) -> dict[str, object]:
 
 async def _call(
     adapter: Adapter,
-    lookup: KindLookup,
+    lookup: BoundLookup,
     context: LookupContext,
     seconds: float,
     slots: asyncio.Semaphore | None,
@@ -99,13 +102,13 @@ async def _call(
 
 async def _timed(
     adapter: Adapter,
-    lookup: KindLookup,
+    lookup: BoundLookup,
     context: LookupContext,
     seconds: float,
 ) -> Partial:
     try:
         async with adapter_deadline(seconds):
-            return await lookup(context.query, context)
+            return await lookup(context)
     except TimeoutError:
         return _failure(adapter, ErrorKind.TIMEOUT, f"no answer within {seconds:g} s")
     except SourceError as error:
@@ -186,12 +189,14 @@ def _select(
     ready: list[Adapter] = []
     skipped: list[AdapterError] = []
     unsupported: list[str] = []
+    supporting = 0
     for adapter in adapters:
         if adapter.name in exclude or (include is not None and adapter.name not in include):
             continue
-        if query.kind is not None and adapter.lookups.get(query.kind) is None:
+        if query.kind is not None and not adapter.lookups.supports(query.kind):
             unsupported.append(adapter.name)
             continue
+        supporting += 1
         if not _needed(adapter, query, options.facets):
             continue
         status = adapter.status()
@@ -217,7 +222,30 @@ def _select(
             and adapter.name not in {*unsupported, *(e.source for e in skipped)}
         ),
     )
+    if unsupported and not supporting:
+        skipped.append(
+            AdapterError(
+                source=LOOKUP_SOURCE,
+                kind=ErrorKind.UNSUPPORTED,
+                reason=f"no selected source looks up a record of kind {query.kind}",
+            ),
+        )
     return ready, skipped
+
+
+def _describe_identity(context: LookupContext) -> dict[str, object]:
+    """Summarize the identity a pass starts from for the `pass.start` event."""
+    identity = context.identity
+    described: dict[str, object] = {"kind": identity.kind}
+    if isinstance(identity, RecordIdentity):
+        described |= {
+            "artist": None if identity.artist is None else identity.artist.value,
+            "title": None if identity.title is None else identity.title.value,
+            "version": identity.version.model_dump(mode="json"),
+        }
+    else:
+        described["name"] = None if identity.name is None else identity.name.value
+    return described | {"external_ids": len(identity.external_ids)}
 
 
 class _Run:
@@ -232,7 +260,7 @@ class _Run:
         with trace_scope(stage="context"):
             dossier = merge(self.query, self.partials, generated_at=self.now())
         return LookupContext(
-            query=self.query,
+            query=with_kind(self.query, dossier.identity.kind),
             identity=dossier.identity,
             links=dossier.links,
             review_links=dossier.review_links,
@@ -247,24 +275,16 @@ class _Run:
 
     async def _run(self, adapters: Sequence[Adapter]) -> None:
         context = self.context()
-        identity = context.identity
-        kind = context.kind
-        lookups = [(adapter, adapter.lookups.get(kind)) for adapter in adapters]
+        lookups = [(adapter, adapter.lookups.bind(context.query)) for adapter in adapters]
         runnable = [(adapter, lookup) for adapter, lookup in lookups if lookup is not None]
         trace(
             logger,
             TraceEvent.PASS_START,
             sources=[adapter.name for adapter, _ in runnable],
-            kind=kind,
+            kind=context.kind,
             unsupported=[adapter.name for adapter, lookup in lookups if lookup is None],
             query=self.query.model_dump(mode="json"),
-            identity={
-                "kind": identity.kind,
-                "artist": None if identity.artist is None else identity.artist.value,
-                "title": None if identity.title is None else identity.title.value,
-                "version": identity.version.model_dump(mode="json"),
-                "external_ids": len(identity.external_ids),
-            },
+            identity=_describe_identity(context),
             links=len(context.links),
         )
         async with asyncio.TaskGroup() as group:
@@ -288,7 +308,7 @@ class _Run:
             return
         candidate = self.partials[0].candidate
         if candidate is not None and candidate.kind is not None:
-            self.query = self.query.model_copy(update={"kind": candidate.kind})
+            self.query = with_kind(self.query, candidate.kind)
             trace(logger, TraceEvent.LOOKUP_KIND_ADOPTED, kind=candidate.kind)
 
 
@@ -307,7 +327,7 @@ async def run(
     resolver = None
     if query.url is not None:
         resolver = next(
-            (a for a in ready if a.resolves(query) and a.lookups.get(query.kind) is not None),
+            (a for a in ready if a.resolves(query) and a.lookups.supports(query.kind)),
             None,
         )
         trace(

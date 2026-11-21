@@ -47,6 +47,7 @@ def test_adapters_declare_the_record_kinds_they_look_up() -> None:
     unresolved = {adapter.name for adapter in adapters if adapter.lookups.unresolved is not None}
 
     assert {name for name, found in kinds.items() if found == {EntityKind.TRACK}} == TRACKS_ONLY
-    assert all(found == set(EntityKind) for name, found in kinds.items() if name not in TRACKS_ONLY)
+    records = {EntityKind.TRACK, EntityKind.ALBUM}
+    assert all(found == records for name, found in kinds.items() if name not in TRACKS_ONLY)
     readers = {adapter.name for adapter in adapters if adapter.service is not None}
     assert unresolved == (readers - {"genius"}) | UNRESOLVED_WITHOUT_SERVICE
