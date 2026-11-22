@@ -232,6 +232,12 @@ SERVICES = (
     ),
     Service("7digital", ("7digital.com",)),
     Service(
+        "lastfm",
+        ("last.fm", "www.last.fm"),
+        (UrlRule(re.compile(r"^/music/[^/_+][^/]*/?$"), EntityKind.ARTIST),),
+        link=False,
+    ),
+    Service(
         "musicbrainz",
         ("musicbrainz.org",),
         (

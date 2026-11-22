@@ -3,9 +3,13 @@ from collections.abc import Iterable
 from datetime import datetime
 
 from deadwax.core import (
+    ArtistCandidate,
     Entity,
     EntityKind,
     EntityType,
+    IdKind,
+    Metric,
+    MetricKind,
     NotFoundError,
     Provenance,
     RateLimitedError,
@@ -97,7 +101,7 @@ def published(value: str | None) -> str | None:
 
 
 def wiki_texts(wiki: models.Wiki | None, scope: Scope, url: str | None) -> list[Text]:
-    """Return the wiki text of a track or album, if it has one."""
+    """Return the wiki text, if present."""
     if wiki is None:
         return []
     body = wiki_body(wiki)
@@ -133,6 +137,28 @@ def album_candidate(album: models.AlbumInfo) -> RecordCandidate:
         title=album.name,
         url=album.url,
     )
+
+
+def artist_candidate(artist: models.ArtistInfo) -> ArtistCandidate:
+    """Describe the artist and include the MusicBrainz ID when reported."""
+    return ArtistCandidate(
+        name=artist.name,
+        url=artist.url,
+        ids={IdKind.MUSICBRAINZ_ARTIST: artist.mbid} if artist.mbid else {},
+    )
+
+
+def artist_metrics(artist: models.ArtistInfo) -> list[Metric]:
+    """Return the artist's Last.fm listeners and scrobbles."""
+    sources = [Provenance(source=SOURCE, url=artist.url)]
+    return [
+        Metric(kind=kind, value=count, scope=Scope.ARTIST, sources=sources)
+        for kind, count in (
+            (MetricKind.LISTENERS, artist.stats.listeners),
+            (MetricKind.LISTENS, artist.stats.playcount),
+        )
+        if count is not None
+    ]
 
 
 def _note(match: float | None) -> str | None:

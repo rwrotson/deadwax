@@ -1,5 +1,10 @@
+from urllib.parse import unquote_plus, urlsplit
+
 from deadwax.core import (
+    ArtistQuery,
     Capability,
+    EntityKind,
+    IdKind,
     LookupContext,
     Lookups,
     NotFoundError,
@@ -14,9 +19,10 @@ from deadwax.core import (
     Tag,
 )
 from deadwax.sources._adapter import HttpAdapter
-from deadwax.sources._search import search_key
+from deadwax.sources._search import name_key, search_key
 from deadwax.sources.adapters.lastfm import models
 from deadwax.sources.adapters.lastfm import parse as p
+from deadwax.sources.services import recognize
 
 API = "https://ws.audioscrobbler.com/2.0/"
 SIMILAR_TRACKS = "20"
@@ -44,9 +50,15 @@ class LastfmAdapter(HttpAdapter):
     name = "lastfm"
     pass_ = Pass.ENRICH
     group = SourceGroup.CORE
-    service = None
+    service = "lastfm"
     capabilities = frozenset(
-        {Capability.IDENTITY, Capability.TAGS, Capability.TEXTS, Capability.RELATIONS},
+        {
+            Capability.IDENTITY,
+            Capability.TAGS,
+            Capability.TEXTS,
+            Capability.RELATIONS,
+            Capability.METRICS,
+        },
     )
     requires = (Requirement(setting="sources.lastfm.api_key", purpose="every lookup"),)
     secret_params = frozenset({"api_key"})
@@ -68,14 +80,57 @@ class LastfmAdapter(HttpAdapter):
 
     @property
     def lookups(self) -> Lookups:
-        """Tracks and albums through their own API methods."""
-        return Lookups(track=self._find_track, album=self._find_album)
+        """Tracks, albums, and artists through their own API methods."""
+        return Lookups(track=self._find_track, album=self._find_album, artist=self._find_artist)
+
+    def resolves(self, query: Query) -> bool:
+        """Whether this is a Last.fm artist profile URL."""
+        return (
+            isinstance(query, ArtistQuery)
+            and query.url is not None
+            and super().resolves(query)
+            and recognize(query.url)[0] is EntityKind.ARTIST
+        )
 
     async def _find_track(self, query: Query, context: LookupContext) -> Partial:
         return await self._track(_key(query, context), context)
 
     async def _find_album(self, query: Query, context: LookupContext) -> Partial:
         return await self._album(_key(query, context), context)
+
+    def _artist_params(self, query: ArtistQuery, context: LookupContext) -> dict[str, str]:
+        if mbid := context.id(IdKind.MUSICBRAINZ_ARTIST):
+            return {"mbid": mbid}
+        if query.url is not None and self.resolves(query):
+            name = unquote_plus(urlsplit(query.url).path.split("/")[2]).strip()
+        else:
+            key = name_key(query, context)
+            name = key.name if key is not None else ""
+        if not name:
+            raise NotFoundError("neither the query nor earlier sources name the artist")
+        return {"artist": name, "autocorrect": "1"}
+
+    async def _find_artist(self, query: ArtistQuery, context: LookupContext) -> Partial:
+        params = self._artist_params(query, context)
+        artist = (await self._call(models.ArtistInfoResponse, "artist.getInfo", **params)).artist
+
+        tags = []
+        if context.wants(Capability.TAGS):
+            tags = await self._artist_tags(artist.name, artist.url)
+        relations = []
+        if context.wants(Capability.RELATIONS):
+            relations = await self._similar_artists(artist.name, artist.url)
+
+        return Partial(
+            source=self.name,
+            candidate=p.artist_candidate(artist),
+            tags=tags,
+            texts=p.wiki_texts(artist.bio, Scope.ARTIST, artist.url)
+            if context.wants(Capability.TEXTS)
+            else [],
+            relations=relations,
+            metrics=p.artist_metrics(artist) if context.wants(Capability.METRICS) else [],
+        )
 
     async def _artist_tags(self, artist: str, page: str | None) -> list[Tag]:
         found = await self._call(

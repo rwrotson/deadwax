@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md). The v2 source scope, closed v2 stages (8–17, 19, 20, R-1–R-6, M-1–M-3), their evidence, the Stage 18 access attempts, and the v2 decision log are archived in [`plans/v2.md`](plans/v2.md).
 
-- **Status:** v1 and v2 complete; v0.1.0 is the first tagged release (2026-11-20, GitHub only, no PyPI). Stage 18 (Rate Your Music) deferred until RYM is accessible; Boomkat and Norman Records remain access-limited. Stages E-1–E-3 (artist, label, and other record kinds): E-1 and E-2 done, E-3 in progress (steps 1–2 of 6 done: groundwork, MusicBrainz, and Discogs).
+- **Status:** v1 and v2 complete; v0.1.0 is the first tagged release (2026-11-20, GitHub only, no PyPI). Stage 18 (Rate Your Music) deferred until RYM is accessible; Boomkat and Norman Records remain access-limited. Stages E-1–E-3 (artist, label, and other record kinds): E-1 and E-2 done, E-3 in progress (steps 1–3 of 6 done: groundwork, MusicBrainz, Discogs, and Last.fm).
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` (and the nested `AGENTS.md` of the area you change), `docs/architecture.md` (import rules R1–R9), and `CONTRIBUTING.md` before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -74,7 +74,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Sections of closed
 | 20 | Done (RYM blocked, Forced Exposure HTTP 403, Norman disabled by the local allowlist) | Qualification; release v0.1.0. |
 | E-1 | Done | Per-kind lookup slots (`Lookups`), dispatch by the kind known in each pass, `SourceInfo.kinds`. |
 | E-2 | Done | Typed queries per kind, a model for artists and labels, CLI `--artist` and `--label`. |
-| E-3 | In progress (MusicBrainz and Discogs done) | Artist and label lookups, MusicBrainz, Discogs, Last.fm, Wikipedia, and Bandcamp first. |
+| E-3 | In progress (MusicBrainz, Discogs, and Last.fm done) | Artist and label lookups, MusicBrainz, Discogs, Last.fm, Wikipedia, and Bandcamp first. |
 
 Common acceptance for source stages (9–19, and source work in E-3), in addition to each stage's own:
 
@@ -170,6 +170,20 @@ Live, uncached CLI checks found Aphex Twin and Warp by name and by Discogs URL, 
 Checks: `uv run poe check` passed (1252 tests, 97.13% coverage) and `uv run --group docs properdocs build --strict` passed. The first run exhausted disk space. The successful run disabled disposable tool caches and used four test workers. `poe test-live` was deferred to step 6 with the new live invariants.
 
 Remaining: steps 3–6.
+
+### 2026-11-23 — E-3 progress, step 3 (Last.fm)
+
+Last.fm now looks up artists by MusicBrainz artist ID, name, or Last.fm artist profile URL. It contributes the identity, biography, weighted tags, similar artists, and lifetime listener and scrobble counts. The README and source guide describe these additions.
+
+Recorded four Last.fm scenarios with `scripts/record_fixtures.py --live lastfm`. The `aphex_twin` and `musicbrainz_artist_url` scenarios replay MusicBrainz with `--sources musicbrainz,lastfm`. The `lastfm_artist_search` and `lastfm_artist_url` scenarios use `--sources lastfm`. Verified that the recordings contain no configured key. Replay tests cover the lookup routes and fact provenance. Mock responses cover a mismatched MBID, missing credentials, a not-found response, percent-encoded names, and a metrics-only request with a zero listener count and an absent scrobble count.
+
+Live CLI lookups with `--no-cache` found Aphex Twin by name and by Last.fm URL, and Last.fm contributed the same kinds of facts when MusicBrainz supplied the MBID. Each returned a biography, ten weighted tags, ten similar artists, and both metrics from Last.fm. Last.fm found all five v1 control records and Burial's Archangel without adapter errors.
+
+Checks passed for `uv run --no-sync poe check` (1267 tests, 97.12% branch coverage), `uv run --no-sync --group docs properdocs build --strict`, and `git diff --check`. The full `poe test-live` suite is scheduled for step 6.
+
+Remaining: steps 4–6.
+
+**Suggested message:** `feat(sources): add Last.fm artist lookups`.
 
 ### 2026-11-21 — E-2 evidence (typed queries, artists and labels)
 

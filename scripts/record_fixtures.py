@@ -99,6 +99,8 @@ SCENARIOS: dict[str, Query] = {
     "warp": parse_query("Warp", EntityKind.LABEL),
     "discogs_artist_search": parse_query("Aphex Twin", EntityKind.ARTIST),
     "discogs_label_search": parse_query("Warp", EntityKind.LABEL),
+    "lastfm_artist_search": parse_query("Aphex Twin", EntityKind.ARTIST),
+    "lastfm_artist_url": parse_query("https://www.last.fm/music/Aphex+Twin"),
     "musicbrainz_artist_url": parse_query(
         "https://musicbrainz.org/artist/f22942a1-6f70-4f48-866e-238cb2308fbd",
     ),

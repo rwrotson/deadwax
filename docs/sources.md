@@ -83,7 +83,8 @@ The README lists deferred sources and those deadwax will not use.
 ## Last.fm
 
 - **Access:** API with `DEADWAX_SOURCES__LASTFM__API_KEY`. The source is `skipped` without the key.
-- **Contributes:** `track.getInfo` or `album.getInfo` tags with weights (artist-wide tags are marked `artist`), wiki texts, similar tracks (for a track), and up to 10 similar artists.
+- **Tracks and albums:** weighted tags, wiki texts, similar tracks (for a track), and up to 10 similar artists. Artist-wide facts have scope `artist`.
+- **Artists:** looks up a known MusicBrainz artist ID or searches by name with autocorrection. Accepts Last.fm artist profile URLs. Returns artist identity, biography, up to 10 weighted tags and 10 similar artists, and lifetime listener and scrobble counts.
 - **Limits:** errors arrive inside 200 responses: code 6 means not found, 29 means rate limited.
 
 ## Wikipedia and Wikidata

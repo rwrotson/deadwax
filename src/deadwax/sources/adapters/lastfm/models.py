@@ -31,7 +31,7 @@ class Envelope(ApiModel):
 
 
 class Wiki(ApiModel):
-    """User-contributed wiki text of a track or album."""
+    """User-contributed track or album notes or artist biography."""
 
     published: str | None = None
     summary: str = ""
@@ -93,6 +93,29 @@ class AlbumInfoResponse(ApiModel):
     """Response of album.getInfo."""
 
     album: AlbumInfo
+
+
+class ArtistStats(ApiModel):
+    """Lifetime listener and scrobble counts."""
+
+    listeners: int | None = None
+    playcount: int | None = None
+
+
+class ArtistInfo(ApiModel):
+    """Artist as Last.fm knows them."""
+
+    name: str
+    url: str
+    mbid: str | None = None
+    bio: Wiki | None = None
+    stats: Annotated[ArtistStats, BeforeValidator(_as_object)] = ArtistStats()
+
+
+class ArtistInfoResponse(ApiModel):
+    """Response of artist.getInfo."""
+
+    artist: ArtistInfo
 
 
 class SimilarTrack(ApiModel):

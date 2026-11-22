@@ -36,8 +36,12 @@ def test_adapters_read_their_own_section() -> None:
 
 TRACKS_ONLY = {"genius", "nts", "secondhandsongs", "tracklists", "wfmu", "whosampled"}
 
-# Sources that also look up artists and labels.
-NAMES = {"musicbrainz": frozenset(EntityKind), "discogs": frozenset(EntityKind)}
+# Sources that also look up artists or labels.
+NAMES = {
+    "musicbrainz": frozenset(EntityKind),
+    "discogs": frozenset(EntityKind),
+    "lastfm": frozenset({EntityKind.TRACK, EntityKind.ALBUM, EntityKind.ARTIST}),
+}
 
 # Without a service of their own, they still find the kind: from a streaming URL, a Wikidata item.
 UNRESOLVED_WITHOUT_SERVICE = {"odesli", "wikipedia"}
@@ -57,4 +61,4 @@ def test_adapters_declare_the_record_kinds_they_look_up() -> None:
         if name not in TRACKS_ONLY
     )
     readers = {adapter.name for adapter in adapters if adapter.service is not None}
-    assert unresolved == (readers - {"genius"}) | UNRESOLVED_WITHOUT_SERVICE
+    assert unresolved == (readers - {"genius", "lastfm"}) | UNRESOLVED_WITHOUT_SERVICE
