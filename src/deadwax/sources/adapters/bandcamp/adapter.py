@@ -3,9 +3,12 @@ import logging
 import re
 
 from deadwax.core import (
+    ArtistQuery,
     BlockedError,
     Capability,
     EntityKind,
+    LabelQuery,
+    LinkTarget,
     LookupContext,
     Lookups,
     NotFoundError,
@@ -16,16 +19,17 @@ from deadwax.core import (
     Relation,
     SourceError,
     SourceGroup,
+    UnresolvedQuery,
     Verdict,
     compare,
 )
 from deadwax.sources._adapter import HttpAdapter
 from deadwax.sources._http import HttpClient, HttpResources, Profile
-from deadwax.sources._search import search_key
+from deadwax.sources._search import name_key, search_key
 from deadwax.sources.adapters.bandcamp import models
 from deadwax.sources.adapters.bandcamp import parse as p
 from deadwax.sources.config import LookupConfig
-from deadwax.sources.services import recognize
+from deadwax.sources.services import bandcamp_account, recognize
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +83,71 @@ class BandcampAdapter(HttpAdapter):
 
     @property
     def lookups(self) -> Lookups:
-        """Tracks and albums; the page of a query URL tells which."""
-        return Lookups(track=self.find, album=self.find, unresolved=self.find)
+        """Look up releases, artists, and labels, with page-based URL resolution."""
+        return Lookups(
+            track=self.find,
+            album=self.find,
+            artist=self.find_account,
+            label=self.find_account,
+            unresolved=self.find_unresolved,
+        )
+
+    async def find_unresolved(self, query: UnresolvedQuery, context: LookupContext) -> Partial:
+        """Read an account's type or resolve a release page."""
+        if (host := bandcamp_account(query.url)) is not None:
+            return await self._account(host, context, None)
+        return await self.find(query, context)
+
+    async def find_account(
+        self,
+        query: ArtistQuery | LabelQuery,
+        context: LookupContext,
+    ) -> Partial:
+        """Follow a known account URL or search Bandcamp for the name."""
+        if query.url is not None and (host := bandcamp_account(query.url)) is not None:
+            return await self._account(host, context, query.kind)
+
+        target = LinkTarget.ARTIST if query.kind is EntityKind.ARTIST else LinkTarget.LABEL
+        for link in context.links:
+            if (
+                link.service == self.service
+                and link.target is target
+                and (host := bandcamp_account(link.url)) is not None
+            ):
+                return await self._account(host, context, query.kind)
+
+        key = name_key(query, context)
+        if key is None:
+            raise NotFoundError("neither the query nor earlier sources name the account")
+        hit = p.pick_account(key, await self._autocomplete(key.name, "b"))
+        if hit is None or (host := bandcamp_account(hit.item_url_root or "")) is None:
+            raise NotFoundError(f"no matching Bandcamp {query.kind} account")
+        return await self._account(host, context, query.kind, hit.id)
+
+    async def _account(
+        self,
+        host: str,
+        context: LookupContext,
+        kind: EntityKind | None,
+        searched_id: int | None = None,
+    ) -> Partial:
+        root = f"https://{host}/"
+        try:
+            response = await self.client.get(f"{root}music")
+        except NotFoundError:
+            response = await self.client.get(root)
+        if bandcamp_account(response.url) != host:
+            raise NotFoundError("Bandcamp redirected away from the account", url=response.url)
+        partial = p.account_page(
+            response.content,
+            response.url,
+            kind,
+            searched_id,
+            context.facets,
+        )
+        if partial is None:
+            raise NotFoundError("no matching Bandcamp artist or label account", url=response.url)
+        return partial
 
     async def find(self, query: Query, context: LookupContext) -> Partial:
         """Read the page from the query, an earlier pass, or a search, then its label's page."""
@@ -206,31 +273,35 @@ class BandcampAdapter(HttpAdapter):
     async def _search(self, key: RecordKey) -> models.SearchResult | None:
         """Search with the autocomplete endpoint; the HTML search page only when it fails."""
         item_type = "t" if key.kind is EntityKind.TRACK else "a"
+        name = f"{key.artist} {key.title}"
+        try:
+            results = await self._autocomplete(name, item_type)
+        except SourceError:
+            logger.debug("bandcamp search endpoint failed", exc_info=True)
+        else:
+            return p.pick_result(key, results)
+
+        response = await self.client.get(SEARCH_PAGE, params={"q": name, "item_type": item_type})
+        return p.pick_result(key, p.html_search(response.content))
+
+    async def _autocomplete(self, name: str, item_type: str) -> list[models.SearchResult]:
         body = {
-            "search_text": f"{key.artist} {key.title}",
+            "search_text": name,
             "search_filter": item_type,
             "full_page": False,
             "fan_id": None,
         }
 
-        try:
-            response = await self.api_client.request(
-                "POST",
-                SEARCH_API,
-                headers={"content-type": "application/json", "accept": "application/json"},
-                body=json.dumps(body).encode(),
-            )
-            results = models.SearchResponse.model_validate_json(response.content).auto.results
-        except SourceError, ValueError:
-            logger.debug("bandcamp search endpoint failed", exc_info=True)
-        else:
-            return p.pick_result(key, results)
-
-        response = await self.client.get(
-            SEARCH_PAGE,
-            params={"q": f"{key.artist} {key.title}", "item_type": item_type},
+        response = await self.api_client.request(
+            "POST",
+            SEARCH_API,
+            headers={"content-type": "application/json", "accept": "application/json"},
+            body=json.dumps(body).encode(),
         )
-        return p.pick_result(key, p.html_search(response.content))
+        try:
+            return models.SearchResponse.model_validate_json(response.content).auto.results
+        except ValueError as error:
+            raise SourceError("invalid Bandcamp autocomplete response", url=response.url) from error
 
     async def _label_releases(self, record: p.Record) -> list[Relation]:
         """List the label's other releases when the release is sold from the label's account."""

@@ -290,6 +290,7 @@ class _NameIdentity(IdentityBase):
         description="Comment that tells namesakes apart",
     )
     country: Sourced[str] | None = Field(default=None, description="Country as a source gives it")
+    location: Sourced[str] | None = Field(default=None, description="Location as a source gives it")
     begin: Sourced[str] | None = Field(default=None, description="ISO date, possibly partial")
     end: Sourced[str] | None = Field(default=None, description="ISO date, possibly partial")
 
@@ -490,6 +491,7 @@ class _NameCandidate(_Model):
     name: str
     disambiguation: str | None = None
     country: str | None = None
+    location: str | None = None
     begin: str | None = Field(default=None, description="ISO date, possibly partial")
     end: str | None = Field(default=None, description="ISO date, possibly partial")
     ids: dict[IdKind, str] = {}

@@ -38,6 +38,7 @@ TRACKS_ONLY = {"genius", "nts", "secondhandsongs", "tracklists", "wfmu", "whosam
 
 # Sources that also look up artists or labels.
 NAMES = {
+    "bandcamp": frozenset(EntityKind),
     "musicbrainz": frozenset(EntityKind),
     "discogs": frozenset(EntityKind),
     "lastfm": frozenset({EntityKind.TRACK, EntityKind.ALBUM, EntityKind.ARTIST}),

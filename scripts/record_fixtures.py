@@ -102,6 +102,10 @@ SCENARIOS: dict[str, Query] = {
     "lastfm_artist_search": parse_query("Aphex Twin", EntityKind.ARTIST),
     "lastfm_artist_url": parse_query("https://www.last.fm/music/Aphex+Twin"),
     "wikipedia_artist_search": parse_query("Кино", EntityKind.ARTIST),
+    "bandcamp_artist_search": parse_query("Aphex Twin", EntityKind.ARTIST),
+    "bandcamp_label_search": parse_query("Hyperdub", EntityKind.LABEL),
+    "bandcamp_artist_url": parse_query("https://burial.bandcamp.com/"),
+    "bandcamp_label_url": parse_query("https://warprecords.bandcamp.com/"),
     "musicbrainz_artist_url": parse_query(
         "https://musicbrainz.org/artist/f22942a1-6f70-4f48-866e-238cb2308fbd",
     ),

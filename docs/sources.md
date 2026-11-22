@@ -75,9 +75,10 @@ The README lists deferred sources and those deadwax will not use.
 
 ## Bandcamp
 
-- **Access:** no API. The album or track page (`data-tralbum`, `data-embed`, JSON-LD), the mobile `tralbum_details` API, and the search endpoint are read with the browser profile and the escalation ladder.
+- **Access** uses public HTML for release and account pages and plain HTTP for the autocomplete and mobile `tralbum_details` endpoints.
 - **Finds the record by:** the query URL, a Bandcamp link from MusicBrainz, else a search. The HTML search page is tried when the search endpoint fails. If both search routes fail, a direct artist-subdomain URL is accepted only after its page confirms the requested artist, title, and kind.
 - **Contributes:** tags, About and Credits texts, simple credits, fan comments, recommendations as `similar`, the label from the mobile API, and the label's other releases when the label is the selling account; for a track page whose track can be played, the `mp3-128` stream as the track link's `preview_url` (an `https` URL on `bcbits.com`; nothing is downloaded).
+- **Artists and labels** use a direct Bandcamp account URL, a link from MusicBrainz, or an autocomplete name search. The account's `is_label` field resolves its URL to an artist or label. Account pages contribute a name, profile location, biography when present, Bandcamp link, and up to 12 albums from the visible catalogue as `release` or `label_release` relations.
 - **Limits:** a track found on another artist's album (a compilation or third-party upload) contributes only its identity, links, own notes, stream, and a `compilation` relation. The stream URL is signed and expires about 24 hours after the page was fetched; pages are cached for 12 hours (`DEADWAX_SOURCES__BANDCAMP__TTL`), so a returned URL stays valid for at least about 12 hours. Fetch a new dossier to play it later. Album pages give no preview.
 
 ## Last.fm

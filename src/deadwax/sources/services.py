@@ -310,9 +310,25 @@ def service_for_url(url: str) -> str | None:
     return service.name if service is not None and service.link else None
 
 
+def bandcamp_account(url: str) -> str | None:
+    """Identify a Bandcamp account by the hostname of its root or music page."""
+    parts = urlsplit(url)
+    host = parts.hostname or ""
+    if (
+        parts.scheme in {"http", "https"}
+        and parts.netloc.lower() == host
+        and re.fullmatch(r"(?!www\.)[a-z0-9-]+\.bandcamp\.com", host)
+        and parts.path in {"", "/", "/music", "/music/"}
+    ):
+        return host
+    return None
+
+
 def recognize(url: str) -> tuple[EntityKind | None, dict[IdKind, str]]:
     """Infer the record kind and identifiers from a known service URL."""
     service = service_of(url)
+    if service is not None and service.name == "bandcamp" and (host := bandcamp_account(url)):
+        return None, {IdKind.BANDCAMP_ACCOUNT: host}
     return recognize_url(url, service.rules) if service is not None else (None, {})
 
 

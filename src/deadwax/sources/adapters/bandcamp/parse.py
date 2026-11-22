@@ -1,6 +1,6 @@
 import logging
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -9,14 +9,18 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 from pydantic import ValidationError
 
 from deadwax.core import (
+    ArtistCandidate,
     CandidateLabel,
+    Capability,
     Credit,
     Entity,
     EntityKind,
     EntityType,
     IdKind,
+    LabelCandidate,
     Link,
     LinkTarget,
+    NameKey,
     Partial,
     Provenance,
     RecordCandidate,
@@ -31,6 +35,7 @@ from deadwax.core import (
     Verdict,
     artist_similarity,
     compare,
+    compare_names,
     normalize_artist,
 )
 from deadwax.sources._html import (
@@ -40,9 +45,11 @@ from deadwax.sources._html import (
     attribute_json,
     json_ld,
     parse_html,
+    prose,
     text_of,
 )
 from deadwax.sources.adapters.bandcamp import models
+from deadwax.sources.services import bandcamp_account, recognize
 
 logger = logging.getLogger(__name__)
 
@@ -558,6 +565,137 @@ def same_name(left: str | None, right: str | None) -> bool:
     return bool(left and right) and normalize_artist(left or "") == normalize_artist(right or "")
 
 
+def pick_account(
+    reference: NameKey,
+    results: Iterable[models.SearchResult],
+) -> models.SearchResult | None:
+    """Pick the matching account with the highest name score, in search order on ties."""
+    ranked: list[tuple[float, models.SearchResult]] = []
+    for hit in results:
+        host = bandcamp_account(hit.item_url_root or "")
+        if hit.type != "b" or host is None or hit.is_label is None:
+            continue
+        kind = EntityKind.LABEL if hit.is_label else EntityKind.ARTIST
+        match = compare_names(reference, NameKey(hit.name, kind, {IdKind.BANDCAMP_ACCOUNT: host}))
+        if match.verdict is Verdict.MATCH:
+            ranked.append((match.name_score, hit))
+    best = max(ranked, key=lambda pair: pair[0], default=None)
+    return best[1] if best else None
+
+
+def account_page(
+    content: bytes,
+    url: str,
+    expected: EntityKind | None,
+    searched_id: int | None,
+    facets: frozenset[Capability] | None,
+) -> Partial | None:
+    """Read a verified account and the requested facts from its music page."""
+    document = parse_html(content)
+    data = attribute_json(document, "data-band")
+    try:
+        account = models.Account.model_validate(data)
+    except ValidationError:
+        return None
+    kind = EntityKind.LABEL if account.is_label else EntityKind.ARTIST
+    name = account.name.strip()
+    if (
+        not name
+        or (host := bandcamp_account(url)) is None
+        or (expected is not None and kind is not expected)
+        or (searched_id is not None and account.id != searched_id)
+    ):
+        return None
+
+    root = f"https://{host}/"
+    location = text_of(document.css_first("#band-name-location .location"))
+    ids = {IdKind.BANDCAMP_ACCOUNT: host}
+    candidate = (
+        LabelCandidate(name=name, location=location, ids=ids, url=url)
+        if account.is_label
+        else ArtistCandidate(name=name, location=location, ids=ids, url=url)
+    )
+    scope = Scope.LABEL if account.is_label else Scope.ARTIST
+    target = LinkTarget.LABEL if account.is_label else LinkTarget.ARTIST
+    sources = [Provenance(source=SOURCE, url=url)]
+    texts = []
+    if facets is None or Capability.TEXTS in facets:
+        body = prose(document.css_first("#bio-container .signed-out-artists-bio-text"))
+        if body:
+            texts.append(
+                Text(
+                    kind=TextKind.EDITORIAL,
+                    title="Profile",
+                    body=body,
+                    scope=scope,
+                    sources=sources,
+                ),
+            )
+    relations = []
+    if facets is None or Capability.RELATIONS in facets:
+        relations = _account_releases(document, url, name, scope, sources)
+    links = []
+    if facets is None or Capability.LINKS in facets:
+        links.append(Link(service=SOURCE, url=root, target=target, sources=sources))
+    return Partial(
+        source=SOURCE,
+        candidate=candidate,
+        texts=texts,
+        relations=relations,
+        links=links,
+    )
+
+
+def _grid_items(document: Document) -> Iterator[tuple[str, str, str, str, str | None]]:
+    for item in document.css("li.music-grid-item"):
+        kind, _, number = (attribute(item, "data-item-id") or "").partition("-")
+        href = attribute(item.css_first("a"), "href")
+        title = text_of(item.css_first("p.title"))
+        artist = text_of(item.css_first(".artist-override"))
+        if title and artist and title.endswith(artist):
+            title = title.removesuffix(artist).strip()
+        if title and href:
+            yield kind, number, href, title, artist
+
+
+def _account_releases(
+    document: Document,
+    url: str,
+    name: str,
+    scope: Scope,
+    sources: list[Provenance],
+) -> list[Relation]:
+    result: list[Relation] = []
+    seen: set[str] = set()
+    for kind, number, href, title, artist in _grid_items(document):
+        release_url = page_url(urljoin(url, href))
+        if kind != "album" or not number.isdecimal() or number in seen:
+            continue
+        if (
+            urlsplit(release_url).scheme not in {"http", "https"}
+            or recognize(release_url)[0] is not EntityKind.ALBUM
+        ):
+            continue
+        seen.add(number)
+        result.append(
+            Relation(
+                kind=RelationKind.LABEL_RELEASE if scope is Scope.LABEL else RelationKind.RELEASE,
+                target=Entity(
+                    type=EntityType.RELEASE,
+                    name=title,
+                    artist=artist or (name if scope is Scope.ARTIST else None),
+                    ids={IdKind.BANDCAMP_ALBUM: number},
+                    url=release_url,
+                ),
+                scope=scope,
+                sources=sources,
+            ),
+        )
+        if len(result) >= LABEL_RELEASES_LIMIT:
+            break
+    return result
+
+
 def label_releases(
     content: bytes,
     base_url: str,
@@ -567,18 +705,8 @@ def label_releases(
     """Read other releases from the grid of a label's music page."""
     sources = [Provenance(source=SOURCE, url=base_url)]
     result = []
-    for item in parse_html(content).css("li.music-grid-item"):
-        item_id = attribute(item, "data-item-id") or ""
-        kind, _, number = item_id.partition("-")
-        href = attribute(item.css_first("a"), "href")
-        title_node = item.css_first("p.title")
-        override = item.css_first(".artist-override")
-        artist = text_of(override)
-        title = text_of(title_node)
-
-        if title and artist and title.endswith(artist):
-            title = title.removesuffix(artist).strip()
-        if not title or not href or (exclude is not None and number == str(exclude)):
+    for kind, number, href, title, artist in _grid_items(parse_html(content)):
+        if exclude is not None and number == str(exclude):
             continue
 
         ids = {IdKind.BANDCAMP_ALBUM: number} if kind == "album" and number else {}

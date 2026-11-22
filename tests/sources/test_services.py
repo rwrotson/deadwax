@@ -146,7 +146,17 @@ def test_service_of_matches_host_suffix(url: str, name: str | None) -> None:
         ("https://soundcloud.com/discover/sets/new", None, {}),
         ("https://soundcloud.com/burial", None, {}),
         ("https://song.link/s/3a1lNhkSLSkpJE4MSHpDu9", None, {}),
-        ("https://burial.bandcamp.com/", None, {}),
+        ("https://burial.bandcamp.com/", None, {IdKind.BANDCAMP_ACCOUNT: "burial.bandcamp.com"}),
+        (
+            "http://BURIAL.bandcamp.com/music/?from=profile",
+            None,
+            {
+                IdKind.BANDCAMP_ACCOUNT: "burial.bandcamp.com",
+            },
+        ),
+        ("https://bandcamp.com/", None, {}),
+        ("https://www.bandcamp.com/music", None, {}),
+        ("https://burial.bandcamp.com/merch", None, {}),
         ("https://hardwax.com/55357/burial/untrue/?focus=download", EntityKind.ALBUM, {}),
         ("https://hardwax.com/act/burial/", None, {}),
         ("https://www.soundohm.com/product/untrue", EntityKind.ALBUM, {}),
@@ -205,7 +215,7 @@ def test_service_of_matches_host_suffix(url: str, name: str | None) -> None:
             EntityKind.LABEL,
             {IdKind.BEATPORT_LABEL: "1234"},
         ),
-        ("https://warp.bandcamp.com/", None, {}),
+        ("https://warp.bandcamp.com/", None, {IdKind.BANDCAMP_ACCOUNT: "warp.bandcamp.com"}),
         ("https://last.fm/music/Aphex+Twin/", EntityKind.ARTIST, {}),
         ("https://www.last.fm/music/AC%2FDC", EntityKind.ARTIST, {}),
         ("https://www.last.fm/music/Aphex+Twin/_/Xtal", None, {}),
@@ -308,7 +318,10 @@ def test_bad_isrc_is_an_invalid_query(
         (
             "https://warp.bandcamp.com/",
             EntityKind.LABEL,
-            LabelQuery(url="https://warp.bandcamp.com/"),
+            LabelQuery(
+                url="https://warp.bandcamp.com/",
+                ids={IdKind.BANDCAMP_ACCOUNT: "warp.bandcamp.com"},
+            ),
         ),
     ],
 )

@@ -44,6 +44,7 @@ class IdKind(StrEnum):
     WIKIDATA = "wikidata"
     BANDCAMP_ALBUM = "bandcamp_album"
     BANDCAMP_TRACK = "bandcamp_track"
+    BANDCAMP_ACCOUNT = "bandcamp_account"
     SPOTIFY = "spotify"
     APPLE_MUSIC = "apple_music"
     DEEZER = "deezer"

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 
 class ApiModel(BaseModel):
@@ -47,8 +47,16 @@ class Tralbum(ApiModel):
     trackinfo: list[TrackInfo] = []
 
 
+class Account(ApiModel):
+    """An artist or label's `data-band` attribute."""
+
+    id: int
+    name: str
+    is_label: StrictBool
+
+
 class SearchResult(ApiModel):
-    """Album or track found by the search autocomplete endpoint."""
+    """Item found by the search autocomplete endpoint."""
 
     type: str
     id: int
@@ -56,6 +64,8 @@ class SearchResult(ApiModel):
     band_id: int | None = None
     band_name: str | None = None
     item_url_path: str | None = None
+    item_url_root: str | None = None
+    is_label: StrictBool | None = None
 
 
 class SearchResults(ApiModel):

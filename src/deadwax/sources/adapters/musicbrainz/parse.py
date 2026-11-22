@@ -708,10 +708,10 @@ def releases(groups: Iterable[models.ReleaseGroup], artist: models.Artist) -> li
 
 
 def artist_candidate(artist: models.Artist) -> ArtistCandidate:
-    """Describe an artist with the Wikidata and Discogs identifiers of its URL relations."""
+    """Describe an artist with the identifiers of its URL relations."""
     ids = {
         IdKind.MUSICBRAINZ_ARTIST: artist.id,
-        **url_ids(artist.relations, (IdKind.DISCOGS_ARTIST,)),
+        **url_ids(artist.relations, (IdKind.DISCOGS_ARTIST, IdKind.BANDCAMP_ACCOUNT)),
     }
     return ArtistCandidate(
         name=artist.name,
@@ -726,10 +726,10 @@ def artist_candidate(artist: models.Artist) -> ArtistCandidate:
 
 
 def label_candidate(label: models.Label) -> LabelCandidate:
-    """Describe a label with the Wikidata and Discogs identifiers of its URL relations."""
+    """Describe a label with the identifiers of its URL relations."""
     ids = {
         IdKind.MUSICBRAINZ_LABEL: label.id,
-        **url_ids(label.relations, (IdKind.DISCOGS_LABEL,)),
+        **url_ids(label.relations, (IdKind.DISCOGS_LABEL, IdKind.BANDCAMP_ACCOUNT)),
     }
     return LabelCandidate(
         name=label.name,

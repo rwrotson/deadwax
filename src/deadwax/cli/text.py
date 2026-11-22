@@ -91,6 +91,7 @@ def name_fields(identity: ArtistIdentity | LabelIdentity) -> list[tuple[str, Sou
         ("name", identity.name),
         ("disambiguation", identity.disambiguation),
         ("country", identity.country),
+        ("location", identity.location),
         ("begin", identity.begin),
         ("end", identity.end),
     ]

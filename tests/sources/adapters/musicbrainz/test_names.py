@@ -175,6 +175,7 @@ async def test_artist_search_reads_the_matching_artist() -> None:
         IdKind.MUSICBRAINZ_ARTIST: ARTIST_ID,
         IdKind.DISCOGS_ARTIST: "166535",
         IdKind.WIKIDATA: "Q1000498",
+        IdKind.BANDCAMP_ACCOUNT: "burial.bandcamp.com",
     }
     by_kind = {(r.kind, r.target.name) for r in partial.relations}
     assert by_kind == {

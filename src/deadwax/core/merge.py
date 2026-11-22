@@ -461,6 +461,7 @@ class _NameParts:
     name: Sourced[str] | None
     disambiguation: Sourced[str] | None
     country: Sourced[str] | None
+    location: Sourced[str] | None
     begin: Sourced[str] | None
     end: Sourced[str] | None
     external_ids: list[ExternalId]
@@ -491,6 +492,10 @@ def _name_parts(
         "country",
         ((c.country, normalize_text(c.country), p) for c, p in matched if c.country),
     )
+    location, location_conflict = _consensus(
+        "location",
+        ((c.location, normalize_text(c.location), p) for c, p in matched if c.location),
+    )
     begin, begin_conflict = _date("begin", ((c.begin, p) for c, p in matched))
     end, end_conflict = _date("end", ((c.end, p) for c, p in matched))
     external_ids, id_conflicts = _external_ids(matched)
@@ -498,6 +503,7 @@ def _name_parts(
         name_conflict,
         disambiguation_conflict,
         country_conflict,
+        location_conflict,
         begin_conflict,
         end_conflict,
         *id_conflicts,
@@ -506,6 +512,7 @@ def _name_parts(
         name=name,
         disambiguation=disambiguation,
         country=country,
+        location=location,
         begin=begin,
         end=end,
         external_ids=external_ids,
@@ -531,6 +538,7 @@ def _artist_identity(accepted: list[Partial]) -> ArtistIdentity:
         if agreed is None
         else Sourced(value=ArtistType(agreed.value), sources=agreed.sources),
         country=parts.country,
+        location=parts.location,
         begin=parts.begin,
         end=parts.end,
         external_ids=parts.external_ids,
@@ -549,6 +557,7 @@ def _label_identity(accepted: list[Partial]) -> LabelIdentity:
         name=parts.name,
         disambiguation=parts.disambiguation,
         country=parts.country,
+        location=parts.location,
         begin=parts.begin,
         end=parts.end,
         external_ids=parts.external_ids,

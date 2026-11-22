@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md). The v2 source scope, closed v2 stages (8–17, 19, 20, R-1–R-6, M-1–M-3), their evidence, the Stage 18 access attempts, and the v2 decision log are archived in [`plans/v2.md`](plans/v2.md).
 
-- **Status:** v1 and v2 complete; v0.1.0 is the first tagged release (2026-11-20, GitHub only, no PyPI). Stage 18 (Rate Your Music) deferred until RYM is accessible; Boomkat and Norman Records remain access-limited. Stages E-1–E-3 (artist, label, and other record kinds): E-1 and E-2 done, E-3 in progress (steps 1–4 of 6 done, through Wikipedia/Wikidata).
+- **Status:** v1 and v2 complete; v0.1.0 is the first tagged release (2026-11-20, GitHub only, no PyPI). Stage 18 (Rate Your Music) deferred until RYM is accessible; Boomkat and Norman Records remain access-limited. Stages E-1–E-3 (artist, label, and other record kinds): E-1 and E-2 done, E-3 in progress (steps 1–5 of 6 done, through Bandcamp).
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` (and the nested `AGENTS.md` of the area you change), `docs/architecture.md` (import rules R1–R9), and `CONTRIBUTING.md` before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -198,6 +198,20 @@ Uncached CLI checks with Wikipedia found Aphex Twin and Warp by name and via the
 Steps 5–6 remain.
 
 **Suggested message:** `feat(sources): add Wikipedia artist and label lookups`.
+
+### 2026-11-23 — E-3 progress, step 5 (Bandcamp)
+
+Bandcamp looks up artists and labels from a direct account URL, a MusicBrainz link, or autocomplete. The user chose a shared `bandcamp_account` identifier based on the account hostname and a sourced `location` field that preserves the profile's wording. The account identifier lets Bandcamp's Warp Records enrich MusicBrainz's Warp. The boolean `is_label` in `data-band` resolves the kind of an account URL. The adapter adds the profile biography when present, the account link, and up to 12 unique albums from the visible catalogue.
+
+Recorded four direct Bandcamp scenarios with `scripts/record_fixtures.py bandcamp_artist_search bandcamp_label_search bandcamp_artist_url bandcamp_label_url --live bandcamp --sources bandcamp` and two handoff scenarios with `scripts/record_fixtures.py aphex_twin warp --live bandcamp --sources musicbrainz,bandcamp`. The latter replayed MusicBrainz. Search recordings confirmed `item_url_root` and `is_label` on account hits. Mock tests cover a missing or invalid type marker, a type or account ID mismatch, an empty search, the root fallback, the catalogue limit, and facet trimming.
+
+Seven uncached CLI runs with plain HTTP verified both name searches, both MusicBrainz handoffs, both account URL kinds, and the control track Burial — Archangel. The Warp handoff returned the Bandcamp location, account link, and 11 catalogue albums. All seven lookups finished without adapter errors.
+
+`uv run --no-sync poe check` passed with 1,292 tests and 97.02% branch coverage using four workers and disposable tool caches disabled. `uv run --no-sync --group docs properdocs build --strict` and `git diff --check` passed.
+
+Step 6 covers the full `poe test-live` suite, cross-source documentation, and E-3 closing evidence.
+
+**Suggested message:** `feat(sources): add Bandcamp artist and label lookups`.
 
 ### 2026-11-21 — E-2 evidence (typed queries, artists and labels)
 

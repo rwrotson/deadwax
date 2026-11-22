@@ -22,7 +22,9 @@ Every fact has `sources`: a list of `Provenance(source, url)`, where `source` is
 | `external_ids` | IDs in other namespaces: MusicBrainz, Discogs, Wikidata, Bandcamp, Spotify, Apple Music, Deezer, SoundCloud, Beatport |
 | `discrepancies` | Fields on which sources disagree, each with every value and its sources |
 
-An artist or label identity has sourced `name`, `disambiguation` (a comment that tells namesakes apart), `country` as a source gives it, and `begin` and `end` (ISO dates, possibly partial: birth and death, formation and dissolution, or a label's founding and closing); an artist also has `type` (`person`, `group`, `orchestra`, `choir`, `character`, `other`). `found` is true when a source gave the title, or the name.
+An artist or label identity can have a sourced `name`, `disambiguation` to tell namesakes apart, `country`, `location`, and `begin` and `end` dates. Dates use ISO format and may be partial. The `location` field preserves the profile's wording, such as `London, UK` on Bandcamp. An artist can also have a sourced `type` (`person`, `group`, `orchestra`, `choir`, `character`, `other`). `found` is true when a source gave the title or name.
+
+The `bandcamp_account` external ID is the account hostname, such as `warprecords.bandcamp.com`. It links an artist or label identified by MusicBrainz to its Bandcamp account when both sources give the same account address.
 
 Candidates are compared with the query text, or for a URL query with the URL's own page. Among accepted candidates, the value given by the most sources becomes the identity, and every disagreement on artist, title, version, date, tempo, key, or an ID is kept in `discrepancies` instead of being resolved silently.
 
@@ -65,7 +67,7 @@ Relation kinds are directional:
 | `alias` | Other names of the queried artist or label; `note` holds the alias type, such as `Legal name` |
 | `label`, `label_release` | The label; its other releases |
 | `parent_label`, `sublabel` | A label that owns the queried label; an imprint or label it owns |
-| `release` | Main albums and EPs of the queried artist, oldest first |
+| `release` | Main releases of the queried artist, including albums listed on its Bandcamp account |
 | `appears_on`, `compilation` | Releases and compilations containing the record |
 | `mix`, `broadcast` | DJ mixes and broadcasts containing it |
 | `co_played` | Recordings directly before or after it in a radio episode or DJ set |
