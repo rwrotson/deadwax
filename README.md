@@ -70,7 +70,7 @@ Every source is described in detail in [the sources guide](https://rwrotson.gith
 
 | Source | Status | Contributes | Caveats |
 |--------|--------|-------------|---------|
-| Discogs | implemented; search needs `sources.discogs.token` | genres and styles, credits with roles and tracks, notes, labels with catalog numbers, barcodes, other versions of the master, compilations, the label's other releases, members, groups, aliases, user reviews; resolves Discogs URLs | without a token reads only the IDs MusicBrainz gives (25 requests a minute); sends httpx's User-Agent because Discogs refuses deadwax's; review pages may be `blocked` |
+| Discogs | implemented; search needs `sources.discogs.token` | tracks and albums: genres, styles, credits, notes, labels, barcodes, versions, compilations, user reviews; artists and labels: profiles, links, aliases, members, groups, label hierarchy, and discographies; resolves Discogs URLs | without a token reads by ID from the query or MusicBrainz (25 requests a minute); sends httpx's User-Agent because Discogs refuses deadwax's; review pages may be `blocked` |
 | Bandcamp | implemented | tags, About and Credits texts, credits, fan comments, recommendations as similar releases, label, the label's other releases, a stream preview of the track; resolves `bandcamp.com` album and track pages | scraped pages; a track found on another artist's album contributes only its identity, links and own notes; the stream URL expires about 24 hours after the fetch (pages are cached 12 hours) |
 | Last.fm | implemented, needs `sources.lastfm.api_key` | weighted tags (artist-wide ones marked `artist`), wiki texts, similar tracks and artists | `skipped` without the key |
 | Wikipedia/Wikidata | implemented | genres, producers, composers, lyricists, labels, date, the album a song is on, review scores, lead and music sections of the English and original-language articles | section headings recognised in en, ru, ja, de, fr; other languages give the lead |
@@ -118,7 +118,7 @@ Sources without their credential are `skipped` (or, where noted, work with less)
 
 | Setting | Source | Needed |
 |---------|--------|--------|
-| `DEADWAX_SOURCES__DISCOGS__TOKEN` | Discogs | for search; without it only IDs from MusicBrainz are read |
+| `DEADWAX_SOURCES__DISCOGS__TOKEN` | Discogs | for search and compilations; direct URLs and IDs from MusicBrainz work without a token |
 | `DEADWAX_SOURCES__LASTFM__API_KEY` | Last.fm | for every lookup |
 | `DEADWAX_SOURCES__SECONDHANDSONGS__API_KEY` | SecondHandSongs | optional; raises the request limit |
 | `DEADWAX_SOURCES__SPOTIFY__CLIENT_ID`, `DEADWAX_SOURCES__SPOTIFY__CLIENT_SECRET` | Spotify | for every lookup |

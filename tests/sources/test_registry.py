@@ -37,7 +37,7 @@ def test_adapters_read_their_own_section() -> None:
 TRACKS_ONLY = {"genius", "nts", "secondhandsongs", "tracklists", "wfmu", "whosampled"}
 
 # Sources that also look up artists and labels.
-NAMES = {"musicbrainz": frozenset(EntityKind)}
+NAMES = {"musicbrainz": frozenset(EntityKind), "discogs": frozenset(EntityKind)}
 
 # Without a service of their own, they still find the kind: from a streaming URL, a Wikidata item.
 UNRESOLVED_WITHOUT_SERVICE = {"odesli", "wikipedia"}

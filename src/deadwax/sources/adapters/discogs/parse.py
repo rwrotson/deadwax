@@ -1,16 +1,20 @@
 import logging
 import re
 from collections.abc import Iterable, Sequence
+from urllib.parse import urlsplit
 
 from deadwax.core import (
+    ArtistCandidate,
     CandidateLabel,
     Credit,
     Entity,
     EntityKind,
     EntityType,
     IdKind,
+    LabelCandidate,
     Link,
     LinkTarget,
+    NameKey,
     Provenance,
     Rating,
     RecordCandidate,
@@ -24,11 +28,13 @@ from deadwax.core import (
     TextKind,
     Verdict,
     compare,
+    compare_names,
     normalize_barcode,
     normalize_text,
 )
 from deadwax.sources._html import JsonObject, json_ld, parse_html
 from deadwax.sources.adapters.discogs import models
+from deadwax.sources.services import link_target, service_of
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +42,7 @@ SOURCE = "discogs"
 SITE = "https://www.discogs.com"
 VERSIONS_LIMIT = 15
 LABEL_RELEASES_LIMIT = 12
+ARTIST_RELEASES_LIMIT = 12
 COMPILATIONS_LIMIT = 12
 
 # Placeholder artists Discogs uses for unknown credits.
@@ -362,11 +369,16 @@ def _artist_relation(
     )
 
 
-def artist_relations(artist: models.Artist) -> list[Relation]:
+def artist_relations(
+    artist: models.Artist,
+    *,
+    aliases_as_aliases: bool = False,
+) -> list[Relation]:
     """Members of a group, groups of a person, and other names the artist records under."""
     url = page("artist", artist.id)
     aliases = [a for a in artist.aliases if clean_name(a.name).lower() not in _PLACEHOLDERS]
-    return [
+    kind = RelationKind.ALIAS if aliases_as_aliases else RelationKind.PROJECT
+    relations = [
         *(
             _artist_relation(
                 RelationKind.MEMBER,
@@ -377,19 +389,107 @@ def artist_relations(artist: models.Artist) -> list[Relation]:
             for m in artist.members
         ),
         *(_artist_relation(RelationKind.PROJECT, g, None, url) for g in artist.groups),
-        *(_artist_relation(RelationKind.PROJECT, a, "alias", url) for a in aliases),
+        *(_artist_relation(kind, a, None if aliases_as_aliases else "alias", url) for a in aliases),
     ]
+    if aliases_as_aliases:
+        seen = {normalize_text(clean_name(a.name)) for a in aliases}
+        seen.add(normalize_text(clean_name(artist.name)))
+        for variation in artist.namevariations:
+            name = clean_name(variation)
+            key = normalize_text(name)
+            if not key or key in seen or name.lower() in _PLACEHOLDERS:
+                continue
+            seen.add(key)
+            relations.append(
+                Relation(
+                    kind=RelationKind.ALIAS,
+                    target=Entity(type=EntityType.ARTIST, name=name),
+                    scope=Scope.ARTIST,
+                    sources=[Provenance(source=SOURCE, url=url)],
+                ),
+            )
+    return relations
+
+
+def artist_candidate(artist: models.Artist) -> ArtistCandidate:
+    """Identify the artist by the Discogs profile."""
+    return ArtistCandidate(
+        name=clean_name(artist.name),
+        disambiguation=(artist.realname or "").strip() or None,
+        ids={IdKind.DISCOGS_ARTIST: str(artist.id)},
+        url=page("artist", artist.id),
+    )
+
+
+def label_candidate(label: models.Label) -> LabelCandidate:
+    """Identify the label by the Discogs profile."""
+    return LabelCandidate(
+        name=clean_name(label.name),
+        ids={IdKind.DISCOGS_LABEL: str(label.id)},
+        url=page("label", label.id),
+    )
+
+
+def label_hierarchy(label: models.Label) -> list[Relation]:
+    """Return directional relations to the parent label and sublabels."""
+    entries = [(RelationKind.SUBLABEL, ref) for ref in label.sublabels]
+    if label.parent_label is not None:
+        entries.insert(0, (RelationKind.PARENT_LABEL, label.parent_label))
+    return [
+        Relation(
+            kind=kind,
+            target=Entity(
+                type=EntityType.LABEL,
+                name=clean_name(ref.name),
+                url=page("label", ref.id),
+                ids={IdKind.DISCOGS_LABEL: str(ref.id)},
+            ),
+            scope=Scope.LABEL,
+            sources=[Provenance(source=SOURCE, url=page("label", label.id))],
+        )
+        for kind, ref in entries
+    ]
+
+
+def artist_release_relations(releases: Iterable[models.ArtistRelease], url: str) -> list[Relation]:
+    """Return the artist's main masters in discography order."""
+    result = []
+    seen: set[int] = set()
+    for item in releases:
+        if item.type != "master" or item.role != "Main" or item.id in seen:
+            continue
+        seen.add(item.id)
+        result.append(
+            Relation(
+                kind=RelationKind.RELEASE,
+                target=Entity(
+                    type=EntityType.RELEASE,
+                    name=item.title.strip(),
+                    artist=clean_name(item.artist or "") or None,
+                    date=str(item.year) if item.year else None,
+                    url=page("master", item.id),
+                    ids={IdKind.DISCOGS_MASTER: str(item.id)},
+                ),
+                scope=Scope.ARTIST,
+                sources=[Provenance(source=SOURCE, url=url)],
+            ),
+        )
+        if len(result) >= ARTIST_RELEASES_LIMIT:
+            break
+    return result
 
 
 def label_release_relations(
     releases: Iterable[models.LabelRelease],
     label: str,
     label_id: int,
-    record_title: str,
+    record_title: str | None = None,
 ) -> list[Relation]:
     """Other releases of the label, one per artist and title."""
     url = page("label", label_id)
-    seen: set[tuple[str, str]] = {(normalize_text(record_title), "")}
+    seen: set[tuple[str, str]] = set()
+    if record_title is not None:
+        seen.add((normalize_text(record_title), ""))
     result = []
     for item in releases:
         artist = clean_name(item.artist or "")
@@ -513,6 +613,48 @@ def links(release: models.Release, master: models.Master | None) -> list[Link]:
         if a.id is not None
     ]
 
+    return result
+
+
+def pick_name(
+    reference: NameKey,
+    results: Iterable[models.SearchResult],
+    id_kind: IdKind,
+) -> models.SearchResult | None:
+    """Pick the best matching artist or label, in search order for tied names."""
+    best = None
+    score = -1.0
+    for item in results:
+        if item.type != reference.kind:
+            continue
+        key = NameKey(name=clean_name(item.title), kind=reference.kind, ids={id_kind: str(item.id)})
+        match = compare_names(reference, key)
+        if match.verdict is Verdict.MATCH and match.name_score > score:
+            best, score = item, match.name_score
+    return best
+
+
+def profile_links(urls: Iterable[str], target: LinkTarget, profile_url: str) -> list[Link]:
+    """External links listed on a Discogs artist or label profile."""
+    result = []
+    for url in dict.fromkeys(raw.strip() for raw in urls):
+        try:
+            parts = urlsplit(url)
+        except ValueError:
+            continue
+        if parts.scheme not in {"https", "http"} or not parts.hostname:
+            continue
+        service = service_of(url)
+        result.append(
+            Link(
+                service=service.name
+                if service is not None
+                else parts.hostname.removeprefix("www."),
+                url=url,
+                target=link_target(url, target),
+                sources=[Provenance(source=SOURCE, url=profile_url)],
+            ),
+        )
     return result
 
 

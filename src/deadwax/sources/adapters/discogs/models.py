@@ -119,9 +119,46 @@ class Artist(ApiModel):
     id: int
     name: str
     uri: str | None = None
+    realname: str | None = None
+    profile: str | None = None
+    urls: list[str] = []
+    namevariations: list[str] = []
     members: list[ArtistRef] = []
     groups: list[ArtistRef] = []
     aliases: list[ArtistRef] = []
+
+
+class LabelRef(ApiModel):
+    """Parent label or sublabel listed on a label profile."""
+
+    id: int
+    name: str
+
+
+class Label(LabelRef):
+    """Label profile and hierarchy."""
+
+    profile: str | None = None
+    urls: list[str] = []
+    parent_label: LabelRef | None = None
+    sublabels: list[LabelRef] = []
+
+
+class ArtistRelease(ApiModel):
+    """A master or release in an artist's discography."""
+
+    id: int
+    title: str
+    type: str
+    role: str
+    artist: str | None = None
+    year: int | None = None
+
+
+class ArtistReleases(ApiModel):
+    """Page of an artist's discography."""
+
+    releases: list[ArtistRelease] = []
 
 
 class LabelRelease(ApiModel):

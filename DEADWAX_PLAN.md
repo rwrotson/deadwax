@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md). The v2 source scope, closed v2 stages (8–17, 19, 20, R-1–R-6, M-1–M-3), their evidence, the Stage 18 access attempts, and the v2 decision log are archived in [`plans/v2.md`](plans/v2.md).
 
-- **Status:** v1 and v2 complete; v0.1.0 is the first tagged release (2026-11-20, GitHub only, no PyPI). Stage 18 (Rate Your Music) deferred until RYM is accessible; Boomkat and Norman Records remain access-limited. Stages E-1–E-3 (artist, label, and other record kinds): E-1 and E-2 done, E-3 in progress (step 1 of 6 done: groundwork and MusicBrainz).
+- **Status:** v1 and v2 complete; v0.1.0 is the first tagged release (2026-11-20, GitHub only, no PyPI). Stage 18 (Rate Your Music) deferred until RYM is accessible; Boomkat and Norman Records remain access-limited. Stages E-1–E-3 (artist, label, and other record kinds): E-1 and E-2 done, E-3 in progress (steps 1–2 of 6 done: groundwork, MusicBrainz, and Discogs).
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` (and the nested `AGENTS.md` of the area you change), `docs/architecture.md` (import rules R1–R9), and `CONTRIBUTING.md` before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -74,7 +74,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Sections of closed
 | 20 | Done (RYM blocked, Forced Exposure HTTP 403, Norman disabled by the local allowlist) | Qualification; release v0.1.0. |
 | E-1 | Done | Per-kind lookup slots (`Lookups`), dispatch by the kind known in each pass, `SourceInfo.kinds`. |
 | E-2 | Done | Typed queries per kind, a model for artists and labels, CLI `--artist` and `--label`. |
-| E-3 | In progress (MusicBrainz done) | Artist and label lookups, MusicBrainz, Discogs, Last.fm, Wikipedia, and Bandcamp first. |
+| E-3 | In progress (MusicBrainz and Discogs done) | Artist and label lookups, MusicBrainz, Discogs, Last.fm, Wikipedia, and Bandcamp first. |
 
 Common acceptance for source stages (9–19, and source work in E-3), in addition to each stage's own:
 
@@ -152,6 +152,24 @@ Changed:
 Checks: `uv run poe check` passed (1240 tests, coverage 97.08%); `uv run --group docs properdocs build --strict` passed. Live: `deadwax --artist "Aphex Twin" --sources musicbrainz --no-cache` and `deadwax --label Warp --sources musicbrainz --no-cache` give the expected identity, relations, and links; the Warp MusicBrainz URL resolves.
 
 Remaining: steps 2–6.
+
+### 2026-11-22 — Claude Code hook maintenance
+
+The Stop hook now compares dirty Python state before and after the turn. Both check hooks report bounded failure diagnostics and stay silent on success. E-3 is unchanged.
+
+Checks: `bash -n`, `jq -e`, and `git diff --check` passed. Synthetic hook events in a temporary Git repository passed, including Bash edits to an already dirty file, session and worktree isolation, and bounded failure output. `uv run poe check` passed (1240 tests, 97.09% coverage). Live tests were not run; this change does not touch adapters.
+
+### 2026-11-23 — E-3 progress, step 2 (Discogs)
+
+Discogs now looks up artists and labels by direct URL, IDs from earlier passes, or token-authenticated name search. It adds profile text and links, artist members, groups and aliases, label hierarchy, and up to 12 main masters or catalog releases per lookup. Text name queries use the identifiers of the first matching candidate at the merge gate. This lets MusicBrainz's Warp match Discogs's Warp Records (23528) while rejecting namesakes with another ID in the shared namespace.
+
+Recorded five Discogs scenarios with `scripts/record_fixtures.py --live discogs`: `aphex_twin`, `warp`, and `musicbrainz_artist_url` with `--sources musicbrainz,discogs`, and `discogs_artist_search` and `discogs_label_search` with `--sources discogs`. Verified that the recordings contain no configured token. Replay tests exercise the library entry point. Mock responses cover missing credentials, empty search, 404, challenge pages, and discography filtering.
+
+Live, uncached CLI checks found Aphex Twin and Warp by name and by Discogs URL, including both direct URLs without a token, and confirmed Discogs enrichment for the Aphex Twin MusicBrainz URL. Discogs-only search for Warp selected the exact listing (1038614), while MusicBrainz supplied the Warp Records ID (23528) for the combined lookup. The five v1 records and Burial's Archangel returned identities. Discogs review pages were blocked for Paranoid Android, Huerco S., Missing, and Archangel. Discogs timed out for Kino and reported no match in its catalog for the underground album, which Bandcamp found.
+
+Checks: `uv run poe check` passed (1252 tests, 97.13% coverage) and `uv run --group docs properdocs build --strict` passed. The first run exhausted disk space. The successful run disabled disposable tool caches and used four test workers. `poe test-live` was deferred to step 6 with the new live invariants.
+
+Remaining: steps 3–6.
 
 ### 2026-11-21 — E-2 evidence (typed queries, artists and labels)
 

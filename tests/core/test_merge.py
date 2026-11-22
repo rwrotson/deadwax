@@ -784,6 +784,31 @@ def test_namesake_with_another_id_is_no_match() -> None:
     assert "'Aphex Twin'" in error.reason
 
 
+def test_name_query_uses_ids_from_the_first_matching_candidate() -> None:
+    query = LabelQuery(name="Warp")
+    for_source = [
+        ("other", "Unrelated", "9"),
+        ("musicbrainz", "Warp", "23528"),
+        ("discogs", "Warp Records", "23528"),
+        ("namesake", "Warp", "1038614"),
+    ]
+    partials = [
+        Partial(
+            source=source,
+            candidate=LabelCandidate(name=name, ids={IdKind.DISCOGS_LABEL: discogs_id}),
+        )
+        for source, name, discogs_id in for_source
+    ]
+
+    dossier = merge(query, partials, generated_at=NOW)
+
+    assert [(error.source, error.kind) for error in dossier.errors] == [
+        ("other", ErrorKind.NO_MATCH),
+        ("namesake", ErrorKind.NO_MATCH),
+    ]
+    assert [external.value for external in dossier.identity.external_ids] == ["23528"]
+
+
 def test_candidates_of_another_family_do_not_match() -> None:
     record = partial("musicbrainz", candidate("Selected Ambient Works 85-92"))
     label = Partial(source="discogs", candidate=LabelCandidate(name="Warp"))

@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import sys
+from collections.abc import Collection
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -96,6 +97,8 @@ SCENARIOS: dict[str, Query] = {
     "soundcloud_url": parse_query("https://soundcloud.com/radiohead/paranoid-android"),
     "aphex_twin": parse_query("Aphex Twin", EntityKind.ARTIST),
     "warp": parse_query("Warp", EntityKind.LABEL),
+    "discogs_artist_search": parse_query("Aphex Twin", EntityKind.ARTIST),
+    "discogs_label_search": parse_query("Warp", EntityKind.LABEL),
     "musicbrainz_artist_url": parse_query(
         "https://musicbrainz.org/artist/f22942a1-6f70-4f48-866e-238cb2308fbd",
     ),
@@ -255,12 +258,16 @@ def config(scenario: str, live: frozenset[str]) -> LookupConfig:
     )
 
 
-async def record(name: str, query: Query, live: frozenset[str]) -> Dossier:
+async def record(
+    name: str,
+    query: Query,
+    live: frozenset[str],
+    include: Collection[str] = ALL_GROUPS,
+) -> Dossier:
     """Run one lookup and write the fixtures of the sources recorded live."""
     transport = RecordingTransport(name, live)
     try:
-        # Every source runs, opt-in ones too, so that each has fixtures for every scenario.
-        dossier = await lookup(query, config(name, live), include=ALL_GROUPS, transport=transport)
+        dossier = await lookup(query, config(name, live), include=include, transport=transport)
     finally:
         await transport.aclose()
 
@@ -282,6 +289,7 @@ async def main() -> None:
         default=",".join(LIVE_DEFAULT),
         help="comma-separated sources to record live, or 'all' (default: %(default)s)",
     )
+    parser.add_argument("--sources", help="comma-separated sources or groups to run (default: all)")
 
     args = parser.parse_args()
     unknown = sorted(set(args.scenarios) - set(SCENARIOS))
@@ -289,9 +297,10 @@ async def main() -> None:
         parser.error(f"unknown scenarios: {', '.join(unknown)}")
 
     live = frozenset(HOSTS.values()) if args.live == "all" else frozenset(args.live.split(","))
+    include = tuple(args.sources.split(",")) if args.sources else ALL_GROUPS
     for name in args.scenarios or list(SCENARIOS):
         sys.stdout.write(f"{name}\n")
-        dossier = await record(name, SCENARIOS[name], live)
+        dossier = await record(name, SCENARIOS[name], live, include)
         identity = dossier.identity
         found = identity.title if isinstance(identity, RecordIdentity) else identity.name
         title = None if found is None else found.value

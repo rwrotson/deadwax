@@ -67,8 +67,9 @@ The README lists deferred sources and those deadwax will not use.
 ## Discogs
 
 - **Access:** API v2. Discogs refused every User-Agent naming deadwax on 2026-11-12, so httpx's own User-Agent is sent (`discogs.user_agent` overrides it).
-- **Credentials:** `DEADWAX_SOURCES__DISCOGS__TOKEN` (personal access token), needed for search and compilations. Without it, Discogs reads records by the Discogs IDs from MusicBrainz at 25 requests a minute, and a lookup that would need a search is `skipped`.
+- **Credentials:** `DEADWAX_SOURCES__DISCOGS__TOKEN` (personal access token), needed for search and compilations. Without it, Discogs reads profiles and records by ID from the query or MusicBrainz at 25 requests a minute. A lookup that needs search is `skipped`.
 - **Contributes:** genres and styles, credits with roles and tracks, database notes, labels and catalog numbers, barcodes, other versions of the master, compilations, the label's other releases, members, groups and aliases.
+- **Artists and labels:** identity, profile text, and links. For artists, Discogs provides real names where listed, members, groups, aliases and name variations, and up to 12 main masters from the first page of the discography sorted by year. For labels, it provides parent labels, sublabels, and up to 12 catalog releases from the first page.
 - **Reviews:** user reviews come from the release page through the browser profile and the escalation ladder. A refused page is reported as `blocked` with a `reviews:` reason and loses only the reviews.
 - **Limits:** "Not On Label" and placeholder aliases are not treated as labels or relations.
 

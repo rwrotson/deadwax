@@ -160,7 +160,7 @@ def _describe(candidate: Candidate) -> str:
 
 
 def _reference(query: Query, partials: Sequence[Partial]) -> _Key | None:
-    """Use the query text, or for a URL query the first candidate (the URL's own page)."""
+    """Use the query text with established name IDs, or the URL's first candidate."""
     match query:
         case (
             TrackQuery(artist=str(artist), title=str(title))
@@ -171,7 +171,14 @@ def _reference(query: Query, partials: Sequence[Partial]) -> _Key | None:
         ):
             return RecordKey(artist=artist, title=title, kind=query.kind)
         case ArtistQuery(name=str(name)) | LabelQuery(name=str(name)):
-            return NameKey(name=name, kind=query.kind)
+            reference = NameKey(name=name, kind=query.kind, ids=query.ids)
+            for partial in partials:
+                candidate = partial.candidate
+                if isinstance(candidate, ArtistCandidate | LabelCandidate) and candidate.ids:
+                    key = NameKey(name=candidate.name, kind=candidate.kind, ids=candidate.ids)
+                    if compare_names(reference, key).verdict is Verdict.MATCH:
+                        return NameKey(name=name, kind=query.kind, ids=candidate.ids | query.ids)
+            return reference
     for partial in partials:
         if partial.candidate is not None:
             return _candidate_key(partial.candidate, query.kind)

@@ -5,12 +5,15 @@ import httpx
 
 from deadwax.core import (
     AdapterError,
+    ArtistQuery,
     BlockedError,
     Capability,
     ConfigurationError,
     EntityKind,
     ErrorKind,
     IdKind,
+    LabelQuery,
+    LinkTarget,
     LookupContext,
     Lookups,
     NotFoundError,
@@ -28,7 +31,7 @@ from deadwax.core import (
 )
 from deadwax.sources._adapter import HttpAdapter
 from deadwax.sources._http import ClientSpec, HttpClient, HttpResources, Profile
-from deadwax.sources._search import search_key
+from deadwax.sources._search import name_key, search_key
 from deadwax.sources.adapters.discogs import models
 from deadwax.sources.adapters.discogs import parse as p
 from deadwax.sources.config import LookupConfig
@@ -45,6 +48,7 @@ ANONYMOUS_RATE = 25 / 60
 DEFAULT_USER_AGENT = f"python-httpx/{httpx.__version__}"
 
 SKIPPED_SEARCH = "search needs sources.discogs.token, and earlier sources found no Discogs ID"
+_NAME_IDS = {EntityKind.ARTIST: IdKind.DISCOGS_ARTIST, EntityKind.LABEL: IdKind.DISCOGS_LABEL}
 
 
 class DiscogsAdapter(HttpAdapter):
@@ -90,8 +94,11 @@ class DiscogsAdapter(HttpAdapter):
         return {"authorization": f"Discogs token={self.token}"} if self.token else {}
 
     def resolves(self, query: Query) -> bool:
-        """Discogs master and release pages."""
-        return IdKind.DISCOGS_MASTER in query.ids or IdKind.DISCOGS_RELEASE in query.ids
+        """Discogs master, release, artist, and label pages."""
+        return any(
+            kind in query.ids
+            for kind in (IdKind.DISCOGS_MASTER, IdKind.DISCOGS_RELEASE, *_NAME_IDS.values())
+        )
 
     @property
     def client(self) -> HttpClient:
@@ -126,8 +133,94 @@ class DiscogsAdapter(HttpAdapter):
 
     @property
     def lookups(self) -> Lookups:
-        """Tracks and albums; the page of a query URL tells which."""
-        return Lookups(track=self.find, album=self.find, unresolved=self.find)
+        """Tracks, albums, artists, labels, and record URLs of unknown kind."""
+        return Lookups(
+            track=self.find,
+            album=self.find,
+            artist=self.find_artist,
+            label=self.find_label,
+            unresolved=self.find,
+        )
+
+    async def _name_target(
+        self,
+        query: ArtistQuery | LabelQuery,
+        context: LookupContext,
+    ) -> str | None:
+        id_kind = _NAME_IDS[query.kind]
+        if (discogs_id := context.id(id_kind)) is not None:
+            return discogs_id
+        key = name_key(query, context)
+        if key is None:
+            raise NotFoundError("neither the query nor earlier sources name the record")
+        if self.token is None:
+            return None
+        found = await self._get(
+            models.Search,
+            "database/search",
+            q=key.name,
+            type=query.kind.value,
+            per_page=PAGE_SIZE,
+        )
+        result = p.pick_name(key, found.results, id_kind)
+        if result is None:
+            raise NotFoundError(f"no matching Discogs {query.kind}")
+        return str(result.id)
+
+    def _skipped_search(self) -> Partial:
+        error = AdapterError(source=self.name, kind=ErrorKind.SKIPPED, reason=SKIPPED_SEARCH)
+        return Partial(source=self.name, errors=[error])
+
+    async def find_artist(self, query: ArtistQuery, context: LookupContext) -> Partial:
+        """Read the artist profile and discography."""
+        artist_id = await self._name_target(query, context)
+        if artist_id is None:
+            return self._skipped_search()
+        artist = await self._get(models.Artist, f"artists/{artist_id}")
+        candidate = p.artist_candidate(artist)
+        url = p.page("artist", artist.id)
+        relations = []
+        if context.wants(Capability.RELATIONS):
+            found = await self._get(
+                models.ArtistReleases,
+                f"artists/{artist.id}/releases",
+                sort="year",
+                per_page=PAGE_SIZE,
+            )
+            relations = p.artist_relations(artist, aliases_as_aliases=True)
+            relations += p.artist_release_relations(found.releases, url)
+        return Partial(
+            source=self.name,
+            candidate=candidate,
+            texts=p.notes(artist.profile, "Profile", Scope.ARTIST, url),
+            relations=relations,
+            links=p.profile_links(artist.urls, LinkTarget.ARTIST, url),
+        )
+
+    async def find_label(self, query: LabelQuery, context: LookupContext) -> Partial:
+        """Read the label profile and catalog."""
+        label_id = await self._name_target(query, context)
+        if label_id is None:
+            return self._skipped_search()
+        label = await self._get(models.Label, f"labels/{label_id}")
+        candidate = p.label_candidate(label)
+        url = p.page("label", label.id)
+        relations = []
+        if context.wants(Capability.RELATIONS):
+            found = await self._get(
+                models.LabelReleases,
+                f"labels/{label.id}/releases",
+                per_page=PAGE_SIZE,
+            )
+            relations = p.label_hierarchy(label)
+            relations += p.label_release_relations(found.releases, candidate.name, label.id)
+        return Partial(
+            source=self.name,
+            candidate=candidate,
+            texts=p.notes(label.profile, "Profile", Scope.LABEL, url),
+            relations=relations,
+            links=p.profile_links(label.urls, LinkTarget.LABEL, url),
+        )
 
     async def find(self, query: Query, context: LookupContext) -> Partial:
         """Read the master and its main release, then versions, artist, label, and reviews."""
@@ -135,8 +228,7 @@ class DiscogsAdapter(HttpAdapter):
         kind = query.kind or (key.kind if key is not None else None) or EntityKind.ALBUM
         target = await self._target(query, context, key)
         if target is None:
-            error = AdapterError(source=self.name, kind=ErrorKind.SKIPPED, reason=SKIPPED_SEARCH)
-            return Partial(source=self.name, errors=[error])
+            return self._skipped_search()
 
         master_id, release_id = target
         master = await self._get(models.Master, f"masters/{master_id}") if master_id else None

@@ -6,11 +6,15 @@ import pytest
 from pydantic import SecretStr
 
 from deadwax.core import (
+    ArtistCandidate,
+    Capability,
     ConfigurationError,
     EntityKind,
     ErrorKind,
     ExternalId,
     IdKind,
+    LabelCandidate,
+    LinkTarget,
     LookupContext,
     NotFoundError,
     Provenance,
@@ -18,7 +22,9 @@ from deadwax.core import (
     RecordCandidate,
     RecordIdentity,
     RelationKind,
+    Scope,
     SourceState,
+    TextKind,
     UnresolvedQuery,
 )
 from deadwax.sources import LookupConfig, parse_query
@@ -94,6 +100,184 @@ def with_ids(query: Query, **ids: str) -> LookupContext:
 
 ALBUM = parse_query("Band - Record", EntityKind.ALBUM)
 TRACK = parse_query("Band - Song", EntityKind.TRACK)
+
+
+@pytest.mark.asyncio
+async def test_artist_url_reads_profile_and_main_masters() -> None:
+    query = parse_query("https://www.discogs.com/artist/3-Band")
+    master = {"id": 20, "title": "Record", "type": "master", "role": "Main"}
+    seen: list[httpx.Request] = []
+    adapter = make(
+        {
+            f"{API}/artists/3": (
+                200,
+                {
+                    "id": 3,
+                    "name": "Band (2)",
+                    "realname": " Real Name ",
+                    "profile": " From Discogs.\r\n Biography.",
+                    "aliases": [{"id": 4, "name": "Alias"}, {"id": 5, "name": "Unknown"}],
+                    "namevariations": ["Alias", "Band", "The Band", "unknown", ""],
+                    "members": [{"id": 6, "name": "Member", "active": False}],
+                    "groups": [{"id": 7, "name": "Group"}],
+                    "urls": [
+                        "https://band.bandcamp.com",
+                        "https://www.band.example",
+                        "https://band.bandcamp.com",
+                        "ftp://band.example",
+                        "https://[bad",
+                    ],
+                },
+            ),
+            f"{API}/artists/3/releases": (
+                200,
+                {
+                    "releases": [
+                        {**master, "type": "release"},
+                        {**master, "role": "Appearance"},
+                        master,
+                        master,
+                        *({**master, "id": i} for i in range(21, 36)),
+                    ],
+                },
+            ),
+        },
+        seen=seen,
+    )
+    assert adapter.resolves(query)
+    partial = await adapter.lookup(query, LookupContext(query=query))
+    assert isinstance(partial.candidate, ArtistCandidate)
+    assert partial.candidate.name == "Band"
+    assert partial.candidate.disambiguation == "Real Name"
+    assert partial.candidate.ids == {IdKind.DISCOGS_ARTIST: "3"}
+    [profile] = partial.texts
+    assert (profile.title, profile.kind, profile.scope) == ("Profile", TextKind.WIKI, Scope.ARTIST)
+    assert profile.body == "From Discogs.\n Biography."
+    assert [r.target.name for r in partial.relations if r.kind is RelationKind.ALIAS] == [
+        "Alias",
+        "The Band",
+    ]
+    assert any(r.kind is RelationKind.MEMBER and r.note == "former" for r in partial.relations)
+    assert any(
+        r.kind is RelationKind.PROJECT and r.target.name == "Group" for r in partial.relations
+    )
+    masters = [r for r in partial.relations if r.kind is RelationKind.RELEASE]
+    assert [r.target.ids[IdKind.DISCOGS_MASTER] for r in masters] == [str(i) for i in range(20, 32)]
+    assert [(link.service, link.target) for link in partial.links] == [
+        ("bandcamp", LinkTarget.ARTIST),
+        ("band.example", LinkTarget.ARTIST),
+    ]
+    for fact in [*partial.relations, *partial.texts, *partial.links]:
+        assert fact.sources == [Provenance(source="discogs", url=partial.candidate.url)]
+    assert all("authorization" not in request.headers for request in seen)
+    assert seen[-1].url.params["sort"] == "year"
+    await adapter.aclose()
+
+
+@pytest.mark.asyncio
+async def test_label_url_reads_profile_hierarchy_and_catalog() -> None:
+    query = parse_query("https://www.discogs.com/label/5-Label")
+    adapter = make(
+        {
+            f"{API}/labels/5": (
+                200,
+                {
+                    "id": 5,
+                    "name": "Label (2)",
+                    "profile": " A label ",
+                    "parent_label": {"id": 6, "name": "Parent (2)"},
+                    "sublabels": [{"id": 7, "name": "Imprint"}],
+                    "urls": ["https://label.bandcamp.com"],
+                },
+            ),
+            f"{API}/labels/5/releases": (
+                200,
+                {
+                    "releases": [{"id": 10, "title": "Record"}, {"id": 11, "title": "Record"}],
+                },
+            ),
+        },
+    )
+    assert adapter.resolves(query)
+    partial = await adapter.lookup(query, LookupContext(query=query))
+    assert isinstance(partial.candidate, LabelCandidate)
+    assert partial.candidate.name == "Label"
+    assert partial.candidate.ids == {IdKind.DISCOGS_LABEL: "5"}
+    assert partial.texts[0].scope is Scope.LABEL
+    assert partial.links[0].target is LinkTarget.LABEL
+    assert [(r.kind, r.target.name, r.target.ids) for r in partial.relations] == [
+        (RelationKind.PARENT_LABEL, "Parent", {IdKind.DISCOGS_LABEL: "6"}),
+        (RelationKind.SUBLABEL, "Imprint", {IdKind.DISCOGS_LABEL: "7"}),
+        (RelationKind.LABEL_RELEASE, "Record", {IdKind.DISCOGS_RELEASE: "10"}),
+    ]
+    await adapter.aclose()
+
+
+@pytest.mark.parametrize(
+    ("kind", "path"),
+    [(EntityKind.ARTIST, "artists"), (EntityKind.LABEL, "labels")],
+)
+@pytest.mark.asyncio
+async def test_name_search_ranks_results_and_skips_unrequested_discography(
+    kind: EntityKind,
+    path: str,
+) -> None:
+    query = parse_query("The Label", kind)
+    seen: list[httpx.Request] = []
+
+    def search(request: httpx.Request) -> Route:
+        assert dict(request.url.params) == {"q": "The Label", "type": kind.value, "per_page": "25"}
+        assert request.headers["authorization"] == "Discogs token=test"
+        return 200, {
+            "results": [
+                {"id": 1, "type": "master", "title": "The Label"},
+                {"id": 2, "type": kind.value, "title": "Other"},
+                {"id": 3, "type": kind.value, "title": "The Label (2)"},
+                {"id": 4, "type": kind.value, "title": "The Label"},
+            ],
+        }
+
+    adapter = make(
+        {f"{API}/{path}/3": (200, {"id": 3, "name": "The Label (2)"})},
+        token="test",
+        search=search,
+        seen=seen,
+    )
+    partial = await adapter.lookup(
+        query,
+        LookupContext(query=query, facets=frozenset({Capability.IDENTITY})),
+    )
+    assert isinstance(partial.candidate, ArtistCandidate | LabelCandidate)
+    assert partial.candidate.name == "The Label"
+    assert partial.candidate.kind is kind
+    assert not partial.relations
+    assert [request.url.path for request in seen] == ["/database/search", f"/{path}/3"]
+    await adapter.aclose()
+
+
+@pytest.mark.asyncio
+async def test_artist_and_label_search_without_a_token_are_skipped() -> None:
+    seen: list[httpx.Request] = []
+    adapter = make({}, seen=seen)
+    for kind in (EntityKind.ARTIST, EntityKind.LABEL):
+        query = parse_query("Missing", kind)
+        partial = await adapter.lookup(query, LookupContext(query=query))
+        assert [error.kind for error in partial.errors] == [ErrorKind.SKIPPED]
+    assert not seen
+    await adapter.aclose()
+
+
+@pytest.mark.asyncio
+async def test_name_search_empty_and_missing_profile() -> None:
+    adapter = make({}, token="test", search=lambda _: (200, {"results": []}))
+    for query in (
+        parse_query("Missing", EntityKind.ARTIST),
+        parse_query("https://www.discogs.com/label/5-Label"),
+        parse_query("https://open.spotify.com/artist/abc"),
+    ):
+        with pytest.raises(NotFoundError):
+            await adapter.lookup(query, LookupContext(query=query))
+    await adapter.aclose()
 
 
 @pytest.mark.asyncio
