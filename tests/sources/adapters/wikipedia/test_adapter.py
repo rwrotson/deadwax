@@ -5,15 +5,19 @@ import httpx
 import pytest
 
 from deadwax.core import (
+    ArtistQuery,
     EntityKind,
     ExternalId,
     IdKind,
+    LabelCandidate,
+    LabelQuery,
     LookupContext,
     NotFoundError,
     Provenance,
     Query,
     RecordCandidate,
     RecordIdentity,
+    RelationKind,
     Scope,
     TextKind,
 )
@@ -248,3 +252,111 @@ async def test_missing_article_is_skipped() -> None:
 
     assert partial.texts == []
     assert partial.candidate is not None
+
+
+def statement(prop: str, type_: str, value: object) -> dict[str, object]:
+    return {"mainsnak": {"property": prop, "datavalue": {"type": type_, "value": value}}}
+
+
+@pytest.mark.parametrize(
+    ("kind", "prop", "id_kind"),
+    [
+        (ArtistQuery, "P434", IdKind.MUSICBRAINZ_ARTIST),
+        (ArtistQuery, "P1953", IdKind.DISCOGS_ARTIST),
+        (LabelQuery, "P966", IdKind.MUSICBRAINZ_LABEL),
+        (LabelQuery, "P1955", IdKind.DISCOGS_LABEL),
+    ],
+)
+@pytest.mark.asyncio
+async def test_name_by_exact_id(
+    kind: type[ArtistQuery | LabelQuery],
+    prop: str,
+    id_kind: IdKind,
+) -> None:
+    value = "123"
+    query = kind(url="https://example.com/profile", ids={id_kind: value})
+    stale = {"id": "Q9", "labels": labels(en="Wrong"), "claims": {prop: [
+        {**statement(prop, "string", value), "rank": "deprecated"},
+    ]}}  # fmt: skip
+    correct = {"id": "Q1", "labels": labels(en="Expected"), "claims": {prop: [
+        statement(prop, "string", "different"),
+        statement(prop, "string", value),
+    ]}}  # fmt: skip
+
+    def respond(request: httpx.Request) -> object:
+        params = request.url.params
+        if params["action"] == "query":
+            assert params["srsearch"] == f"haswbstatement:{prop}={value}"
+            return {"query": {"search": [{"title": "Q9"}, {"title": "Q1"}]}}
+        assert params["ids"] == "Q9|Q1"
+        return {"entities": {"Q9": stale, "Q1": correct}}
+
+    partial = await make(wikidata=respond).lookup(query, LookupContext(query=query))
+
+    assert partial.candidate is not None
+    assert partial.candidate.kind is query.kind
+    assert partial.candidate.ids == {IdKind.WIKIDATA: "Q1", id_kind: value}
+
+
+@pytest.mark.asyncio
+async def test_label_found_by_alias() -> None:
+    query = LabelQuery(name="Example")
+    renamed = {
+        "id": "Q1",
+        "labels": labels(en="Current Name"),
+        "aliases": {"en": [{"language": "en", "value": "Example"}]},
+        "claims": {
+            "P966": [statement("P966", "string", "mbid")],
+            "P571": [statement("P571", "time", {"time": "+1989-06-00T00:00:00Z", "precision": 10})],
+            "P576": [statement("P576", "time", {"time": "+1999-00-00T00:00:00Z", "precision": 9})],
+            "P495": [ref("P495", "Q2")],
+            "P749": [ref("P749", "Q3")],
+            "P355": [ref("P355", "Q4")],
+        },
+    }
+    namesake = {"id": "Q9", "labels": labels(en="Example")}
+
+    def respond(request: httpx.Request) -> object:
+        params = request.url.params
+        if params["action"] == "query":
+            assert params["srsearch"] == "Example haswbstatement:P966"
+            return {"query": {"search": [{"title": "Q9"}, {"title": "Q1"}]}}
+        if params["ids"] == "Q9|Q1":
+            return {"entities": {"Q9": namesake, "Q1": renamed}}
+        assert params["ids"] == "Q2|Q3|Q4"
+        return {"entities": {
+            "Q2": {"id": "Q2", "labels": labels(en="United Kingdom")},
+            "Q3": {"id": "Q3", "labels": labels(en="Parent")},
+            "Q4": {"id": "Q4", "labels": labels(en="Child")},
+        }}  # fmt: skip
+
+    partial = await make(wikidata=respond).lookup(query, LookupContext(query=query))
+
+    candidate = partial.candidate
+    assert isinstance(candidate, LabelCandidate)
+    assert (candidate.name, candidate.country, candidate.begin, candidate.end) == (
+        "Example",
+        "United Kingdom",
+        "1989-06",
+        "1999",
+    )
+    assert [(r.kind, r.target.name, r.scope) for r in partial.relations] == [
+        (RelationKind.PARENT_LABEL, "Parent", Scope.LABEL),
+        (RelationKind.SUBLABEL, "Child", Scope.LABEL),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_artist_search_without_matching_item() -> None:
+    query = ArtistQuery(name="An Artist")
+
+    def respond(request: httpx.Request) -> object:
+        if request.url.params["action"] == "query":
+            return {"query": {"search": [{"title": "Q9"}]}}
+        return {"entities": {"Q9": {
+            "id": "Q9", "labels": labels(en="Unrelated"),
+            "claims": {"P434": [statement("P434", "string", "mbid")]},
+        }}}  # fmt: skip
+
+    with pytest.raises(NotFoundError, match="no matching Wikidata item"):
+        await make(wikidata=respond).lookup(query, LookupContext(query=query))

@@ -91,7 +91,9 @@ The README lists deferred sources and those deadwax will not use.
 
 - **Access:** MediaWiki and Wikidata APIs, keyless, honest User-Agent.
 - **Finds the record by:** the Wikidata ID from MusicBrainz, else a Wikidata search by title, type, and performer.
-- **Contributes:** genres, producers, composers, lyricists, labels, release date, the album a song is on, review scores (Wikidata P444 and the ratings templates of the articles), and the lead plus music-related sections of the English article and the article in the record's original language.
+- **Finds the artist or label by:** a known Wikidata ID, then exact MusicBrainz or Discogs ID statements. Without those IDs it searches by name for items with a MusicBrainz artist or label ID and compares their labels and aliases.
+- **Contributes for tracks and albums:** genres, producers, composers, lyricists, labels, release date, the album a song is on, review scores (Wikidata P444 and article ratings templates), and the lead and music-related sections of the English and original-language articles.
+- **Contributes for artists and labels:** identity fields and external IDs, genres, artists' labels, members and projects, parent labels and sublabels, plus article leads and sections on career, history, style, and influences when available.
 - **Limits:** section headings are recognised in English, Russian, Japanese, German, and French; other languages contribute only the lead. A sitelink that redirects (a song's link to its album) is skipped.
 
 ## ListenBrainz

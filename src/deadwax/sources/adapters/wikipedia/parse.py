@@ -3,12 +3,17 @@ from collections.abc import Collection, Iterator, Mapping, Sequence
 from urllib.parse import quote
 
 from deadwax.core import (
+    ArtistCandidate,
+    ArtistType,
     CandidateLabel,
     Credit,
     Entity,
     EntityKind,
     EntityType,
     IdKind,
+    LabelCandidate,
+    NameCandidate,
+    NameKey,
     NotFoundError,
     Provenance,
     Rating,
@@ -24,6 +29,8 @@ from deadwax.core import (
     TextKind,
     Verdict,
     compare,
+    compare_names,
+    name_similarity,
     normalize_text,
 )
 from deadwax.sources._html import Node, parse_html, prose, text_of
@@ -57,6 +64,24 @@ REFERENCED = (PERFORMER, GENRE, LABEL, PART_OF, LANGUAGE, *_CREDITS)
 # Identifiers an item records; a song's release IDs are those of its single, so only albums.
 _ALBUM_IDS = {"P436": IdKind.MUSICBRAINZ_RELEASE_GROUP, "P1954": IdKind.DISCOGS_MASTER}
 _TRACK_IDS = {"P435": IdKind.MUSICBRAINZ_WORK}
+
+NAME_IDS = {
+    EntityKind.ARTIST: {"P434": IdKind.MUSICBRAINZ_ARTIST, "P1953": IdKind.DISCOGS_ARTIST},
+    EntityKind.LABEL: {"P966": IdKind.MUSICBRAINZ_LABEL, "P1955": IdKind.DISCOGS_LABEL},
+}
+_NAME_RELATIONS = {
+    EntityKind.ARTIST: (
+        (LABEL, RelationKind.LABEL, EntityType.LABEL),
+        ("P527", RelationKind.MEMBER, EntityType.ARTIST),
+        ("P463", RelationKind.PROJECT, EntityType.ARTIST),
+    ),
+    EntityKind.LABEL: (
+        ("P749", RelationKind.PARENT_LABEL, EntityType.LABEL),
+        ("P355", RelationKind.SUBLABEL, EntityType.LABEL),
+    ),
+}
+_COUNTRIES = {EntityKind.ARTIST: ("P495", "P27"), EntityKind.LABEL: ("P495", "P17")}
+_GROUP_TYPES = frozenset({"Q2088357", "Q215380", "Q5741069"})
 
 # Language of a search for text in a non-Latin script.
 _SCRIPTS = (
@@ -97,6 +122,15 @@ _SECTIONS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("liste des titres", "personnel", "classement", "référence", "lien", "note"),
     ),
 }  # fmt: skip
+
+_NAME_SECTIONS = {
+    "en": ("style", "career", "history", "influence", "early life", "music", "artistry"),
+    "ru": ("стил", "карьер", "истори", "влияни", "биограф", "творчеств", "музык"),
+    "ja": ("来歴", "歴史", "音楽", "影響", "活動"),
+    "de": ("stil", "karriere", "geschichte", "einfluss", "musik"),
+    "fr": ("style", "carrière", "histoire", "influence", "biographie", "musique"),
+}
+_NAME_SECTION_EXCLUSIONS = ("discograph", "videograph", "дискограф", "ディスコグラフィ")
 
 # Elements whose text is not part of the prose.
 _NOISE = (
@@ -212,10 +246,10 @@ def same_artist(left: str, right: str) -> bool:
     return compare(*keys).verdict is Verdict.MATCH
 
 
-def _date(item: models.Item) -> str | None:
-    """Earliest publication date, cut to its precision."""
+def _date(item: models.Item, prop: str = DATE) -> str | None:
+    """Earliest stated date of the property, cut to its precision."""
     dates = []
-    for statement in item.statements(DATE):
+    for statement in item.statements(prop):
         found = statement.mainsnak.time
         if found is None:
             continue
@@ -304,6 +338,95 @@ def candidate(
     )
 
 
+def _name_match(key: NameKey, names: Sequence[str]) -> tuple[float, str] | None:
+    best = max(names, key=lambda name: name_similarity(key.name, name, key.kind), default=None)
+    if best is None:
+        return None
+    match = compare_names(NameKey(key.name, key.kind), NameKey(best, key.kind))
+    return (match.name_score, best) if match.verdict is Verdict.MATCH else None
+
+
+def pick_name(key: NameKey, items: Sequence[models.Item], language: str) -> models.Item | None:
+    """Pick the best matching label or alias with the expected music identifier property."""
+    prop = next(iter(NAME_IDS[key.kind]))
+    matches = (
+        (match[0], item)
+        for item in items
+        if item.texts(prop)
+        if (match := _name_match(key, item.names(languages(language)))) is not None
+    )
+    best = max(matches, key=lambda match: match[0], default=None)
+    return best[1] if best is not None else None
+
+
+def country_items(item: models.Item, kind: EntityKind) -> list[str]:
+    """Country of origin, then citizenship for artists or country for labels."""
+    return [qid for prop in _COUNTRIES[kind] for qid in item.items(prop)]
+
+
+def name_references(item: models.Item, kind: EntityKind) -> list[str]:
+    """Items named in the identity, genres, and relations of this artist or label."""
+    related = [qid for prop, _, _ in _NAME_RELATIONS[kind] for qid in item.items(prop)]
+    return country_items(item, kind) + item.items(GENRE) + related
+
+
+def name_candidate(
+    item: models.Item,
+    kind: EntityKind,
+    labels: Labels,
+    wanted: NameKey | None,
+    known_ids: Mapping[IdKind, str],
+) -> NameCandidate:
+    """Describe an artist or label with its Wikidata identity statements."""
+    url = entity_url(item.id)
+    name = item.label(labels.name_languages) or item.label(tuple(item.labels))
+    if wanted is not None and (
+        match := _name_match(
+            wanted,
+            item.names(languages(search_language(wanted.name), *labels.name_languages)),
+        )
+    ):
+        name = match[1]
+    if not name:
+        raise NotFoundError("the Wikidata item has no name", url=url)
+
+    ids = {IdKind.WIKIDATA: item.id}
+    for prop, id_kind in NAME_IDS[kind].items():
+        if values := item.texts(prop):
+            known = known_ids.get(id_kind)
+            ids[id_kind] = known if known is not None and known in values else values[0]
+
+    country = next(
+        (label for qid in country_items(item, kind) if (label := labels.term(qid)) is not None),
+        None,
+    )
+    if kind is EntityKind.LABEL:
+        return LabelCandidate(
+            name=name,
+            country=country,
+            begin=_date(item, "P571"),
+            end=_date(item, "P576"),
+            ids=ids,
+            url=url,
+        )
+
+    types = item.items("P31")
+    artist_type = None
+    if "Q5" in types:
+        artist_type = ArtistType.PERSON
+    elif _GROUP_TYPES.intersection(types):
+        artist_type = ArtistType.GROUP
+    return ArtistCandidate(
+        name=name,
+        country=country,
+        type=artist_type,
+        begin=_date(item, "P569") or _date(item, "P571"),
+        end=_date(item, "P570") or _date(item, "P576"),
+        ids=ids,
+        url=url,
+    )
+
+
 def claim_tags(item: models.Item, labels: Labels, scope: Scope) -> list[Tag]:
     """Genres stated on the item."""
     sources = [Provenance(source=SOURCE, url=entity_url(item.id))]
@@ -345,6 +468,27 @@ def claim_relations(
         for prop, relation, entity in kinds
         for qid in item.items(prop)
         if (name := labels.name(qid)) is not None and (prop != PART_OF or qid in albums)
+    ]
+
+
+def name_relations(
+    item: models.Item,
+    kind: EntityKind,
+    labels: Labels,
+    scope: Scope,
+) -> list[Relation]:
+    """Artist labels, members and projects, or the label's hierarchy."""
+    sources = [Provenance(source=SOURCE, url=entity_url(item.id))]
+    return [
+        Relation(
+            kind=relation,
+            target=Entity(type=entity, name=name, url=entity_url(qid), ids={IdKind.WIKIDATA: qid}),
+            scope=scope,
+            sources=sources,
+        )
+        for prop, relation, entity in _NAME_RELATIONS[kind]
+        for qid in item.items(prop)
+        if (name := labels.name(qid)) is not None
     ]
 
 
@@ -498,8 +642,11 @@ def _heading(node: Node) -> Node | None:
     return node.css_first("h2") if node.tag == "div" and "mw-heading2" in classes else None
 
 
-def _wanted(heading: str, language: str) -> bool:
+def _wanted(heading: str, language: str, scope: Scope) -> bool:
     allowed, denied = _SECTIONS.get(language, ((), ()))
+    if scope in {Scope.ARTIST, Scope.LABEL}:
+        allowed = _NAME_SECTIONS.get(language, ())
+        denied += _NAME_SECTION_EXCLUSIONS
     heading = heading.lower()
     return any(a in heading for a in allowed) and not any(d in heading for d in denied)
 
@@ -541,7 +688,7 @@ def sections(html: str, title: str, language: str, scope: Scope, url: str) -> li
 
     result = []
     for index, (heading, anchor, nodes) in enumerate(groups):
-        if index > 0 and (heading is None or not _wanted(heading, language)):
+        if index > 0 and (heading is None or not _wanted(heading, language, scope)):
             continue
         body = _prose(nodes)
         if body is None:

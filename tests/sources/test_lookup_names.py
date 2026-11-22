@@ -161,8 +161,14 @@ async def test_artist_by_name(replay: Replay, config: LookupConfig) -> None:
 async def test_artist_by_musicbrainz_url(replay: Replay, config: LookupConfig) -> None:
     query = parse_query(f"https://musicbrainz.org/artist/{APHEX_TWIN}")
 
-    dossier = await replayed(query, "musicbrainz_artist_url", replay, config)
+    dossier = await lookup(
+        query,
+        config,
+        include=("musicbrainz", "lastfm"),
+        transport=replay("musicbrainz_artist_url"),
+    )
 
+    assert not dossier.errors
     assert isinstance(dossier.identity, ArtistIdentity)
     assert ids(dossier)[IdKind.MUSICBRAINZ_ARTIST] == APHEX_TWIN
     assert {metric.kind for metric in dossier.metrics} == {MetricKind.LISTENERS, MetricKind.LISTENS}
@@ -180,6 +186,81 @@ async def test_label_by_name(replay: Replay, config: LookupConfig) -> None:
     assert {RelationKind.SUBLABEL, RelationKind.ASSOCIATED} <= relation_kinds(dossier)
     assert RelationKind.LABEL_RELEASE in relation_kinds(dossier)
     assert "discogs" not in errors(dossier)
+
+
+@pytest.mark.parametrize(
+    ("query", "scenario", "expected"),
+    [
+        (
+            ArtistQuery(name="Aphex Twin"),
+            "aphex_twin",
+            ("Q223161", Scope.ARTIST, "Musical style and influences", RelationKind.PROJECT),
+        ),
+        (
+            parse_query("Warp", EntityKind.LABEL),
+            "warp",
+            ("Q543707", Scope.LABEL, "History", RelationKind.SUBLABEL),
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_wikipedia_from_musicbrainz(
+    query: Query,
+    scenario: str,
+    expected: tuple[str, Scope, str, RelationKind],
+    replay: Replay,
+    config: LookupConfig,
+) -> None:
+    qid, scope, section, relation = expected
+    seen: list[str] = []
+    dossier = await lookup(
+        query,
+        config,
+        include=("musicbrainz", "wikipedia"),
+        transport=replay(scenario, seen),
+    )
+
+    assert not dossier.errors
+    assert ids(dossier)[IdKind.WIKIDATA] == qid
+    wikidata = [request for request in seen if "www.wikidata.org" in request]
+    assert f"ids={qid}" in wikidata[0]
+    assert not any("list=search" in request for request in wikidata)
+    [text] = [text for text in dossier.texts if text.title == section]
+    assert text.scope is scope
+    assert all(
+        source.source == "wikipedia" and source.url and ".wikipedia.org/wiki/" in source.url
+        for source in text.sources
+    )
+    assert any(
+        r.kind is relation
+        and r.scope is scope
+        and any(
+            s.source == "wikipedia" and s.url == f"https://www.wikidata.org/wiki/{qid}"
+            for s in r.sources
+        )
+        for r in dossier.relations
+    )
+
+
+@pytest.mark.asyncio
+async def test_wikipedia_artist_search(replay: Replay, config: LookupConfig) -> None:
+    dossier = await lookup(
+        ArtistQuery(name="Кино"),
+        config,
+        include=("wikipedia",),
+        transport=replay("wikipedia_artist_search"),
+    )
+
+    assert not dossier.errors
+    assert isinstance(dossier.identity, ArtistIdentity)
+    assert dossier.identity.name is not None
+    assert dossier.identity.name.value == "Кино"
+    assert dossier.identity.type is not None
+    assert dossier.identity.type.value is ArtistType.GROUP
+    assert ids(dossier)[IdKind.WIKIDATA] == "Q650555"
+    assert {tag.name for tag in dossier.tags} >= {"post-punk", "new wave"}
+    assert {text.language for text in dossier.texts} == {"ru", "en"}
+    assert {RelationKind.MEMBER, RelationKind.LABEL} <= relation_kinds(dossier)
 
 
 @pytest.mark.parametrize(

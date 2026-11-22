@@ -1,11 +1,14 @@
 from collections.abc import Iterable
 
 from deadwax.core import (
+    ArtistQuery,
     Capability,
     EntityKind,
     IdKind,
+    LabelQuery,
     LookupContext,
     Lookups,
+    NameKey,
     NotFoundError,
     Partial,
     Pass,
@@ -17,12 +20,13 @@ from deadwax.core import (
     normalize_text,
 )
 from deadwax.sources._adapter import HttpAdapter
-from deadwax.sources._search import search_key
+from deadwax.sources._search import name_key, search_key
 from deadwax.sources.adapters.wikipedia import models
 from deadwax.sources.adapters.wikipedia import parse as p
 
 WIKIDATA_API = f"{p.WIKIDATA}/w/api.php"
 SEARCH_LIMIT = "5"
+_NAME_PROPS = "labels|aliases|claims|sitelinks"
 
 # wbgetentities accepts at most 50 IDs per request.
 _BATCH = 50
@@ -74,8 +78,14 @@ class WikipediaAdapter(HttpAdapter):
 
     @property
     def lookups(self) -> Lookups:
-        """Tracks and albums; the Wikidata item tells which."""
-        return Lookups(track=self.find, album=self.find, unresolved=self.find)
+        """Tracks, albums, artists, and labels."""
+        return Lookups(
+            track=self.find,
+            album=self.find,
+            artist=self.find_name,
+            label=self.find_name,
+            unresolved=self.find,
+        )
 
     async def find(self, query: Query, context: LookupContext) -> Partial:
         """Read the Wikidata item from earlier passes or a search, then its articles."""
@@ -119,20 +129,22 @@ class WikipediaAdapter(HttpAdapter):
             relations=p.claim_relations(item, labels, scope, albums),
         )
 
-    async def _search(self, key: RecordKey) -> str:
-        """Find the item of the record by its title, type, and performer."""
-        language = p.search_language(f"{key.artist} {key.title}")
-        type_filter = f" {p.type_filter(key.kind)}" if key.kind is not None else ""
+    async def _search_ids(self, search: str) -> list[str]:
         found = await self._api(
             models.Search,
             WIKIDATA_API,
             action="query",
             list="search",
-            srsearch=f"{key.title}{type_filter}",
+            srsearch=search,
             srlimit=SEARCH_LIMIT,
         )
+        return [hit.title for hit in found.query.search]
 
-        ids = [hit.title for hit in found.query.search]
+    async def _search(self, key: RecordKey) -> str:
+        """Find the item of the record by its title, type, and performer."""
+        language = p.search_language(f"{key.artist} {key.title}")
+        type_filter = f" {p.type_filter(key.kind)}" if key.kind is not None else ""
+        ids = await self._search_ids(f"{key.title}{type_filter}")
         if not ids:
             raise NotFoundError("no Wikidata item with this title")
 
@@ -148,6 +160,70 @@ class WikipediaAdapter(HttpAdapter):
         if qid is None:
             raise NotFoundError("no matching Wikidata item")
         return qid
+
+    async def find_name(self, query: ArtistQuery | LabelQuery, context: LookupContext) -> Partial:
+        """Find the artist or label and read its claims and articles."""
+        key = name_key(query, context)
+        kind = query.kind
+        language = p.search_language(key.name) if key is not None else "en"
+        known_ids = {
+            id_kind: value
+            for id_kind in p.NAME_IDS[kind].values()
+            if (value := context.id(id_kind)) is not None
+        }
+        qid = context.id(IdKind.WIKIDATA)
+        if qid is not None:
+            items = await self._entities([qid], _NAME_PROPS)
+            item = items.get(qid)
+            if item is None or not item.labels:
+                raise NotFoundError("no such Wikidata item", url=p.entity_url(qid))
+        else:
+            item = await self._search_name(kind, key, known_ids, language)
+
+        original = await self._original_language(item) or language
+        referenced = await self._entities(
+            p.name_references(item, kind),
+            "labels",
+            p.languages(original),
+        )
+        labels = p.Labels(referenced, original)
+        scope = Scope.ARTIST if kind is EntityKind.ARTIST else Scope.LABEL
+        return Partial(
+            source=self.name,
+            candidate=p.name_candidate(item, kind, labels, key, known_ids),
+            tags=p.claim_tags(item, labels, scope),
+            relations=p.name_relations(item, kind, labels, scope),
+            texts=await self._articles(item, original, scope)
+            if context.wants(Capability.TEXTS)
+            else [],
+        )
+
+    async def _search_name(
+        self,
+        kind: EntityKind,
+        key: NameKey | None,
+        known_ids: dict[IdKind, str],
+        language: str,
+    ) -> models.Item:
+        properties = p.NAME_IDS[kind]
+        for prop, id_kind in properties.items():
+            if (value := known_ids.get(id_kind)) is None:
+                continue
+            ids = await self._search_ids(f"haswbstatement:{prop}={value}")
+            items = await self._entities(ids, _NAME_PROPS)
+            for qid in ids:
+                if (item := items.get(qid)) is not None and value in item.texts(prop):
+                    return item
+
+        if not known_ids and key is not None:
+            prop = next(iter(properties))
+            ids = await self._search_ids(f"{key.name} haswbstatement:{prop}")
+            items = await self._entities(ids, _NAME_PROPS)
+            item = p.pick_name(key, [items[qid] for qid in ids if qid in items], language)
+            if item is not None:
+                return item
+
+        raise NotFoundError("no matching Wikidata item for the artist or label")
 
     async def _original_language(self, item: models.Item) -> str | None:
         """Wiki language code of the record's language, if the item states it."""
@@ -166,6 +242,7 @@ class WikipediaAdapter(HttpAdapter):
     async def _articles(self, item: models.Item, original: str | None, scope: Scope) -> list[Text]:
         """Sections and ratings of the English and original-language articles."""
         texts: list[Text] = []
+        records = scope not in {Scope.ARTIST, Scope.LABEL}
         for language in dict.fromkeys(lang for lang in (original, "en") if lang):
             sitelink = item.sitelinks.get(f"{language}wiki")
             if sitelink is None:
@@ -176,7 +253,7 @@ class WikipediaAdapter(HttpAdapter):
                     f"https://{language}.wikipedia.org/w/api.php",
                     action="parse",
                     page=sitelink.title,
-                    prop="text|wikitext",
+                    prop="text|wikitext" if records else "text",
                     formatversion="2",
                     redirects="1",
                     disableeditsection="1",
@@ -190,6 +267,7 @@ class WikipediaAdapter(HttpAdapter):
                 continue
             url = p.article_url(language, page.parse.title)
             texts += p.sections(page.parse.text, page.parse.title, language, scope, url)
-            texts += p.ratings(page.parse.wikitext, language, scope, url)
+            if records:
+                texts += p.ratings(page.parse.wikitext, language, scope, url)
 
         return texts

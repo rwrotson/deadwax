@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md). The v2 source scope, closed v2 stages (8–17, 19, 20, R-1–R-6, M-1–M-3), their evidence, the Stage 18 access attempts, and the v2 decision log are archived in [`plans/v2.md`](plans/v2.md).
 
-- **Status:** v1 and v2 complete; v0.1.0 is the first tagged release (2026-11-20, GitHub only, no PyPI). Stage 18 (Rate Your Music) deferred until RYM is accessible; Boomkat and Norman Records remain access-limited. Stages E-1–E-3 (artist, label, and other record kinds): E-1 and E-2 done, E-3 in progress (steps 1–3 of 6 done: groundwork, MusicBrainz, Discogs, and Last.fm).
+- **Status:** v1 and v2 complete; v0.1.0 is the first tagged release (2026-11-20, GitHub only, no PyPI). Stage 18 (Rate Your Music) deferred until RYM is accessible; Boomkat and Norman Records remain access-limited. Stages E-1–E-3 (artist, label, and other record kinds): E-1 and E-2 done, E-3 in progress (steps 1–4 of 6 done, through Wikipedia/Wikidata).
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` (and the nested `AGENTS.md` of the area you change), `docs/architecture.md` (import rules R1–R9), and `CONTRIBUTING.md` before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -74,7 +74,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Sections of closed
 | 20 | Done (RYM blocked, Forced Exposure HTTP 403, Norman disabled by the local allowlist) | Qualification; release v0.1.0. |
 | E-1 | Done | Per-kind lookup slots (`Lookups`), dispatch by the kind known in each pass, `SourceInfo.kinds`. |
 | E-2 | Done | Typed queries per kind, a model for artists and labels, CLI `--artist` and `--label`. |
-| E-3 | In progress (MusicBrainz, Discogs, and Last.fm done) | Artist and label lookups, MusicBrainz, Discogs, Last.fm, Wikipedia, and Bandcamp first. |
+| E-3 | In progress (MusicBrainz, Discogs, Last.fm, and Wikipedia done) | Artist and label lookups, MusicBrainz, Discogs, Last.fm, Wikipedia, and Bandcamp first. |
 
 Common acceptance for source stages (9–19, and source work in E-3), in addition to each stage's own:
 
@@ -184,6 +184,20 @@ Checks passed for `uv run --no-sync poe check` (1267 tests, 97.12% branch covera
 Remaining: steps 4–6.
 
 **Suggested message:** `feat(sources): add Last.fm artist lookups`.
+
+### 2026-11-23 — E-3 progress, step 4 (Wikipedia and Wikidata)
+
+Wikipedia now looks up artists and labels by QID, exact MusicBrainz or Discogs ID statement, or a name search filtered by the relevant MusicBrainz ID property. It compares labels and aliases for name searches and verifies exact IDs against the retrieved claims. It adds sourced identity fields and genres, artists' record labels and memberships, label hierarchy, and article leads and sections on history, style, career, and influences. Wikidata country names are kept as supplied, so a name can appear alongside MusicBrainz's country code in a discrepancy.
+
+Recorded Wikimedia responses with `scripts/record_fixtures.py aphex_twin warp --live wikipedia --sources musicbrainz,wikipedia` and `scripts/record_fixtures.py wikipedia_artist_search --live wikipedia --sources wikipedia`. Replay tests cover QID handoff and Russian and English articles for Кино. Mock responses cover all four exact identifier properties, deprecated claims, name mismatches, alias selection, partial dates, and both directions of the label hierarchy.
+
+Uncached CLI checks with Wikipedia found Aphex Twin and Warp by name and via their MusicBrainz and Discogs URLs. Combined MusicBrainz and Wikipedia lookups returned five Wikipedia sections for Aphex Twin and two for Warp. Wikipedia found Paranoid Android, the Huerco S. album, and «Группа крови». It returned `not_found` for the underground album, the Todd Terry remix of Missing, and Burial's Archangel. MusicBrainz identified Archangel in the combined run.
+
+`uv run --no-sync poe check` passed with 1,276 tests and 97.08% branch coverage. The run used four test workers and disabled disposable tool caches to fit the available disk space. `uv run --no-sync --group docs properdocs build --strict` and `git diff --check` passed. The full live suite is scheduled for step 6.
+
+Steps 5–6 remain.
+
+**Suggested message:** `feat(sources): add Wikipedia artist and label lookups`.
 
 ### 2026-11-21 — E-2 evidence (typed queries, artists and labels)
 

@@ -41,6 +41,7 @@ NAMES = {
     "musicbrainz": frozenset(EntityKind),
     "discogs": frozenset(EntityKind),
     "lastfm": frozenset({EntityKind.TRACK, EntityKind.ALBUM, EntityKind.ARTIST}),
+    "wikipedia": frozenset(EntityKind),
 }
 
 # Without a service of their own, they still find the kind: from a streaming URL, a Wikidata item.
