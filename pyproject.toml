@@ -1,7 +1,7 @@
 # PROJECT ----------------------------------------------------------------------
 [project]
 name = "deadwax"
-version = "0.1.0"
+version = "0.2.0"
 description = "Collect what open sources know about a track or album: texts, credits, relations, version identity and listening links"
 authors = [
     { name = "Igor Lashkov", email = "rwrotson@yandex.ru" },

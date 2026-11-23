@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.0 (2026-11-23)
+
+### Feat
+
+- preserve source similarity scores and ranks
+- **sources**: expand the default source set
+- **sources**: add Bandcamp artist and label lookups
+- **sources**: add Wikipedia artist and label lookups
+- **sources**: add Last.fm artist lookups
+- **sources**: look up artists and labels in Discogs
+- **sources**: look up artists and labels in MusicBrainz
+- add typed queries and a model for artists and labels
+
+### Fix
+
+- **sources**: narrow the default source set
+
+### Refactor
+
+- dispatch adapter lookups by record kind
+
 ## v0.1.0 (2026-11-20)
 
 ### Feat
