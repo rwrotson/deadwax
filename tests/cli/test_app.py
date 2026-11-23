@@ -387,10 +387,13 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
     assert {(row["group"], row["default"]) for row in json.loads(as_json.stdout)} == {
         ("core", True),
         ("catalogues", True),
+        ("catalogues", False),
         ("press", True),
+        ("press", False),
         ("radio", True),
         ("radio", False),
         ("streaming", True),
+        ("streaming", False),
         ("shops", True),
         ("shops", False),
         ("samples", False),

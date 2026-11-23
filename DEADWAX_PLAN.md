@@ -59,7 +59,7 @@ Carried from the v1 decision log, where each has its date and reason. They apply
 - Non-Latin names are compared as written; alias-aware matching is a later, separate change.
 - Fixtures: sources not being recorded are replayed; requests with a body are keyed with a body hash; recording and source tests run with `escalation=none`; credentials go only to sources recorded live.
 - Generated docs pages (configuration, output schema, API reference) are never edited by hand; README holds the source tier tables.
-- The default set includes every current adapter configured to start without a visible browser. Boomkat, Norman Records, WhoSampled, and 1001Tracklists remain opt-in (2026-11-23).
+- The default set contains 21 sources. Album of the Year, AllMusic, Beatport, Bleep, Boomkat, Forced Exposure, Juno, Norman Records, Phonica, Rate Your Music, WhoSampled, and 1001Tracklists are opt-in (2026-11-23).
 
 ## Implementation stages and acceptance criteria
 
@@ -238,6 +238,14 @@ Uncached CLI checks over direct HTTP found Aphex Twin and Warp by name and resol
 Removed `COM812` from Ruff's lint selection and documented manual trailing commas for wrapped signatures, calls, and collection literals in `AGENTS.md`. `CONTRIBUTING.md` links to the convention.
 
 Checks: Ruff stdin examples preserved single-line, wrapped, and single-element forms without warnings. `MYPY_CACHE_DIR=/dev/null uv run --no-sync poe check` passed with 1,292 tests and 97.02% coverage. `uv run --no-sync --group docs properdocs build --strict` passed. Both used a writable temporary uv cache. Live lookups were outside the formatting verification.
+
+### 2026-11-23 — Narrow the default source set
+
+Moved Album of the Year, AllMusic, Beatport, Bleep, Forced Exposure, Juno, Phonica, and Rate Your Music to opt-in at the user's request. `deadwax sources --format json` confirmed 21 default sources and 12 opt-in sources.
+
+`uv run --no-sync poe check` passed with 1,292 tests and 97.02% branch coverage. `uv run --no-sync --group docs properdocs build --strict` and `git diff --check` passed. The verification used the CLI source list and offline tests. Live lookups were outside this selection change.
+
+**Suggested message:** `fix(sources): narrow the default source set`.
 
 ### 2026-11-21 — E-2 evidence (typed queries, artists and labels)
 

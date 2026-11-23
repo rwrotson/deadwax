@@ -53,7 +53,7 @@ def _split_names(value: object) -> object:
 # Source and group names, given as a sequence or as one comma-separated string.
 type SourceNames = Annotated[tuple[str, ...], BeforeValidator(_split_names)]
 
-# Default lookup sources omit adapters configured to start with a visible browser.
+# Sources selected when a lookup does not specify an explicit list.
 DEFAULT_SOURCES: tuple[str, ...] = (
     "musicbrainz",
     "itunes",
@@ -68,19 +68,11 @@ DEFAULT_SOURCES: tuple[str, ...] = (
     "spotify",
     "youtube",
     "genius",
-    "albumoftheyear",
-    "allmusic",
-    "beatport",
-    "bleep",
     "deezer",
-    "forcedexposure",
     "hardwax",
-    "juno",
     "nts",
-    "phonica",
     "pressreviews",
     "ra",
-    "rateyourmusic",
     "soundcloud",
     "soundohm",
     "wfmu",

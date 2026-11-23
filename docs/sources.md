@@ -12,13 +12,13 @@ Lookup errors marked `blocked` carry the source's access configuration for that 
 
 Every source belongs to one group: `core` (the v1 sources), `shops`, `press`, `catalogues`, `radio`, `streaming`, or `samples`. `--sources` and `--exclude` take source and group names, comma-separated; `--sources all` selects every source, while `--sources shops --exclude boomkat` runs every shop except Boomkat. Disabled sources are still omitted, and sources missing credentials are reported as skipped. An unknown name is a usage error that lists the known sources and groups.
 
-Without `--sources`, a lookup uses `DEADWAX_DEFAULT_SOURCES`, which accepts source and group names. Its default contains 29 sources.
+Without `--sources`, a lookup uses `DEADWAX_DEFAULT_SOURCES`, which accepts source and group names. Its default contains 21 sources.
 
 ```text
-musicbrainz,itunes,odesli,bandcamp,wikipedia,lastfm,discogs,listenbrainz,secondhandsongs,kexp,spotify,youtube,genius,albumoftheyear,allmusic,beatport,bleep,deezer,forcedexposure,hardwax,juno,nts,phonica,pressreviews,ra,rateyourmusic,soundcloud,soundohm,wfmu
+musicbrainz,itunes,odesli,bandcamp,wikipedia,lastfm,discogs,listenbrainz,secondhandsongs,kexp,spotify,youtube,genius,deezer,hardwax,nts,pressreviews,ra,soundcloud,soundohm,wfmu
 ```
 
-Boomkat, Norman Records, WhoSampled, and 1001Tracklists are opt-in because they start in a visible browser. The automatic headed fallback still applies to eligible challenges in headless browsers. `DEADWAX_SOURCES__<SOURCE>__ENABLED=false` disables an individual source even when selected.
+Use `--sources` to opt into Album of the Year, AllMusic, Beatport, Bleep, Boomkat, Forced Exposure, Juno, Norman Records, Phonica, Rate Your Music, WhoSampled, and 1001Tracklists. The automatic headed fallback still applies to eligible challenges in headless browsers. `DEADWAX_SOURCES__<SOURCE>__ENABLED=false` disables an individual source even when selected.
 
 `DEADWAX_CONCURRENCY` (default 8) caps how many sources of one lookup run at once. A source's `adapter_timeout` starts when it begins running, not while it waits for a slot.
 
@@ -141,7 +141,7 @@ The README lists deferred sources and those deadwax will not use.
 
 ## Rate Your Music
 
-- **Group:** `catalogues`; in the default set. Automated access requires express permission from RYM.
+- **Group:** `catalogues`; opt-in. Automated access requires express permission from RYM.
 - **Access:** browser first, using the `browser` extra. Searches releases or songs and reads the matched page.
 - **Contributes:** primary and secondary genres, descriptors, average user score and rating count, chart relations with displayed position, and up to ten visible full user reviews.
 - **Limits:** live page parsing is unverified while DNS access to RYM is unavailable in the development environment.
@@ -182,7 +182,7 @@ The README lists deferred sources and those deadwax will not use.
 
 ## Beatport
 
-- **Group:** `streaming`; in the default set.
+- **Group:** `streaming`; opt-in.
 - **Access:** scraped pages; the record lives in the Next.js state (`__NEXT_DATA__`) of search, track, and release pages. A rendered page without that state triggers the next HTML transport. Beatport answers plain requests with a Cloudflare challenge; each available transport may still be blocked.
 - **Finds the record by:** a Beatport track or release URL in the query or from an earlier source, else a track or release search through the matching gate. Each result's mix name is part of its title, so an Extended Mix found for an Original Mix query becomes an `other_version` relation.
 - **Contributes:** for a track: artist (remixers apart), title with mix name and the version it denotes, the release's date, tempo, key, ISRC, label and catalog number; genre and sub-genre as `genre` and `style` tags; remixers as credits; the DJ charts that list it as `charted_by` relations; the page's link. For a release: artist, title, date, barcode, label and catalog number, remixers, and the link; release pages list no genres or tempos.
@@ -203,18 +203,18 @@ The README lists deferred sources and those deadwax will not use.
 
 ## Juno
 
-- **Group:** `shops`; in the default set.
+- **Group:** `shops`; opt-in.
 - **Access:** scraped search and product pages of juno.co.uk. Juno answers plain requests with a Cloudflare challenge, so it needs the escalation ladder (`deadwax[stealth]` or `deadwax[browser]`); otherwise it reports `blocked`. The parser was built on pages saved from a browser.
 - **Finds the record by:** a Juno product URL in the query or from an earlier source, else a search through the matching gate. Search results list each release's tracks, so a track is found on the release that holds it; Juno's mix names ("Todd Terry club mix") are part of the track's title.
 - **Contributes:** the shop review as a `shop` text, the genre as a `genre` tag and Juno's tags as `tag` tags, label and catalog number ("unknown label" is left out), the release date, the product link; for a track, an `appears_on` relation to the release. Artists are as Juno prints them, in capitals. "People also bought" is loaded by the page's scripts and is not read.
 
 ## Forced Exposure and Bleep
 
-Both are in the default set and search release titles through the matching gate. Forced Exposure gives label copy, genre, date, label, catalog number, and related releases. Bleep gives editorial copy, genre sections, date, label, catalog number, and an `appears_on` relation when a track is found on a release. Both try Patchright first.
+Both are opt-in and search release titles through the matching gate. Forced Exposure gives label copy, genre, date, label, catalog number, and related releases. Bleep gives editorial copy, genre sections, date, label, catalog number, and an `appears_on` relation when a track is found on a release. Both try Patchright first.
 
 ## Phonica, Boomkat, and Norman Records
 
-Phonica is in the default set. It uses headless Patchright and sends search POSTs from the browser page with its profile cookies, searching the release title and artist separately. Boomkat and Norman Records are opt-in. Boomkat searches through the matching gate and reads its editorial description and genres; it uses visible Patchright by default. Norman Records uses visible Nodriver and reads a direct product URL or one supplied by an earlier source; its text search is unavailable. The verified *Untrue* product has no staff review, so it contributes identity and genres only. Boomkat and Norman Records returned Cloudflare challenges in headless mode during the live probe.
+Phonica is opt-in. It uses headless Patchright and sends search POSTs from the browser page with its profile cookies, searching the release title and artist separately. Boomkat and Norman Records are opt-in. Boomkat searches through the matching gate and reads its editorial description and genres; it uses visible Patchright by default. Norman Records uses visible Nodriver and reads a direct product URL or one supplied by an earlier source; its text search is unavailable. The verified *Untrue* product has no staff review, so it contributes identity and genres only. Boomkat and Norman Records returned Cloudflare challenges in headless mode during the live probe.
 
 ## Genius
 
@@ -225,13 +225,13 @@ Phonica is in the default set. It uses headless Patchright and sends search POST
 
 ## AllMusic
 
-- **Pass:** enrichment; in the default set; group `press`.
+- **Pass:** enrichment; opt-in; group `press`.
 - **Contributes:** review text, score and critic; styles, moods, themes, credits, and similar albums.
 - **Limits:** the *OK Computer* search and album page were verified through a persistent Patchright profile. Direct requests may still meet Cloudflare 403; similar-album extraction has not been verified on a live page.
 
 ## Album of the Year
 
-- **Pass:** enrichment; in the default set; group `catalogues`.
+- **Pass:** enrichment; opt-in; group `catalogues`.
 - **Contributes:** critic scores by publication, user score as a metric, genres, and links to original reviews for the later press pass.
 - **Tracks:** a track query searches releases and accepts one, such as the track's single, only when its tracklist lists the track; the track is related to that release, and the release's scores keep the release-group scope.
 - **Limits:** Cloudflare refuses direct requests. The parser was checked against saved real pages, and live lookups succeeded through a headed Patchright persistent profile after a manual challenge solve.

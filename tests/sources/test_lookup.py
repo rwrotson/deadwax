@@ -441,8 +441,16 @@ def test_describe_sources_marks_groups_and_the_default_set() -> None:
     }
     assert [info.source for info in infos if info.default] == ["musicbrainz", "deezer"]
     assert [info.source for info in describe_sources() if not info.default] == [
+        "beatport",
+        "juno",
+        "forcedexposure",
+        "bleep",
+        "phonica",
         "boomkat",
         "norman",
+        "allmusic",
+        "albumoftheyear",
+        "rateyourmusic",
         "whosampled",
         "tracklists",
     ]
@@ -576,7 +584,7 @@ def test_describe_sources() -> None:
     assert sources["wikipedia"].status.ready
     assert sources["beatport"].status.ready
     assert sources["beatport"].group is SourceGroup.STREAMING
-    assert sources["beatport"].default
+    assert not sources["beatport"].default
     for name in (
         "hardwax",
         "soundohm",
@@ -589,7 +597,7 @@ def test_describe_sources() -> None:
     ):
         assert sources[name].status.ready
         assert sources[name].group is SourceGroup.SHOPS
-        assert sources[name].default == (name not in {"boomkat", "norman"})
+        assert sources[name].default == (name in {"hardwax", "soundohm"})
     for name in ("spotify", "youtube", "soundcloud"):
         assert sources[name].status.state is SourceState.MISSING_CREDENTIAL
         assert sources[name].group is SourceGroup.STREAMING
