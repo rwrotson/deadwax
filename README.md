@@ -1,15 +1,17 @@
 # deadwax
 
-Collect what open sources know about one track or album:
+Collect what open sources know about one track, album, artist, or label. For tracks and albums, deadwax gathers four kinds of information.
 
 1. texts that describe how this exact release sounds: tags, credits, reviews, label and shop copy;
 2. relations for further digging: members and their projects, label and neighbouring releases, compilations, mixes and broadcasts, covers, remixes, samples, similar recordings;
 3. identity of the exact recording and version — original, remix, demo, live, remaster, or cover are never mixed, and disagreements between sources are shown, not smoothed over;
 4. listening links on streaming services.
 
+Artist and label dossiers can include profiles, aliases, catalogues, and relationships between artists and labels.
+
 Every fact carries the source and URL where it was found. Nothing is invented: missing data leaves a field empty. The result is equally usable in a terminal and as JSON for other programs.
 
-> **Status:** v1, with the eight sources listed below. The specification, stages, and progress log are in [`DEADWAX_PLAN.md`](https://github.com/rwrotson/deadwax/blob/main/DEADWAX_PLAN.md).
+> The specification, stages, and progress log are in [`DEADWAX_PLAN.md`](https://github.com/rwrotson/deadwax/blob/main/DEADWAX_PLAN.md).
 
 ## Usage
 
@@ -19,6 +21,7 @@ deadwax https://open.spotify.com/track/6LgJvl0Xdtc73RJ1mmpotq
 deadwax --album "Burial - Untrue" --sources musicbrainz,itunes --format json
 deadwax --album "Burial - Untrue" --sources core --exclude bandcamp
 deadwax --artist "Burial"
+deadwax --label Warp
 deadwax sources
 deadwax runs --failed
 ```
@@ -55,50 +58,50 @@ An application that looks up many records keeps one `Deadwax` client, which shar
 
 ## Sources
 
-Every source is described in detail in [the sources guide](https://rwrotson.github.io/deadwax/sources/); the output is described in [the output guide](https://rwrotson.github.io/deadwax/output/).
+The Kinds column shows which queries each adapter accepts. Some shop adapters contribute album-level facts to a track query. See the [sources guide](https://rwrotson.github.io/deadwax/sources/) and the [output guide](https://rwrotson.github.io/deadwax/output/).
 
 ### Tier 1: identity and links
 
-| Source | Status | Contributes | Caveats |
-|--------|--------|-------------|---------|
-| MusicBrainz | implemented | identity, ISRCs, labels, credits, tags and genres, members and associated artists, covers, remixes, samples, appearances on releases and compilations, streaming links, Discogs and Wikidata IDs; for artists and labels: identity, tags, aliases, labels, releases, owners and imprints, related artists, links; resolves MusicBrainz URLs, and Spotify URLs when Spotify has no credentials | the only identity-pass source; the public server is often busy (retried) |
-| iTunes Search | implemented | Apple Music links and previews, release date, genre; resolves Apple Music URLs | about 20 requests a minute |
-| Deezer | implemented, default | Deezer links, plus ISRC, barcode, label, and genres when present in HTML; resolves Deezer URLs | Akamai can block its pages; HTML can omit fields; no API fallback |
-| Odesli (song.link) | implemented | links on every platform Odesli matches, with the title and ISRC or UPC; resolves streaming URLs | no public API since 2026-07-31: reads the song.link page of a streaming link from the query or an earlier source (MusicBrainz, iTunes, Deezer), else `not_found` |
+| Source | Kinds | Status | Contributes | Caveats |
+|--------|-------|--------|-------------|---------|
+| MusicBrainz | track, album, artist, label | implemented | identity, ISRCs, labels, credits, tags and genres, members and associated artists, covers, remixes, samples, appearances on releases and compilations, streaming links, Discogs and Wikidata IDs; for artists and labels: identity, tags, aliases, labels, releases, owners and imprints, related artists, links; resolves MusicBrainz URLs, and Spotify URLs when Spotify has no credentials | the only identity-pass source; the public server is often busy (retried) |
+| iTunes Search | track, album | implemented | Apple Music links and previews, release date, genre; resolves Apple Music URLs | about 20 requests a minute |
+| Deezer | track, album | implemented, default | Deezer links, plus ISRC, barcode, label, and genres when present in HTML; resolves Deezer URLs | Akamai can block its pages; HTML can omit fields; no API fallback |
+| Odesli (song.link) | track, album | implemented | links on every platform Odesli matches, with the title and ISRC or UPC; resolves streaming URLs | no public API since 2026-07-31: reads the song.link page of a streaming link from the query or an earlier source (MusicBrainz, iTunes, Deezer), else `not_found` |
 
 ### Tier 2: enrichment
 
-| Source | Status | Contributes | Caveats |
-|--------|--------|-------------|---------|
-| Discogs | implemented; search needs `sources.discogs.token` | tracks and albums: genres, styles, credits, notes, labels, barcodes, versions, compilations, user reviews; artists and labels: profiles, links, aliases, members, groups, label hierarchy, and discographies; resolves Discogs URLs | without a token reads by ID from the query or MusicBrainz (25 requests a minute); sends httpx's User-Agent because Discogs refuses deadwax's; review pages may be `blocked` |
-| Bandcamp | implemented | tracks and albums have tags, notes, credits, fan comments, recommendations, label, label releases, and track previews. Artists and labels have profiles, locations, account links, and catalogues. Resolves Bandcamp release and account URLs | scraped pages; a track found on another artist's album contributes only its identity, links and own notes; the stream URL expires about 24 hours after the fetch (pages are cached 12 hours) |
-| Last.fm | implemented, needs `sources.lastfm.api_key` | tracks, albums, and artists: weighted tags, wiki texts, similar tracks and artists, listener and scrobble counts for artists, and resolution of Last.fm artist URLs | `skipped` without the key |
-| Wikipedia/Wikidata | implemented | tracks and albums: genres, credits, labels, date, album relations, and review scores; artists and labels: genres, artist memberships and record labels, and label hierarchy; all kinds: article leads and selected sections | section headings recognised in en, ru, ja, de, fr; other languages give the lead |
-| ListenBrainz | implemented | listen and listener counts, similar recordings and artists, LB Radio recordings by similar artists, CritiqueBrainz reviews | needs MusicBrainz IDs from the identity pass |
-| SecondHandSongs | implemented | first release date, writers, covers, the original of a cover, adaptations | songs only; about 10–20 requests a minute without `sources.secondhandsongs.api_key` |
-| KEXP | implemented | the latest 25 plays as broadcasts with programs and hosts, host comments | |
-| NTS | implemented, default | episode broadcasts, neighbouring tracks, episode genres marked as context | searches the current JSON track index; at most 10 matching episodes |
-| WFMU | implemented, default | playlist broadcasts and DJ comments | searches the artist browser because the basic and advanced searches are unavailable; at most 10 recent matching playlists |
-| Spotify | implemented, needs `sources.spotify.client_id` and `sources.spotify.client_secret` | links, ISRC or barcode, ℗ and © lines; label, popularity, and previews when Spotify gives them; resolves Spotify URLs | `skipped` without credentials; development-mode apps get no label, popularity, or previews; no audio features |
-| YouTube | implemented, needs `sources.youtube.api_key` | links to uploads of the record only, official channels first | about 100 lookups a day on the free quota |
-| Beatport | implemented, default | tempo, key, genre and sub-genre, mix name as the version, ISRC, label and catalog number, remixers, DJ charts that list the track; resolves Beatport URLs | Cloudflare: needs the `stealth` or `browser` extra, else `blocked` |
-| Hard Wax | implemented, default | one-line shop text, store section as genre, label and catalog number, the release a track is on; resolves Hard Wax product pages | searched through the shop's JSON feed |
-| Soundohm | implemented, default | full shop text (often the label's press release), genre, label, catalog number, year; resolves Soundohm product pages | albums only: product pages list no tracks |
-| Juno | implemented, default | shop review, genre and Juno tags, label and catalog number, release date, the release a track is on; resolves Juno product pages | Cloudflare: needs the `stealth` or `browser` extra, else `blocked`; built on pages saved from a browser |
-| Forced Exposure | implemented, default | label copy, genre, release date, label, catalog number, related releases | Patchright first; albums only |
-| Bleep | implemented, default | editorial description, genres, release date, label, catalog number, tracklist | Patchright first |
-| Phonica | implemented, default | shop description, genres, release details | Patchright headless; search title and artist separately through a browser session |
-| Boomkat | implemented, opt-in | editorial description and genres | Patchright with a visible window; headless meets Cloudflare |
-| Norman Records | implemented, opt-in | release identity and genres from a product URL | Nodriver with a visible window; text search is unavailable |
-| SoundCloud | implemented, default, needs `sources.soundcloud.client_id` | uploader descriptions, genre and tags, plays, likes and reposts, notable reposting accounts, uploads absent elsewhere (edits, bootlegs) as other versions; resolves SoundCloud URLs | no new API apps: the web client's ID changes now and then and must be replaced by hand |
-| Genius | implemented, default, needs `sources.genius.token` | song description, annotations, credits, song relations, full lyrics when available | API facts remain when the HTML page is blocked |
-| AllMusic | experimental, default | review, rating, critic, styles, moods, themes, credits; similar albums when available | The *OK Computer* search and album page were live-verified through a persistent Patchright profile; direct requests may be blocked |
-| Rate Your Music | experimental, default | primary and secondary genres, descriptors, user rating and vote count, chart positions, up to ten visible full user reviews | requires express permission for automated access and the `browser` extra; live page parsing is unverified |
-| WhoSampled | implemented, opt-in | samples, covers and remixes; sample element and positions where shown | direct recording pages through the headed `browser` extra; the site's search path is excluded by robots.txt |
-| 1001Tracklists | implemented, opt-in | DJ sets containing a track, supporting DJs, adjacent tracks | public track search; headed `browser` extra, at most five verified sets; use `--timeout 120` with the default request rate |
-| Album of the Year | implemented, default | critic scores, user score, genres, links to critic reviews; for a track, the single or release whose tracklist lists it | Cloudflare: live lookups succeeded through a headed Patchright persistent profile; direct requests are `blocked` |
-| Press reviews | implemented, default | full accessible review text, author, and score when present from linked Pitchfork, The Quietus, and The Wire pages | needs review links from earlier sources; all three sites were checked on live pages |
-| Resident Advisor | implemented, default | full review text and associated artist and label biographies | finds reviews by GraphQL search or earlier review links; RA discontinued DJ charts |
+| Source | Kinds | Status | Contributes | Caveats |
+|--------|-------|--------|-------------|---------|
+| Discogs | track, album, artist, label | implemented; search needs `sources.discogs.token` | tracks and albums: genres, styles, credits, notes, labels, barcodes, versions, compilations, user reviews; artists and labels: profiles, links, aliases, members, groups, label hierarchy, and discographies; resolves Discogs URLs | without a token reads by ID from the query or MusicBrainz (25 requests a minute); sends httpx's User-Agent because Discogs refuses deadwax's; review pages may be `blocked` |
+| Bandcamp | track, album, artist, label | implemented | tracks and albums have tags, notes, credits, fan comments, recommendations, label, label releases, and track previews. Artists and labels have profiles, locations, account links, and catalogues. Resolves Bandcamp release and account URLs | scraped pages; a track found on another artist's album contributes only its identity, links and own notes; the stream URL expires about 24 hours after the fetch (pages are cached 12 hours) |
+| Last.fm | track, album, artist | implemented, needs `sources.lastfm.api_key` | tracks, albums, and artists: weighted tags, wiki texts, similar tracks and artists, listener and scrobble counts for artists, and resolution of Last.fm artist URLs | `skipped` without the key |
+| Wikipedia/Wikidata | track, album, artist, label | implemented | tracks and albums: genres, credits, labels, date, album relations, and review scores; artists and labels: genres, artist memberships and record labels, and label hierarchy; all kinds: article leads and selected sections | section headings recognised in en, ru, ja, de, fr; other languages give the lead |
+| ListenBrainz | track, album | implemented | listen and listener counts, similar recordings and artists, LB Radio recordings by similar artists, CritiqueBrainz reviews | needs MusicBrainz IDs from the identity pass |
+| SecondHandSongs | track | implemented | first release date, writers, covers, the original of a cover, adaptations | songs only; about 10–20 requests a minute without `sources.secondhandsongs.api_key` |
+| KEXP | track, album | implemented | the latest 25 plays as broadcasts with programs and hosts, host comments | |
+| NTS | track | implemented, default | episode broadcasts, neighbouring tracks, episode genres marked as context | searches the current JSON track index; at most 10 matching episodes |
+| WFMU | track | implemented, default | playlist broadcasts and DJ comments | searches the artist browser because the basic and advanced searches are unavailable; at most 10 recent matching playlists |
+| Spotify | track, album | implemented, needs `sources.spotify.client_id` and `sources.spotify.client_secret` | links, ISRC or barcode, ℗ and © lines; label, popularity, and previews when Spotify gives them; resolves Spotify URLs | `skipped` without credentials; development-mode apps get no label, popularity, or previews; no audio features |
+| YouTube | track, album | implemented, needs `sources.youtube.api_key` | links to uploads of the record only, official channels first | about 100 lookups a day on the free quota |
+| Beatport | track, album | implemented, default | tempo, key, genre and sub-genre, mix name as the version, ISRC, label and catalog number, remixers, DJ charts that list the track; resolves Beatport URLs | Cloudflare: needs the `stealth` or `browser` extra, else `blocked` |
+| Hard Wax | track, album | implemented, default | one-line shop text, store section as genre, label and catalog number, the release a track is on; resolves Hard Wax product pages | searched through the shop's JSON feed |
+| Soundohm | track, album | implemented, default | full shop text (often the label's press release), genre, label, catalog number, year; resolves Soundohm product pages | albums only: product pages list no tracks |
+| Juno | track, album | implemented, default | shop review, genre and Juno tags, label and catalog number, release date, the release a track is on; resolves Juno product pages | Cloudflare: needs the `stealth` or `browser` extra, else `blocked`; built on pages saved from a browser |
+| Forced Exposure | track, album | implemented, default | label copy, genre, release date, label, catalog number, related releases | Patchright first; albums only |
+| Bleep | track, album | implemented, default | editorial description, genres, release date, label, catalog number, tracklist | Patchright first |
+| Phonica | track, album | implemented, default | shop description, genres, release details | Patchright headless; search title and artist separately through a browser session |
+| Boomkat | track, album | implemented, opt-in | editorial description and genres | Patchright with a visible window; headless meets Cloudflare |
+| Norman Records | track, album | implemented, opt-in | release identity and genres from a product URL | Nodriver with a visible window; text search is unavailable |
+| SoundCloud | track, album | implemented, default, needs `sources.soundcloud.client_id` | uploader descriptions, genre and tags, plays, likes and reposts, notable reposting accounts, uploads absent elsewhere (edits, bootlegs) as other versions; resolves SoundCloud URLs | no new API apps: the web client's ID changes now and then and must be replaced by hand |
+| Genius | track | implemented, default, needs `sources.genius.token` | song description, annotations, credits, song relations, full lyrics when available | API facts remain when the HTML page is blocked |
+| AllMusic | track, album | experimental, default | review, rating, critic, styles, moods, themes, credits; similar albums when available | The *OK Computer* search and album page were live-verified through a persistent Patchright profile; direct requests may be blocked |
+| Rate Your Music | track, album | experimental, default | primary and secondary genres, descriptors, user rating and vote count, chart positions, up to ten visible full user reviews | requires express permission for automated access and the `browser` extra; live page parsing is unverified |
+| WhoSampled | track | implemented, opt-in | samples, covers and remixes; sample element and positions where shown | direct recording pages through the headed `browser` extra; the site's search path is excluded by robots.txt |
+| 1001Tracklists | track | implemented, opt-in | DJ sets containing a track, supporting DJs, adjacent tracks | public track search; headed `browser` extra, at most five verified sets; use `--timeout 120` with the default request rate |
+| Album of the Year | track, album | implemented, default | critic scores, user score, genres, links to critic reviews; for a track, the single or release whose tracklist lists it | Cloudflare: live lookups succeeded through a headed Patchright persistent profile; direct requests are `blocked` |
+| Press reviews | track, album | implemented, default | full accessible review text, author, and score when present from linked Pitchfork, The Quietus, and The Wire pages | needs review links from earlier sources; all three sites were checked on live pages |
+| Resident Advisor | track, album | implemented, default | full review text and associated artist and label biographies | finds reviews by GraphQL search or earlier review links; RA discontinued DJ charts |
 
 Names written in a non-Latin script are compared as written: a store that lists "Кино" as "Kino" is reported as `no_match`.
 

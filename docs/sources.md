@@ -2,6 +2,8 @@
 
 `deadwax sources` lists every source with its group, whether it is in the default set, its pass, the record kinds it looks up, what it contributes, and whether it can run. Genius, SecondHandSongs, NTS, WFMU, 1001Tracklists, and WhoSampled look up tracks only and do not run for an album. Each source has the settings `enabled`, `rate` (requests per second), `ttl` (cache lifetime), `user_agent`, and `proxy`, set as `DEADWAX_SOURCES__<SOURCE>__<SETTING>` or in a `[<source>]` TOML table; see [Configuration](configuration.md).
 
+MusicBrainz, Discogs, Bandcamp, and Wikipedia/Wikidata look up both artists and labels. Last.fm also looks up artists and supplies biographies, similar artists, and listener and scrobble counts.
+
 Its Access column shows the configured retrieval methods: API requests use httpx; HTML pages use the listed transports in order. `impersonate` uses curl_cffi, `patchright` uses Patchright, and `nodriver` uses Nodriver. Browser transports show their configured `headed` or `headless` mode; `headless → headed` means a challenged headless page is retried in a window (`http.headed_fallback`). If the global allowlist leaves an HTML source with no transport, `sources` shows `HTML (no permitted transports)` and a disabled status; lookups omit that source, including any API work it could do. The list does not check whether optional packages are installed or whether a site will accept a request. Flags on a separate lookup can override its browser mode.
 
 Lookup errors marked `blocked` carry the source's access configuration for that run. The terminal and Markdown error tables show it in an Access column; JSON has a structured `access` field with `api`, `html_transports`, `browser_headless`, and `headed_fallback`; `deadwax sources --format json` nests the same field in each source.
@@ -22,8 +24,8 @@ Boomkat, Norman Records, WhoSampled, and 1001Tracklists are opt-in because they 
 
 ## How a lookup runs
 
-1. **URL resolution.** For a URL query, the first ready source that recognises the URL reads it alone. Its record becomes the reference, and for a URL that does not reveal its kind it sets the kind. The order is Spotify, MusicBrainz, Odesli, iTunes, Deezer, Discogs, Bandcamp, SoundCloud, Beatport, Hard Wax, Soundohm, Juno: Spotify reads Spotify URLs when it has credentials, MusicBrainz otherwise.
-2. **Identity pass.** MusicBrainz finds the recording or release group and gives later sources its IDs and links: ISRCs, barcodes, Discogs, Wikidata, Bandcamp, and streaming URLs.
+1. **URL resolution.** For a URL query, the first ready source that recognises the URL reads it alone. Its record becomes the reference, and for a URL that does not reveal its kind it sets the kind. MusicBrainz and Discogs resolve their artist and label URLs. Last.fm resolves its artist URLs, and Bandcamp reads the account page to determine whether it belongs to an artist or a label. Spotify reads its own track and album URLs when it has credentials. MusicBrainz can resolve them without Spotify credentials.
+2. **Identity pass.** MusicBrainz finds the recording, release group, artist, or label. For artists and labels, it passes MusicBrainz and Discogs IDs, Wikidata IDs, and links such as Bandcamp account pages to the enrichment sources. For tracks and albums it can also pass ISRCs, barcodes, and streaming links.
 3. **Enrichment pass.** All other sources except Odesli run concurrently, at most `concurrency` at once. Each one uses the IDs and links from the identity pass first and falls back to its own search.
 4. **Links pass.** Odesli opens the song.link page of a streaming URL found by any earlier source, such as the Apple Music link from iTunes. YouTube searches uploads of the record.
 
@@ -33,7 +35,7 @@ Each source runs under `adapter_timeout` (`--timeout`). Waiting for another sour
 
 | Tier | Sources | Role |
 |------|---------|------|
-| 1, identity and links | MusicBrainz, iTunes Search, Deezer, Odesli | Which exact recording or release this is; listening links |
+| 1, identity and links | MusicBrainz, iTunes Search, Deezer, Odesli | Identity of the recording, release, artist, or label and links |
 | 2, enrichment | Discogs, Bandcamp, Last.fm, Wikipedia/Wikidata, ListenBrainz, SecondHandSongs, Genius, Album of the Year, Rate Your Music, KEXP, NTS, WFMU, 1001Tracklists, Spotify, SoundCloud, Beatport, Hard Wax, Soundohm, Juno, Forced Exposure, Bleep, Phonica, Boomkat, Norman Records, AllMusic, WhoSampled | Tags, credits, texts, relations, metrics |
 | 3, links | Odesli, YouTube, press reviews, Resident Advisor | Listening links; reviews found through links of earlier passes |
 

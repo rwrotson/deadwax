@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md). The v2 source scope, closed v2 stages (8–17, 19, 20, R-1–R-6, M-1–M-3), their evidence, the Stage 18 access attempts, and the v2 decision log are archived in [`plans/v2.md`](plans/v2.md).
 
-- **Status:** v1 and v2 complete; v0.1.0 is the first tagged release (2026-11-20, GitHub only, no PyPI). Stage 18 (Rate Your Music) deferred until RYM is accessible; Boomkat and Norman Records remain access-limited. Stages E-1–E-3 (artist, label, and other record kinds): E-1 and E-2 done, E-3 in progress (steps 1–5 of 6 done, through Bandcamp).
+- **Status:** v1 and v2 complete; v0.1.0 is the first tagged release (2026-11-20, GitHub only, no PyPI). Stage 18 (Rate Your Music) deferred until RYM is accessible; Boomkat and Norman Records remain access-limited. Stages E-1 and E-2 are done. E-3 artist and label lookups and their six live scenarios are verified. Closing E-3 awaits a completed standard live suite.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Read `AGENTS.md` (and the nested `AGENTS.md` of the area you change), `docs/architecture.md` (import rules R1–R9), and `CONTRIBUTING.md` before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -74,7 +74,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Sections of closed
 | 20 | Done (RYM blocked, Forced Exposure HTTP 403, Norman disabled by the local allowlist) | Qualification; release v0.1.0. |
 | E-1 | Done | Per-kind lookup slots (`Lookups`), dispatch by the kind known in each pass, `SourceInfo.kinds`. |
 | E-2 | Done | Typed queries per kind, a model for artists and labels, CLI `--artist` and `--label`. |
-| E-3 | In progress (MusicBrainz, Discogs, Last.fm, and Wikipedia done) | Artist and label lookups, MusicBrainz, Discogs, Last.fm, Wikipedia, and Bandcamp first. |
+| E-3 | In progress (standard live suite pending) | Artist and label lookups in MusicBrainz, Discogs, Last.fm, Wikipedia, and Bandcamp. Live invariants and documentation. |
 
 Common acceptance for source stages (9–19, and source work in E-3), in addition to each stage's own:
 
@@ -220,6 +220,18 @@ At the user's request, added the 16 adapters that start headless or use an API o
 `uv run --no-sync poe check` passed with 1,292 tests and 97.02% branch coverage. `uv run --no-sync --group docs properdocs build --strict` passed. Both commands used a writable temporary uv cache. `deadwax sources --format json` confirmed 29 defaults and the four opt-in adapters. Live lookups were outside this configuration verification.
 
 **Suggested message:** `feat(sources): expand the default source set`.
+
+### 2026-11-23 — E-3 progress, step 6 (live invariants and documentation)
+
+Added six live scenarios for Aphex Twin, Burial, Кино, Warp, Hyperdub, and the Aphex Twin MusicBrainz URL. They check the typed identity, its MusicBrainz ID, provenance on returned facts and identity values, and support for the query. The live report includes artist and label identities. README and the guides document source coverage, identifier and link handoff, and the `alias`, `release`, `label_release`, `parent_label`, and `sublabel` relations. Step 5's recorded responses and mock tests cover the Bandcamp account kind marker `is_label` and its missing or invalid forms. The live Warp Records account URL resolved to a label and returned catalogue entries.
+
+`uv run --no-sync poe check` passed with 1,292 tests and 97.02% branch coverage, including fixture replay and mocks. `uv run --no-sync --group docs properdocs build --strict` and `git diff --check` passed. The standard `uv run --no-sync poe test-live` with network access collected 29 cases and passed all six new scenarios before disk exhaustion prevented completion of the existing track corpus. A rerun with in-memory output capture again passed the six new scenarios and reported HTTP 503 from MusicBrainz on the first existing track case, Oren Ambarchi — Salt.
+
+A diagnostic run with direct HTTP and pytest `-x` passed the six new cases and Oren Ambarchi — Salt. It stopped on a MusicBrainz HTTP 503 for Hainbach — BTM Blau. E-3 remains open pending a successful standard live run.
+
+Uncached CLI checks over direct HTTP found Aphex Twin and Warp by name and resolved the MusicBrainz artist, Discogs label, Last.fm artist, and Bandcamp account URLs. The live suite returned the MusicBrainz label ID for Warp. The CLI returned a Discogs identity on a repeat lookup. The control lookup for Burial — Archangel with MusicBrainz, iTunes, Last.fm, and Discogs identified the original track. Discogs review pages returned `blocked`.
+
+**Suggested message:** `test: verify live artist and label lookups`.
 
 ### 2026-11-21 — E-2 evidence (typed queries, artists and labels)
 

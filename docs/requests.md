@@ -28,7 +28,7 @@ request = Request(
 | `tags_per_source` | At most this many tags from each source, in merge order; unset means no cap |
 | `relations` | Relation kinds wanted, each with an optional target type and a cap per source; unset means every kind without a cap, an empty tuple means none |
 
-Facets are the adapter capabilities: `identity`, `links`, `previews`, `tags`, `credits`, `texts`, `relations`, `metrics`. For an artist or label, texts are biographies and profiles, tags are genres, relations are members, labels, and similar artists, metrics are listener counts, and links are service pages; `credits` and `previews` apply only to tracks and albums. `previews` are links with a `preview_url` (iTunes, Spotify, Deezer, Bandcamp). Bandcamp's preview is a signed stream URL that expires about a day after the page was fetched; use it soon after the lookup. On the command line, `--facets tags,previews` sets `Request.facets`.
+Facets are the adapter capabilities: `identity`, `links`, `previews`, `tags`, `credits`, `texts`, `relations`, `metrics`. For artists and labels, texts include biographies and profiles, tags include genres, and links can point to service pages. Artist metrics include Last.fm listener and scrobble counts. Artist relations include members, labels, similar artists, aliases, and main releases (`release`). Label relations include aliases, parent labels, sublabels, and catalogue releases (`label_release`). The `credits` and `previews` facets apply to tracks and albums. Previews are links with a `preview_url` (iTunes, Spotify, Deezer, Bandcamp). Bandcamp's preview is a signed stream URL that expires about a day after the page was fetched. On the command line, `--facets tags,previews` sets `Request.facets`.
 
 ### Which sources run
 

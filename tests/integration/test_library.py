@@ -4,9 +4,12 @@ import pytest
 from pydantic import SecretStr
 
 from deadwax import (
+    ArtistIdentity,
     Dossier,
     EntityKind,
     ErrorKind,
+    IdKind,
+    LabelIdentity,
     LookupConfig,
     PerSourceSettings,
     RecordIdentity,
@@ -110,19 +113,93 @@ def live_config() -> LookupConfig:
 def summary(name: str, dossier: Dossier) -> str:
     """One report line: what was found, by whom, and which sources gave up."""
     identity = dossier.identity
-    assert isinstance(identity, RecordIdentity)
-    if identity.title is None or identity.artist is None:
-        found = "not found"
-    else:
+    found = "not found"
+    if isinstance(identity, RecordIdentity) and identity.title and identity.artist:
         by = ",".join(sorted({s.source for s in identity.title.sources}))
         record = f"{identity.artist.value} - {identity.title.value}"
         found = f"{record} [{identity.version.kind}] by {by}"
+    elif isinstance(identity, ArtistIdentity | LabelIdentity) and identity.name:
+        by = ",".join(sorted({s.source for s in identity.name.sources}))
+        found = f"{identity.name.value} [{identity.kind}] by {by}"
     counts = (
         f"tags {len(dossier.tags)}, credits {len(dossier.credits)}, texts {len(dossier.texts)}, "
         f"relations {len(dossier.relations)}, links {len(dossier.links)}"
     )
     errors = ", ".join(f"{e.source}:{e.kind}" for e in dossier.errors) or "none"
     return f"{name}: {found}; {counts}; errors: {errors}"
+
+
+def assert_name_lookup(
+    dossier: Dossier,
+    identity: ArtistIdentity | LabelIdentity,
+    mbid: IdKind,
+) -> None:
+    assert dossier.found
+    assert any(external.kind is mbid and external.value for external in identity.external_ids)
+    assert ErrorKind.UNSUPPORTED not in {error.kind for error in dossier.errors}
+    facts = [
+        *dossier.tags,
+        *dossier.credits,
+        *dossier.texts,
+        *dossier.relations,
+        *dossier.metrics,
+        *dossier.links,
+        *dossier.review_links,
+        *identity.external_ids,
+        *(value for discrepancy in identity.discrepancies for value in discrepancy.values),
+        identity.name,
+        identity.disambiguation,
+        identity.country,
+        identity.location,
+        identity.begin,
+        identity.end,
+        identity.type if isinstance(identity, ArtistIdentity) else None,
+    ]
+    for fact in facts:
+        if fact is not None:
+            assert fact.sources, fact
+            assert all(source.source and source.url for source in fact.sources), fact
+
+
+@pytest.mark.enable_socket
+@pytest.mark.timeout(120)
+@pytest.mark.parametrize(
+    ("text", "kind"),
+    [
+        pytest.param("Aphex Twin", EntityKind.ARTIST, id="aphex_twin"),
+        pytest.param("Burial", EntityKind.ARTIST, id="burial"),
+        pytest.param("Кино", EntityKind.ARTIST, id="kino"),
+        pytest.param(
+            "https://musicbrainz.org/artist/f22942a1-6f70-4f48-866e-238cb2308fbd",
+            None,
+            id="musicbrainz_artist_url",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_artist_lookup(
+    text: str,
+    kind: EntityKind | None,
+    request: pytest.FixtureRequest,
+    live_report: list[str],
+) -> None:
+    dossier = await lookup(parse_query(text, kind), live_config())
+
+    live_report.append(summary(request.node.callspec.id, dossier))
+    assert isinstance(dossier.identity, ArtistIdentity)
+    assert_name_lookup(dossier, dossier.identity, IdKind.MUSICBRAINZ_ARTIST)
+
+
+@pytest.mark.enable_socket
+@pytest.mark.timeout(120)
+@pytest.mark.parametrize("name", ["Warp", "Hyperdub"], ids=["warp", "hyperdub"])
+@pytest.mark.asyncio
+async def test_label_lookup(name: str, live_report: list[str]) -> None:
+    dossier = await lookup(parse_query(name, EntityKind.LABEL), live_config())
+
+    live_report.append(summary(name, dossier))
+    assert isinstance(dossier.identity, LabelIdentity)
+    assert_name_lookup(dossier, dossier.identity, IdKind.MUSICBRAINZ_LABEL)
 
 
 @pytest.mark.enable_socket

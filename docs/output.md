@@ -64,10 +64,12 @@ Relation kinds are directional:
 |------|--------|
 | `member`, `project` | Band members; other projects of the artist or its members |
 | `associated` | Other related artists from MusicBrainz; `note` holds the relation type and its attributes, such as `supporting musician: guitar`, `subgroup`, `tribute`, or, for a label, `label founder` and `recording contract` |
-| `alias` | Other names of the queried artist or label; `note` holds the alias type, such as `Legal name` |
-| `label`, `label_release` | The label; its other releases |
-| `parent_label`, `sublabel` | A label that owns the queried label; an imprint or label it owns |
-| `release` | Main releases of the queried artist, including albums listed on its Bandcamp account |
+| `alias` | Another name for the queried artist or label. The `note` can give the alias type, such as `Legal name` |
+| `label` | A record's label or an artist's record label |
+| `label_release` | An entry in the queried label's catalogue, or another release on a track or album's label |
+| `parent_label` | The parent or owner of the queried label |
+| `sublabel` | A subsidiary or imprint of the queried label |
+| `release` | An entry in the source's selection of main releases by the queried artist, such as an official MusicBrainz album or an album on the artist's Bandcamp account |
 | `appears_on`, `compilation` | Releases and compilations containing the record |
 | `mix`, `broadcast` | DJ mixes and broadcasts containing it |
 | `co_played` | Recordings directly before or after it in a radio episode or DJ set |
