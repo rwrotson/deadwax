@@ -85,7 +85,26 @@ def fast_config(**changes: object) -> LookupConfig:
     sources["spotify"] = {**FAST, "client_id": "test-id", "client_secret": "test-secret"}
     sources["youtube"] = {**FAST, "api_key": "test-key"}
     sources["soundcloud"] = {**FAST, "client_id": "test-id"}
-    fields = {"sources": sources, "http": {"escalation": []}}
+    fields = {
+        "sources": sources,
+        "http": {"escalation": []},
+        # The shared recordings cover this set of adapters.
+        "default_sources": (
+            "musicbrainz",
+            "itunes",
+            "odesli",
+            "bandcamp",
+            "wikipedia",
+            "lastfm",
+            "discogs",
+            "listenbrainz",
+            "secondhandsongs",
+            "kexp",
+            "spotify",
+            "youtube",
+            "genius",
+        ),
+    }
     return LookupConfig.model_validate(fields | changes)
 
 

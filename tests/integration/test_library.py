@@ -36,6 +36,24 @@ YOUTUBE_KEY = os.environ.get("DEADWAX_SOURCES__YOUTUBE__API_KEY")
 SOUNDCLOUD_ID = os.environ.get("DEADWAX_SOURCES__SOUNDCLOUD__CLIENT_ID")
 GENIUS_TOKEN = os.environ.get("DEADWAX_SOURCES__GENIUS__TOKEN")
 
+# Keep the library corpus on the sources qualified for this live suite.
+LIBRARY_SOURCES = (
+    "musicbrainz",
+    "itunes",
+    "odesli",
+    "bandcamp",
+    "wikipedia",
+    "lastfm",
+    "discogs",
+    "listenbrainz",
+    "secondhandsongs",
+    "kexp",
+    "spotify",
+    "youtube",
+    "genius",
+    "soundcloud",
+)
+
 # Tracks from a personal library as "Artist - Title" from their tags. Tracks of compilations
 # tagged "Various Artists" use the artist from the title, and an untagged file its name.
 LIBRARY: dict[str, str] = {
@@ -118,8 +136,7 @@ async def test_library_track(
 ) -> None:
     query = parse_query(text, EntityKind.TRACK)
 
-    config = live_config()
-    dossier = await lookup(query, config, include=[*config.default_sources, "soundcloud"])
+    dossier = await lookup(query, live_config(), include=LIBRARY_SOURCES)
 
     live_report.append(summary(request.node.callspec.id, dossier))
     assert [e for e in dossier.errors if e.kind is ErrorKind.FAILED] == []

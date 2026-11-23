@@ -59,7 +59,7 @@ Carried from the v1 decision log, where each has its date and reason. They apply
 - Non-Latin names are compared as written; alias-aware matching is a later, separate change.
 - Fixtures: sources not being recorded are replayed; requests with a body are keyed with a body hash; recording and source tests run with `escalation=none`; credentials go only to sources recorded live.
 - Generated docs pages (configuration, output schema, API reference) are never edited by hand; README holds the source tier tables.
-- Deezer stays in the `core` group but not in `DEFAULT_SOURCES`: Akamai blocks it on every route (2026-11-19).
+- The default set includes every current adapter configured to start without a visible browser. Boomkat, Norman Records, WhoSampled, and 1001Tracklists remain opt-in (2026-11-23).
 
 ## Implementation stages and acceptance criteria
 
@@ -78,7 +78,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Sections of closed
 
 Common acceptance for source stages (9–19, and source work in E-3), in addition to each stage's own:
 
-- The adapter declares its `group`. An open-API source of the agreed default set (ListenBrainz, SecondHandSongs, KEXP, Spotify, YouTube, Genius) is added to `DEFAULT_SOURCES` in `sources/config.py` in its stage; other sources stay opt-in.
+- The adapter declares its `group`. The default set is defined in `sources/config.py`.
 - An HTML source that searches and reads one page builds on `SearchPageAdapter` in `sources/_search.py` (formerly `_base.py`), or the evidence says why not.
 
 - Fixture tests for every extraction path, and for not found, blocked, and a missing key where one applies.
@@ -91,7 +91,7 @@ Common acceptance for source stages (9–19, and source work in E-3), in additio
 
 - [x] The user confirmed express permission for automated RYM access.
 - [x] Browser-first fetching for a source that never answers plain httpx.
-- [ ] Verify primary and secondary genres, descriptor tags, rating with vote count, chart positions, and user reviews against real RYM pages. The provisional parser is covered only by synthetic HTML and remains opt-in.
+- [ ] Verify primary and secondary genres, descriptor tags, rating with vote count, chart positions, and user reviews against real RYM pages. The provisional parser is covered only by synthetic HTML.
 
 **Deferred until:** RYM search and record pages can be captured and live lookups run. Do not mark this stage done from synthetic fixtures. The 2026-11-16 access attempts are in `plans/v2.md`.
 
@@ -212,6 +212,14 @@ Seven uncached CLI runs with plain HTTP verified both name searches, both MusicB
 Step 6 covers the full `poe test-live` suite, cross-source documentation, and E-3 closing evidence.
 
 **Suggested message:** `feat(sources): add Bandcamp artist and label lookups`.
+
+### 2026-11-23 — Default source selection
+
+At the user's request, added the 16 adapters that start headless or use an API or plain HTTP. The default now selects 29 sources. Boomkat, Norman Records, WhoSampled, and 1001Tracklists remain opt-in. Browser transports and headed fallback retain their existing settings. The replay fixtures and live library corpus keep their previous source coverage.
+
+`uv run --no-sync poe check` passed with 1,292 tests and 97.02% branch coverage. `uv run --no-sync --group docs properdocs build --strict` passed. Both commands used a writable temporary uv cache. `deadwax sources --format json` confirmed 29 defaults and the four opt-in adapters. Live lookups were outside this configuration verification.
+
+**Suggested message:** `feat(sources): expand the default source set`.
 
 ### 2026-11-21 — E-2 evidence (typed queries, artists and labels)
 

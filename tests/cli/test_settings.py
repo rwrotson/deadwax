@@ -159,4 +159,3 @@ def test_source_section_override_keeps_source_defaults(monkeypatch: pytest.Monke
 
 def test_default_source_set_matches_the_library() -> None:
     assert load_settings().default_sources == LookupConfig().default_sources
-    assert "deezer" not in load_settings().default_sources

@@ -386,14 +386,12 @@ def test_sources_command(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "DEADWAX_SOURCES__LASTFM__API_KEY" in table.stdout
     assert {(row["group"], row["default"]) for row in json.loads(as_json.stdout)} == {
         ("core", True),
-        ("core", False),
         ("catalogues", True),
-        ("catalogues", False),
-        ("press", False),
+        ("press", True),
         ("radio", True),
         ("radio", False),
         ("streaming", True),
-        ("streaming", False),
+        ("shops", True),
         ("shops", False),
         ("samples", False),
     }
