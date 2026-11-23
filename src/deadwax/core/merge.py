@@ -236,8 +236,8 @@ def _judge(reference: _Key | None, partials: Iterable[Partial]) -> _Judgement:
     return judgement
 
 
-def _union(*groups: Iterable[Provenance]) -> list[Provenance]:
-    return list(dict.fromkeys(provenance for group in groups for provenance in group))
+def _union[T: Hashable](*groups: Iterable[T]) -> list[T]:
+    return list(dict.fromkeys(item for group in groups for item in group))
 
 
 def _first(values: list[str]) -> str:
@@ -594,6 +594,10 @@ def _combine_relations(kept: Relation, other: Relation) -> Relation:
     return _combine(kept, other).model_copy(
         update={
             "target": target,
+            "similarity_observations": _union(
+                kept.similarity_observations,
+                other.similarity_observations,
+            ),
             "recording_offset": kept.recording_offset
             if kept.recording_offset is not None
             else other.recording_offset,

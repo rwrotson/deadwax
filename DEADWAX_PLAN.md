@@ -247,6 +247,19 @@ Moved Album of the Year, AllMusic, Beatport, Bleep, Forced Exposure, Juno, Phoni
 
 **Suggested message:** `fix(sources): narrow the default source set`.
 
+### 2026-11-23 — Similarity observations for mixhound P9, stage 1
+
+`Relation.similarity_observations` exposes provenance, original scores and one-based ranks for
+Last.fm and ListenBrainz. LB Radio assigns ranks before filtering and resolving titles. Merging
+keeps distinct observations in input order. Request caps retain all observations on each kept
+relation. Offline fixtures verify score precision, zero and missing scores, radio gaps, merge order,
+and JSON compatibility.
+
+`uv sync --locked --all-groups`, `uv run poe check` (1,297 tests, 97.02% coverage), and
+`uv run --group docs properdocs build --strict` passed. Live lookups were outside this stage.
+
+**Suggested message:** `feat: preserve source similarity scores and ranks`.
+
 ### 2026-11-21 — E-2 evidence (typed queries, artists and labels)
 
 Decisions (user, 2026-11-21):

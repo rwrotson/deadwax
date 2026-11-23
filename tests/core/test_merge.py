@@ -12,6 +12,7 @@ from deadwax.core import (
     ArtistType,
     CandidateLabel,
     Credit,
+    Dossier,
     Entity,
     EntityKind,
     EntityType,
@@ -31,8 +32,11 @@ from deadwax.core import (
     RecordIdentity,
     Relation,
     RelationKind,
+    RelationLimit,
+    Request,
     ReviewLink,
     Scope,
+    SimilarityObservation,
     Tag,
     TagKind,
     Text,
@@ -43,6 +47,7 @@ from deadwax.core import (
     VersionKind,
     merge,
     text_query,
+    trim,
 )
 
 NOW = datetime(2026, 11, 12, tzinfo=UTC)
@@ -460,6 +465,67 @@ def test_relations_of_one_target_merge_and_fill_the_target() -> None:
     assert merged.target.artist == "Todd Terry"
     assert (merged.target.date, merged.target.url) == ("1995", "https://shs.example/1")
     assert merged.target.ids == {IdKind.MUSICBRAINZ_RECORDING: "r"}
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_similarity_observations_survive_merge_and_trim(reverse: bool) -> None:
+    lastfm = SimilarityObservation(
+        provenance=Provenance(source="lastfm", url="https://www.last.fm/music/Band"),
+        score=0.0,
+        rank=3,
+    )
+    listenbrainz = SimilarityObservation(
+        provenance=Provenance(source="listenbrainz", url="https://listenbrainz.org/track/seed/"),
+        score=0.12345678912345,
+        rank=7,
+    )
+
+    def lead(name: str, observation: SimilarityObservation, note: str | None = None) -> Relation:
+        return Relation(
+            kind=RelationKind.SIMILAR,
+            target=Entity(type=EntityType.RECORDING, name=name, artist="Band"),
+            scope=Scope.RECORDING,
+            note=note,
+            sources=[observation.provenance],
+            similarity_observations=[observation],
+        )
+
+    feeds = [
+        ("lastfm", lastfm, "match 0.00"),
+        ("listenbrainz", listenbrainz, None),
+    ]
+    if reverse:
+        feeds.reverse()
+
+    partials = [
+        partial(
+            source,
+            None,
+            relations=[
+                lead("Shared", observation, note),
+                lead("Shared", observation, note),
+                lead(source, observation),
+            ],
+        )
+        for source, observation, note in feeds
+    ]
+    dossier = merge(TRACK, partials, generated_at=NOW)
+
+    assert [relation.target.name for relation in dossier.relations] == [
+        "Shared",
+        feeds[0][0],
+        feeds[1][0],
+    ]
+    request = Request(
+        query=TRACK,
+        relations=(RelationLimit(kind=RelationKind.SIMILAR, per_source=1),),
+    )
+    trimmed = trim(dossier, request)
+    assert [relation.target.name for relation in trimmed.relations] == ["Shared", feeds[1][0]]
+    merged = trimmed.relations[0]
+    assert merged.note == feeds[0][2]
+    assert merged.similarity_observations == [observation for _, observation, _ in feeds]
+    assert Dossier.model_validate_json(trimmed.model_dump_json()) == trimmed
 
 
 def test_broadcasts_on_other_dates_stay_apart() -> None:

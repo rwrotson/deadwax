@@ -17,6 +17,7 @@ from deadwax.core import (
     Relation,
     RelationKind,
     Scope,
+    SimilarityObservation,
     SourceError,
     Tag,
     TagKind,
@@ -180,8 +181,11 @@ def similar_tracks(found: Iterable[models.SimilarTrack], url: str | None) -> lis
             note=_note(track.match),
             scope=Scope.RECORDING,
             sources=sources,
+            similarity_observations=[
+                SimilarityObservation(provenance=sources[0], score=track.match, rank=rank),
+            ],
         )
-        for track in found
+        for rank, track in enumerate(found, start=1)
     ]
 
 
@@ -195,6 +199,9 @@ def similar_artists(found: Iterable[models.SimilarArtist], url: str | None) -> l
             note=_note(artist.match),
             scope=Scope.ARTIST,
             sources=sources,
+            similarity_observations=[
+                SimilarityObservation(provenance=sources[0], score=artist.match, rank=rank),
+            ],
         )
-        for artist in found
+        for rank, artist in enumerate(found, start=1)
     ]

@@ -82,6 +82,13 @@ Relation kinds are directional:
 | `similar_artist_recording` | Recordings by artists similar to the record's artist (ListenBrainz LB Radio), with `artist` scope |
 | `other_version` | Another version of the same work, kept apart from the identity |
 
+ListenBrainz and Last.fm similarity relations carry a `similarity_observations` list. Each entry
+has `provenance`, the source's unrounded `score` (or `null` when absent), and the one-based
+`rank` within its response list. LB Radio uses the order of all recordings across the response
+groups before filtering and title resolution. A merged relation retains each source's observations,
+including their original ranks after request limits are applied. Last.fm's display `note` still
+rounds the match score to two decimal places.
+
 Sample relations can carry `recording_offset` and `target_offset` in seconds, plus an `element` label. An absent value is left empty.
 
 Genius song lyrics appear as a full `lyrics` text with `work` scope when the page contains them. JSON, Markdown, and terminal output retain the complete text.

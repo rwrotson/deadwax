@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from email.utils import parsedate_to_datetime
+from itertools import chain
 
 from deadwax.core import (
     Entity,
@@ -12,6 +13,7 @@ from deadwax.core import (
     Relation,
     RelationKind,
     Scope,
+    SimilarityObservation,
     Text,
     TextKind,
 )
@@ -65,8 +67,11 @@ def similar_recordings(
             ),
             scope=Scope.RECORDING,
             sources=sources,
+            similarity_observations=[
+                SimilarityObservation(provenance=sources[0], score=recording.score, rank=rank),
+            ],
         )
-        for recording in list(found)[:limit]
+        for rank, recording in enumerate(list(found)[:limit], start=1)
     ]
 
 
@@ -88,30 +93,35 @@ def similar_artists(
             ),
             scope=Scope.ARTIST,
             sources=sources,
+            similarity_observations=[
+                SimilarityObservation(provenance=sources[0], score=artist.score, rank=rank),
+            ],
         )
-        for artist in list(found)[:limit]
+        for rank, artist in enumerate(list(found)[:limit], start=1)
     ]
 
 
 def radio_seeds(
     found: dict[str, list[models.RadioRecording]],
     artist: str,
-) -> list[models.RadioRecording]:
-    """LB Radio recordings in response order, without those of the seed artist."""
+) -> list[tuple[int, models.RadioRecording]]:
+    """Ranked LB Radio recordings with the seed artist filtered out."""
     return [
-        item for items in found.values() for item in items if item.similar_artist_mbid != artist
+        (rank, item)
+        for rank, item in enumerate(chain.from_iterable(found.values()), start=1)
+        if item.similar_artist_mbid != artist
     ]
 
 
 def radio_recordings(
-    found: Iterable[models.RadioRecording],
+    found: Iterable[tuple[int, models.RadioRecording]],
     names: dict[str, models.RecordingMetadata],
     url: str,
 ) -> list[Relation]:
     """Recordings by similar artists whose titles the metadata endpoint resolved."""
     sources = [Provenance(source=SOURCE, url=url)]
     result = []
-    for item in found:
+    for rank, item in found:
         entry = names.get(item.recording_mbid)
         title = entry.recording.name if entry and entry.recording else None
         if not title:
@@ -129,6 +139,9 @@ def radio_recordings(
                 ),
                 scope=Scope.ARTIST,
                 sources=sources,
+                similarity_observations=[
+                    SimilarityObservation(provenance=sources[0], rank=rank),
+                ],
             ),
         )
     return result

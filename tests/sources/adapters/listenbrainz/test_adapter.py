@@ -16,6 +16,7 @@ from deadwax.core import (
     RecordIdentity,
     RelationKind,
     Scope,
+    SimilarityObservation,
     TextKind,
 )
 from deadwax.sources import LookupConfig, parse_query
@@ -224,9 +225,58 @@ def track_context(*ids: tuple[IdKind, str]) -> LookupContext:
 
 
 @pytest.mark.asyncio
+async def test_similarity_observations_keep_endpoint_scores_and_ranks() -> None:
+    scores = [0.12345678912345, 0.0, None]
+    adapter = make(
+        routes={
+            "/similar-recordings/json": [
+                {"recording_mbid": f"r{index}", "recording_name": f"Track {index}", "score": score}
+                for index, score in enumerate(scores)
+            ],
+            "/similar-artists/json": [
+                {"artist_mbid": f"a{index}", "name": f"Artist {index}", "score": score}
+                for index, score in enumerate(scores)
+            ],
+        },
+    )
+    found = track_context((IdKind.MUSICBRAINZ_ARTIST, ARTIST))
+
+    partial = await adapter.lookup(found.query, found)
+    await adapter.aclose()
+
+    for kind, prefix in ((EntityType.RECORDING, "Track"), (EntityType.ARTIST, "Artist")):
+        similar = [
+            relation
+            for relation in partial.relations
+            if relation.kind is RelationKind.SIMILAR and relation.target.type is kind
+        ]
+        assert [relation.target.name for relation in similar] == [
+            f"{prefix} 0",
+            f"{prefix} 1",
+            f"{prefix} 2",
+        ]
+        for rank, (relation, score) in enumerate(zip(similar, scores, strict=True), start=1):
+            assert relation.similarity_observations == [
+                SimilarityObservation(provenance=relation.sources[0], score=score, rank=rank),
+            ]
+            assert relation.sources[0].source == "listenbrainz"
+
+
+@pytest.mark.asyncio
 async def test_radio_recordings_of_similar_artists() -> None:
     seen: list[httpx.Request] = []
-    adapter = make(seen, radio_artists=3, radio_per_artist=1)
+    adapter = make(
+        seen,
+        routes={
+            "/1/metadata/recording/": {
+                "r5": {"recording": {"name": "First"}},
+                "r6": {"recording": {}},
+                "r7": {"recording": {"name": "Third"}},
+            },
+        },
+        radio_artists=3,
+        radio_per_artist=1,
+    )
     found = track_context((IdKind.MUSICBRAINZ_ARTIST, ARTIST))
 
     partial = await adapter.lookup(found.query, found)
@@ -241,11 +291,16 @@ async def test_radio_recordings_of_similar_artists() -> None:
         "pop_end": "100",
     }
     assert dict(names.url.params) == {"recording_mbids": "r5,r6,r7", "inc": "artist"}
-    relation = next(r for r in partial.relations if r.kind is RelationKind.SIMILAR_ARTIST_RECORDING)
-    assert (relation.target.type, relation.scope) == (EntityType.RECORDING, Scope.ARTIST)
-    assert relation.target.url == "https://musicbrainz.org/recording/r5"
-    assert relation.target.ids == {IdKind.MUSICBRAINZ_RECORDING: "r5"}
-    assert relation.sources[0].url == f"https://listenbrainz.org/artist/{ARTIST}/"
+    first, third = [r for r in partial.relations if r.kind is RelationKind.SIMILAR_ARTIST_RECORDING]
+    assert [r.target.name for r in (first, third)] == ["First", "Third"]
+    for relation, rank in ((first, 2), (third, 4)):
+        assert relation.similarity_observations == [
+            SimilarityObservation(provenance=relation.sources[0], rank=rank),
+        ]
+    assert (first.target.type, first.scope) == (EntityType.RECORDING, Scope.ARTIST)
+    assert first.target.url == "https://musicbrainz.org/recording/r5"
+    assert first.target.ids == {IdKind.MUSICBRAINZ_RECORDING: "r5"}
+    assert first.sources[0].url == f"https://listenbrainz.org/artist/{ARTIST}/"
 
 
 @pytest.mark.asyncio

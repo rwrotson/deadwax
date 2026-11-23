@@ -110,7 +110,7 @@ class ListenBrainzAdapter(HttpAdapter):
         response = await self.client.get(
             f"{API}/metadata/recording/",
             params={
-                "recording_mbids": ",".join(item.recording_mbid for item in seeds),
+                "recording_mbids": ",".join(item.recording_mbid for _, item in seeds),
                 "inc": "artist",
             },
         )

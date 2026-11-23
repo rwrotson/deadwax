@@ -60,6 +60,9 @@ An application that looks up many records keeps one `Deadwax` client, which shar
 
 The Kinds column shows which queries each adapter accepts. Some shop adapters contribute album-level facts to a track query. See the [sources guide](https://rwrotson.github.io/deadwax/sources/) and the [output guide](https://rwrotson.github.io/deadwax/output/).
 
+The JSON dossier includes [source scores and ranks](https://rwrotson.github.io/deadwax/output/#facts) for ListenBrainz
+and Last.fm similarity relations.
+
 ### Tier 1: identity and links
 
 | Source | Kinds | Status | Contributes | Caveats |

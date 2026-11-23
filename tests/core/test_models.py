@@ -18,6 +18,7 @@ from deadwax.core import (
     Query,
     RecordCandidate,
     RecordIdentity,
+    Relation,
     Scope,
     Sourced,
     Tag,
@@ -35,6 +36,15 @@ def test_dossier_round_trips_through_json() -> None:
     )
 
     assert Dossier.model_validate_json(dossier.model_dump_json()) == dossier
+
+
+def test_relation_without_serialized_observations_defaults_to_empty() -> None:
+    relation = Relation.model_validate_json(
+        '{"kind":"similar","target":{"type":"recording","name":"Other"},'
+        '"scope":"recording","sources":[{"source":"lastfm"}]}',
+    )
+
+    assert relation.similarity_observations == []
 
 
 def test_dossier_requires_aware_timestamp() -> None:

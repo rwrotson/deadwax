@@ -395,12 +395,21 @@ class Entity(_Model):
     ids: dict[IdKind, str] = {}
 
 
+class SimilarityObservation(_Model):
+    """A source's score and position for a similarity relation."""
+
+    provenance: Provenance
+    score: float | None = Field(default=None, description="Original score from the source")
+    rank: int = Field(ge=1, description="One-based position in the source response")
+
+
 class Relation(Fact):
     """Connection between the record and another entity."""
 
     kind: RelationKind
     target: Entity
     note: str | None = None
+    similarity_observations: list[SimilarityObservation] = []
     recording_offset: int | None = Field(
         default=None,
         ge=0,

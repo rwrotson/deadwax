@@ -1,6 +1,14 @@
 import pytest
 
-from deadwax.core import NotFoundError, RateLimitedError, Scope, SourceError, TextKind
+from deadwax.core import (
+    NotFoundError,
+    Provenance,
+    RateLimitedError,
+    Scope,
+    SimilarityObservation,
+    SourceError,
+    TextKind,
+)
 from deadwax.sources.adapters.lastfm import models
 from deadwax.sources.adapters.lastfm import parse as p
 
@@ -90,3 +98,22 @@ def test_similar_items() -> None:
 
     assert (track.target.name, track.target.artist, track.note) == ("Other", "B", "match 0.50")
     assert (artist.target.name, artist.note, artist.scope) == ("C", None, Scope.ARTIST)
+
+
+def test_similarity_observations_keep_unrounded_matches_and_response_order() -> None:
+    matches = ("0.12345678912345", "0", None)
+    items = [{"name": f"Lead {index}", "match": match} for index, match in enumerate(matches)]
+    tracks = models.SimilarTracks.model_validate(
+        {"track": [item | {"artist": {"name": "Band"}} for item in items]},
+    )
+    artists = models.SimilarArtists.model_validate({"artist": items})
+    provenance = Provenance(source="lastfm", url=URL)
+
+    for relations in (p.similar_tracks(tracks.track, URL), p.similar_artists(artists.artist, URL)):
+        assert [relation.target.name for relation in relations] == ["Lead 0", "Lead 1", "Lead 2"]
+        assert [relation.note for relation in relations] == ["match 0.12", "match 0.00", None]
+        assert [relation.similarity_observations for relation in relations] == [
+            [SimilarityObservation(provenance=provenance, score=0.12345678912345, rank=1)],
+            [SimilarityObservation(provenance=provenance, score=0.0, rank=2)],
+            [SimilarityObservation(provenance=provenance, rank=3)],
+        ]
