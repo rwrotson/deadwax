@@ -4,8 +4,6 @@ deadwax is a typed Python library and command that, for one track, album, artist
 
 The base install depends on Pydantic, httpx, and selectolax. Extras: `logs` (structlog), `cli` (Typer, Pydantic Settings, rich, platformdirs), `stealth` (curl_cffi), `browser`/`patchright` (Patchright), `nodriver` (Nodriver). Distribution, package, and command `deadwax`; environment prefix `DEADWAX_`.
 
-More specific instructions live in `src/deadwax/sources/AGENTS.md` and `tests/AGENTS.md`.
-
 ## Workflow
 
 - Implementation is staged. Read `DEADWAX_PLAN.md` (specification and handoff journal) before work, implement only the first incomplete stage, append dated evidence, and stop at the stage boundary.
@@ -62,11 +60,17 @@ A layer imports only layers below it; `logs` and `sources` are siblings. Import 
 
 ## Read when
 
+Before editing, read the guide for each affected layer and the test guide if the change touches tests.
+
 | Task | Read |
 | --- | --- |
 | Any code change | `docs/architecture.md` (layers, R1–R9, lookup flow, errors) |
-| Adding or changing a source | `src/deadwax/sources/AGENTS.md`, `docs/architecture.md` "Adding a source" |
-| Writing tests | `tests/AGENTS.md` |
+| Working in `src/deadwax/core/` | [Core guide](docs/agents/src/deadwax/core.md) |
+| Working in `src/deadwax/cli/` | [CLI guide](docs/agents/src/deadwax/cli.md) |
+| Working in `src/deadwax/logs/` | [Logging guide](docs/agents/src/deadwax/logs.md) |
+| Working in `src/deadwax/sources/` | [Sources guide](docs/agents/src/deadwax/sources.md) |
+| Adding or changing a source | [Adding a source](docs/architecture.md#adding-a-source) |
+| Working in `tests/` | [Test guide](docs/agents/tests.md) |
 | Dependencies, settings, credentials, public API, docstrings and comments | `CONTRIBUTING.md` |
 | CI, releases, publishing | README "CI/CD", `docs/notes.md` |
 | History, or changing a v1/v2 adapter | `plans/v1.md`, `plans/v2.md` (archived stages and decision logs) |

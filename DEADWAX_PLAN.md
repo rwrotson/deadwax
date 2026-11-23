@@ -7,7 +7,7 @@ This is the active specification and multi-session handoff for deadwax. deadwax 
 - **Status:** v1 and v2 complete; v0.1.0 is the first tagged release (2026-11-20, GitHub only, no PyPI). Stage 18 (Rate Your Music) deferred until RYM is accessible; Boomkat and Norman Records remain access-limited. Stages E-1 and E-2 are done. E-3 artist and label lookups and their six live scenarios are verified. Closing E-3 awaits a completed standard live suite.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
-- Read `AGENTS.md` (and the nested `AGENTS.md` of the area you change), `docs/architecture.md` (import rules R1–R9), and `CONTRIBUTING.md` before code changes. After code changes run `uv run poe check`; after docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
+- Before code changes, read [`AGENTS.md`](AGENTS.md), the applicable guides in its [Read when table](AGENTS.md#read-when), `docs/architecture.md` (import rules R1–R9), and `CONTRIBUTING.md`. After code changes run `uv run poe check`. After docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
 - Before changing a v1 adapter, read its rows in the decision log of `plans/v1.md`; before changing a v2 adapter, its stage and evidence in `plans/v2.md`.
 
 ### Accepted decisions
@@ -299,3 +299,11 @@ Checks: `uv run poe check` passed (fmt-check, lint, lint-imports, mypy, 1149 tes
 Remaining: E-2 (typed queries and the model for new kinds), E-3.
 
 **Suggested message:** `refactor!: dispatch adapter lookups by record kind`.
+
+### 2026-12-03 — Agent guide layout
+
+Moved the sources and tests guides into `docs/agents/`, added guides for core, CLI, and logging, and linked all five from the root `AGENTS.md`. ProperDocs excludes the agent guide directory from the published site. E-3 still awaits a completed standard live suite.
+
+`uv run --group docs properdocs build --strict` and `git diff --check` passed. Checked the guide links and anchors, verified the two moves preserved their contents, and confirmed the generated site, sitemap, and search index exclude the agent guides. The Python suite and live lookups were skipped because the change affects only documentation and its site configuration.
+
+**Suggested message:** `docs: organize agent guides by project structure`.
