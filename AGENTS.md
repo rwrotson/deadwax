@@ -19,6 +19,11 @@ More specific instructions live in `src/deadwax/sources/AGENTS.md` and `tests/AG
 - After completing and verifying a meaningful, self-contained part of the work, pause before starting the next part.
 - At each pause, send the user a one-line English Conventional Commit message for the completed work. Resume when the user asks you to continue.
 
+## Python formatting
+
+- In new or edited code, keep function signatures, calls, and collection literals on one line when they fit. When they need wrapping, put one parameter, argument, or item on each line. Add a trailing comma after the last entry when there are two or more entries so Ruff preserves the layout.
+- Omit optional trailing commas in single-entry forms. Keep the required comma in a single-element tuple and any comma Ruff inserts in a wrapped signature with one parameter.
+
 ## Commands
 
 ```bash

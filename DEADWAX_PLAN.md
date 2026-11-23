@@ -233,6 +233,12 @@ Uncached CLI checks over direct HTTP found Aphex Twin and Warp by name and resol
 
 **Suggested message:** `test: verify live artist and label lookups`.
 
+### 2026-11-23 — Python formatting maintenance
+
+Removed `COM812` from Ruff's lint selection and documented manual trailing commas for wrapped signatures, calls, and collection literals in `AGENTS.md`. `CONTRIBUTING.md` links to the convention.
+
+Checks: Ruff stdin examples preserved single-line, wrapped, and single-element forms without warnings. `MYPY_CACHE_DIR=/dev/null uv run --no-sync poe check` passed with 1,292 tests and 97.02% coverage. `uv run --no-sync --group docs properdocs build --strict` passed. Both used a writable temporary uv cache. Live lookups were outside the formatting verification.
+
 ### 2026-11-21 — E-2 evidence (typed queries, artists and labels)
 
 Decisions (user, 2026-11-21):
