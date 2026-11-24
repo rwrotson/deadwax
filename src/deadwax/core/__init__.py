@@ -50,6 +50,7 @@ from .models import (
     Attributed,
     Candidate,
     CandidateLabel,
+    CatalogExpansion,
     Credit,
     Discrepancy,
     Dossier,
@@ -76,6 +77,7 @@ from .models import (
     RecordIdentity,
     Relation,
     RelationKind,
+    ReleaseTrack,
     ReviewLink,
     Scope,
     SimilarityObservation,
@@ -87,6 +89,7 @@ from .models import (
     TextKind,
     VersionInfo,
     VersionKind,
+    WorkPerformance,
 )
 from .normalize import (
     fold,
@@ -97,7 +100,7 @@ from .normalize import (
     normalize_text,
     split_featuring,
 )
-from .orchestrator import LOOKUP_SOURCE, LookupOptions, expand_names, run
+from .orchestrator import LOOKUP_SOURCE, LookupOptions, expand_names, run, run_source
 from .query import (
     AlbumQuery,
     ArtistQuery,
@@ -141,6 +144,7 @@ __all__ = [
     "Candidate",
     "CandidateLabel",
     "Capability",
+    "CatalogExpansion",
     "ConfigurationError",
     "Credit",
     "DeadwaxError",
@@ -189,6 +193,7 @@ __all__ = [
     "Relation",
     "RelationKind",
     "RelationLimit",
+    "ReleaseTrack",
     "Request",
     "Requirement",
     "ReviewLink",
@@ -215,6 +220,7 @@ __all__ = [
     "Verdict",
     "VersionInfo",
     "VersionKind",
+    "WorkPerformance",
     "adapter_time_left",
     "artist_similarity",
     "build_identity",
@@ -237,6 +243,7 @@ __all__ = [
     "pause_adapter_timeout",
     "recognize_url",
     "run",
+    "run_source",
     "split_featuring",
     "text_query",
     "title_similarity",

@@ -7,6 +7,7 @@ from deadwax.core import (
     AdapterError,
     ArtistQuery,
     Capability,
+    CatalogExpansion,
     EntityKind,
     ErrorKind,
     IdKind,
@@ -20,6 +21,7 @@ from deadwax.core import (
     Query,
     RecordKey,
     Relation,
+    ReleaseTrack,
     Requirement,
     Scope,
     SourceGroup,
@@ -114,6 +116,13 @@ class DiscogsAdapter(HttpAdapter):
             label=self.find_label,
             unresolved=self.find,
         )
+
+    async def release_tracklist(
+        self, release_id: str, limit: int
+    ) -> CatalogExpansion[ReleaseTrack]:
+        """Read the tracklist of the specific Discogs release by ID."""
+        release = await self._get(models.Release, f"releases/{release_id}")
+        return p.release_tracklist(release, limit)
 
     async def _name_target(
         self,

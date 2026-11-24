@@ -1,14 +1,18 @@
 import re
 from collections.abc import Iterable, Sequence
+from itertools import chain, islice
 
 from deadwax.core import (
+    AdapterError,
     ArtistCandidate,
     ArtistType,
     CandidateLabel,
+    CatalogExpansion,
     Credit,
     Entity,
     EntityKind,
     EntityType,
+    ErrorKind,
     IdKind,
     LabelCandidate,
     Link,
@@ -18,6 +22,7 @@ from deadwax.core import (
     RecordKey,
     Relation,
     RelationKind,
+    ReleaseTrack,
     ReviewLink,
     Scope,
     Tag,
@@ -25,6 +30,7 @@ from deadwax.core import (
     Verdict,
     VersionInfo,
     VersionKind,
+    WorkPerformance,
     classify_marker,
     compare,
     compare_names,
@@ -248,13 +254,112 @@ def artist_credits(relations: Iterable[models.Relation], scope: Scope, url: str)
     ]
 
 
-def _recording_entity(recording: models.RecordingRef) -> Entity:
+def _recording_entity(recording: models.RecordingRef | models.Recording) -> Entity:
     return Entity(
         type=EntityType.RECORDING,
         name=recording.title,
         artist=credit_name(recording.artist_credit) or None,
         url=page("recording", recording.id),
         ids={IdKind.MUSICBRAINZ_RECORDING: recording.id},
+    )
+
+
+def release_tracklist(release: models.Release, limit: int) -> CatalogExpansion[ReleaseTrack]:
+    """Read release tracks in medium order with their own titles and credits."""
+    url = page("release", release.id)
+    entity = Entity(
+        type=EntityType.RELEASE,
+        name=release.title,
+        url=url,
+        ids={IdKind.MUSICBRAINZ_RELEASE: release.id},
+    )
+    entries = (
+        (medium.position, track)
+        for medium in release.media
+        for track in chain((medium.pregap,) if medium.pregap else (), medium.tracks)
+    )
+    items = [
+        ReleaseTrack(
+            title=track.title,
+            artist_credit=credit_name(track.artist_credit) or None,
+            medium=medium,
+            position=track.number,
+            ids={IdKind.MUSICBRAINZ_TRACK: track.id} if track.id else {},
+            recording=_recording_entity(track.recording),
+            isrcs=track.recording.isrcs,
+            sources=[Provenance(source=SOURCE, url=url)],
+        )
+        for medium, track in islice(entries, limit + 1)
+    ]
+    incomplete = any((medium.track_count or 0) > len(medium.tracks) for medium in release.media)
+    errors = []
+    if not items or incomplete:
+        errors.append(
+            AdapterError(
+                source=SOURCE,
+                kind=ErrorKind.NOT_FOUND,
+                reason="release tracklist is missing or incomplete",
+                url=url,
+            )
+        )
+    return CatalogExpansion[ReleaseTrack](
+        entity=entity,
+        items=items[:limit],
+        truncated=len(items) > limit,
+        errors=errors,
+    )
+
+
+def _performance_version(recording: models.RecordingRef, attributes: list[str]) -> VersionInfo:
+    version = recording_version(recording.title, recording.disambiguation)
+    if version.kind is VersionKind.ORIGINAL:
+        for attribute, kind in (
+            ("live", VersionKind.LIVE),
+            ("instrumental", VersionKind.INSTRUMENTAL),
+            ("cover", VersionKind.COVER),
+        ):
+            if attribute in attributes:
+                return VersionInfo(kind=kind, detail=attribute)
+    return version
+
+
+def work_performances(work: models.Work, limit: int) -> CatalogExpansion[WorkPerformance]:
+    """Keep work identity separate from the recording and performance attributes."""
+    url = page("work", work.id)
+    entity = Entity(
+        type=EntityType.WORK,
+        name=work.title,
+        url=url,
+        ids={IdKind.MUSICBRAINZ_WORK: work.id},
+    )
+    entries = (
+        (relation.recording, relation.attributes)
+        for relation in work.relations
+        if relation.type == "performance" and relation.recording is not None
+    )
+    items = [
+        WorkPerformance(
+            recording=_recording_entity(recording),
+            version=_performance_version(recording, attributes),
+            attributes=attributes,
+            sources=[Provenance(source=SOURCE, url=url)],
+        )
+        for recording, attributes in islice(entries, limit + 1)
+    ]
+    errors = (
+        []
+        if items
+        else [
+            AdapterError(
+                source=SOURCE, kind=ErrorKind.NOT_FOUND, reason="no recording performances", url=url
+            )
+        ]
+    )
+    return CatalogExpansion[WorkPerformance](
+        entity=entity,
+        items=items[:limit],
+        truncated=len(items) > limit,
+        errors=errors,
     )
 
 

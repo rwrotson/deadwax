@@ -143,11 +143,17 @@ class Track(ApiModel):
 
     title: str
     recording: Recording
+    id: str | None = None
+    number: str | None = None
+    artist_credit: list[ArtistCredit] = Field(default=[], alias="artist-credit")
 
 
 class Medium(ApiModel):
     """Disc or side of a release."""
 
+    position: int | None = None
+    track_count: int | None = Field(default=None, alias="track-count")
+    pregap: Track | None = None
     tracks: list[Track] = []
 
 

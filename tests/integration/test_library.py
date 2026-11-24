@@ -12,6 +12,7 @@ from deadwax import (
     LabelIdentity,
     LookupConfig,
     PerSourceSettings,
+    Query,
     RecordIdentity,
     TextKind,
     TrackQuery,
@@ -27,6 +28,12 @@ from deadwax.sources import (
     SoundCloudSettings,
     SpotifySettings,
     YouTubeSettings,
+)
+from tests.integration.live import (
+    LiveRun,
+    MusicBrainzUnavailableError,
+    failed_sources,
+    only_musicbrainz_503,
 )
 
 # Read at import (`poe test-live` loads .env): the autouse fixture removes DEADWAX_* variables
@@ -133,9 +140,9 @@ def assert_name_lookup(
     dossier: Dossier,
     identity: ArtistIdentity | LabelIdentity,
     mbid: IdKind,
+    *,
+    retrying: bool,
 ) -> None:
-    assert dossier.found
-    assert any(external.kind is mbid and external.value for external in identity.external_ids)
     assert ErrorKind.UNSUPPORTED not in {error.kind for error in dossier.errors}
     facts = [
         *dossier.tags,
@@ -160,6 +167,15 @@ def assert_name_lookup(
             assert fact.sources, fact
             assert all(source.source and source.url for source in fact.sources), fact
 
+    failures = failed_sources(dossier.errors)
+    has_mbid = any(external.kind is mbid and external.value for external in identity.external_ids)
+    if only_musicbrainz_503(failures) and (retrying or not dossier.found or not has_mbid):
+        raise MusicBrainzUnavailableError
+    assert dossier.found
+    assert has_mbid
+    if retrying:
+        assert not failures
+
 
 @pytest.mark.enable_socket
 @pytest.mark.timeout(120)
@@ -181,25 +197,35 @@ async def test_artist_lookup(
     text: str,
     kind: EntityKind | None,
     request: pytest.FixtureRequest,
-    live_report: list[str],
+    live_run: LiveRun,
 ) -> None:
     dossier = await lookup(parse_query(text, kind), live_config())
 
-    live_report.append(summary(request.node.callspec.id, dossier))
+    live_run.lines.append(summary(request.node.callspec.id, dossier))
     assert isinstance(dossier.identity, ArtistIdentity)
-    assert_name_lookup(dossier, dossier.identity, IdKind.MUSICBRAINZ_ARTIST)
+    assert_name_lookup(
+        dossier,
+        dossier.identity,
+        IdKind.MUSICBRAINZ_ARTIST,
+        retrying=live_run.retrying,
+    )
 
 
 @pytest.mark.enable_socket
 @pytest.mark.timeout(120)
 @pytest.mark.parametrize("name", ["Warp", "Hyperdub"], ids=["warp", "hyperdub"])
 @pytest.mark.asyncio
-async def test_label_lookup(name: str, live_report: list[str]) -> None:
+async def test_label_lookup(name: str, live_run: LiveRun) -> None:
     dossier = await lookup(parse_query(name, EntityKind.LABEL), live_config())
 
-    live_report.append(summary(name, dossier))
+    live_run.lines.append(summary(name, dossier))
     assert isinstance(dossier.identity, LabelIdentity)
-    assert_name_lookup(dossier, dossier.identity, IdKind.MUSICBRAINZ_LABEL)
+    assert_name_lookup(
+        dossier,
+        dossier.identity,
+        IdKind.MUSICBRAINZ_LABEL,
+        retrying=live_run.retrying,
+    )
 
 
 @pytest.mark.enable_socket
@@ -216,7 +242,14 @@ async def test_library_track(
     dossier = await lookup(query, live_config(), include=LIBRARY_SOURCES)
 
     live_report.append(summary(request.node.callspec.id, dossier))
-    assert [e for e in dossier.errors if e.kind is ErrorKind.FAILED] == []
+    assert_track_lookup(dossier, query)
+    failures = failed_sources(dossier.errors)
+    if only_musicbrainz_503(failures):
+        raise MusicBrainzUnavailableError
+    assert not failures
+
+
+def assert_track_lookup(dossier: Dossier, query: Query) -> None:
     facts = [*dossier.tags, *dossier.credits, *dossier.texts, *dossier.relations, *dossier.links]
     assert all(fact.sources for fact in facts)
     identity = dossier.identity

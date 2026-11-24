@@ -463,6 +463,35 @@ class AdapterError(_Model):
     access: SourceAccess | None = None
 
 
+class ReleaseTrack(Attributed):
+    """One track as listed on a specific release, with its linked recording."""
+
+    title: str
+    artist_credit: str | None = None
+    medium: int | None = None
+    position: str | None = None
+    ids: dict[IdKind, str] = {}
+    recording: Entity
+    isrcs: list[str] = []
+
+
+class WorkPerformance(Attributed):
+    """A recording linked to a work, with the source's relationship attributes."""
+
+    recording: Entity
+    version: VersionInfo
+    attributes: list[str] = []
+
+
+class CatalogExpansion[T](_Model):
+    """Entries sourced from one release or work, with coverage diagnostics."""
+
+    entity: Entity | None = None
+    items: list[T] = []
+    truncated: bool = False
+    errors: list[AdapterError] = []
+
+
 class CandidateLabel(_Model):
     """Label and catalog number as given by one source."""
 

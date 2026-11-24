@@ -4,7 +4,7 @@
 
 This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md). The v2 source scope, closed v2 stages (8–17, 19, 20, R-1–R-6, M-1–M-3), their evidence, the Stage 18 access attempts, and the v2 decision log are archived in [`plans/v2.md`](plans/v2.md).
 
-- **Status:** v1 and v2 complete; v0.1.0 is the first tagged release (2026-11-20, GitHub only, no PyPI). Stage 18 (Rate Your Music) deferred until RYM is accessible; Boomkat and Norman Records remain access-limited. Stages E-1 and E-2 are done. E-3 artist and label lookups and their six live scenarios are verified. Closing E-3 awaits a completed standard live suite.
+- **Status:** v1 and v2 complete; v0.1.0 is the first tagged release (2026-11-20, GitHub only, no PyPI). Stage 18 (Rate Your Music) deferred until RYM is accessible; Boomkat and Norman Records remain access-limited. Stages E-1 and E-2 are done. E-3 and the catalog transitions for Mixhound discovery stage 3 are done. Release and integration belong to Mixhound stage 4.
 - **Branch:** `main`. Agents never create commits on the user's behalf.
 - **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
 - Before code changes, read [`AGENTS.md`](AGENTS.md), the applicable guides in its [Read when table](AGENTS.md#read-when), `docs/architecture.md` (import rules R1–R9), and `CONTRIBUTING.md`. After code changes run `uv run poe check`. After docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
@@ -74,8 +74,9 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Sections of closed
 | 20 | Done (RYM blocked, Forced Exposure HTTP 403, Norman disabled by the local allowlist) | Qualification; release v0.1.0. |
 | E-1 | Done | Per-kind lookup slots (`Lookups`), dispatch by the kind known in each pass, `SourceInfo.kinds`. |
 | E-2 | Done | Typed queries per kind, a model for artists and labels, CLI `--artist` and `--label`. |
-| E-3 | In progress (standard live suite pending) | Artist and label lookups in MusicBrainz, Discogs, Last.fm, Wikipedia, and Bandcamp. Live invariants and documentation. |
+| E-3 | Done | Artist and label lookups in MusicBrainz, Discogs, Last.fm, Wikipedia, and Bandcamp. Live invariants and documentation. |
 | Cover lookup | Done | MusicBrainz and SecondHandSongs confirm unmarked cover performances. |
+| Catalog transitions | Done | Bounded release tracklists from MusicBrainz and Discogs, and performances by MusicBrainz Work ID. |
 
 Common acceptance for source stages (9–19, and source work in E-3), in addition to each stage's own:
 
@@ -347,3 +348,29 @@ Live Discogs-only checks passed for a release, an artist, and a label by ID with
 `uv run --no-sync poe check` passed with 1,300 tests and 96.99% branch coverage. The strict documentation build passed. The full `uv run --no-sync poe test-live` with `NO_PROXY=musicbrainz.org` ran all 29 scenarios in 5 minutes 22 seconds. All six name lookups, the Genius case and the three previous MusicBrainz failures passed. The run passed 26 and failed three because MusicBrainz returned HTTP 503 for `codeine_promise_of_love`, `spiritualized_shine_a_light`, and `jeff_buckley_sky_blue_skin`. E-3 remains open pending a successful standard live run.
 
 **Suggested message:** `refactor(sources): use only the Discogs API`.
+
+
+### 2026-11-25 — E-3 live qualification complete
+
+The live suite queues a scenario when MusicBrainz HTTP 503 after HTTP retries is the sole cause of its failure. It finishes the first pass, waits 30 seconds once, and repeats queued scenarios serially in their original order. The report shows both attempts. A failed second attempt or an independent first-pass failure fails the suite. The corpus and production HTTP handling are unchanged.
+
+`uv run poe check` passed with 1,300 tests and 96.99% branch-enabled coverage. The strict documentation build and `git diff --check` passed. Simulated reports verified the delay and order, recovery, a second 503, other failures, and a first pass with no eligible scenarios.
+
+`NO_PROXY=musicbrainz.org uv run poe test-live` passed all 29 scenarios in 338.77 seconds, including the six artist and label scenarios and Genius. All passed on the first attempt.
+
+**Suggested message:** `test: retry live scenarios after MusicBrainz 503 responses`.
+
+
+### 2026-11-25 — Mixhound discovery stage 3 catalog transitions
+
+`Deadwax.release_tracklist()` lists tracks on a specific MusicBrainz or Discogs release. It preserves track titles, positions, credits, and provenance. MusicBrainz keeps release-track IDs separate from recording IDs and returns available ISRCs. Discogs preserves index parts and uses the enclosing credit when a track has no credit of its own.
+
+`Deadwax.work_performances()` takes a MusicBrainz Work ID and returns recordings with their version details and source relationship attributes, including explicit covers. The two opt-in methods default to 50 entries and cap requests at 100. Both report truncation and carry the existing source diagnostics, including missing or incomplete coverage.
+
+`uv run poe check` passed with 1,306 tests and 96.99% branch-enabled coverage. Ruff, all 16 import contracts, mypy, the strict docs build, and `git diff --check` passed. Fixture checks covered positions, credits, identifiers, work and recording separation, limits, and coverage diagnostics.
+
+Uncached live checks with `NO_PROXY=musicbrainz.org` passed on MusicBrainz release `3c8cbdc8-555f-3987-8f03-6baf9488d1b0` and Discogs release `4950798` for *OK Computer*. The calls returned the first three tracks as requested, with positions 1–3 and A1–A3 respectively. MusicBrainz Work `2be60b42-e477-3d91-b31f-a61a00780158` (*Song to the Siren*) returned 15 performances at the requested limit, including 11 with explicit cover attributes. All three calls reported truncation and no source errors.
+
+The Deadwax release and Mixhound dependency update remain for stage 4.
+
+**Suggested message:** `feat(sources): enumerate release tracks and work performances`.

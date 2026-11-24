@@ -32,6 +32,7 @@ class IdKind(StrEnum):
     """Namespace of an external identifier."""
 
     MUSICBRAINZ_RECORDING = "musicbrainz_recording"
+    MUSICBRAINZ_TRACK = "musicbrainz_track"
     MUSICBRAINZ_RELEASE = "musicbrainz_release"
     MUSICBRAINZ_RELEASE_GROUP = "musicbrainz_release_group"
     MUSICBRAINZ_ARTIST = "musicbrainz_artist"

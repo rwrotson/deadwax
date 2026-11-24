@@ -45,6 +45,11 @@ print(dossier.model_dump_json(indent=2))
 
 An application that looks up many records keeps one `Deadwax` client, which shares the cache, rate limits, and browsers across concurrent lookups, and asks for facets with a `Request`; see [Requests](https://rwrotson.github.io/deadwax/requests/).
 
+Use `Deadwax.release_tracklist()` to list tracks on a specific MusicBrainz or
+Discogs release, and `Deadwax.work_performances()` to list performances by
+MusicBrainz Work ID. Both calls accept a result limit and return provenance and
+source diagnostics. [Catalog transitions](https://rwrotson.github.io/deadwax/requests/#catalog-transitions)
+
 ## Installation
 
 | Install | Adds |

@@ -59,3 +59,35 @@ async with Deadwax(LookupConfig(...)) as client:
 `Deadwax` opens the response cache, the per-host rate limiters, and the shared browsers once, and closes them on exit. Lookups may run concurrently: they share the rate limiters, so MusicBrainz is asked at most once a second across all of them. Adapters and their HTTP clients are built for each lookup, so state that belongs to one lookup (access tokens, escalation level, headed browser fallback of a source) does not leak into the next. `client.lookup()` accepts a `Request` or a bare `Query` (all facets), and `include`/`exclude` like `deadwax.lookup()`.
 
 `deadwax.lookup(query_or_request, config, include=..., exclude=..., transport=...)` opens a client for one call.
+
+
+## Catalog transitions
+
+Call these methods explicitly to follow a catalog lead from a known identifier.
+Each call uses one source and the existing cache, rate limits and diagnostics.
+
+```python
+from deadwax import Deadwax, IdKind
+
+async with Deadwax() as client:
+    tracks = await client.release_tracklist(IdKind.MUSICBRAINZ_RELEASE, release_id, limit=20)
+    discogs_tracks = await client.release_tracklist(IdKind.DISCOGS_RELEASE, discogs_release_id)
+    performances = await client.work_performances(work_id, limit=20)
+```
+
+`release_tracklist()` takes the ID of a specific edition. MusicBrainz returns
+medium and printed track positions, track titles and credits, separate release
+track and recording IDs, and ISRCs when provided. Discogs returns positions and
+credited names, including the parts of index tracks. When Discogs gives no
+track-specific credit, the enclosing credit applies. Discogs entries carry the
+release URL as provenance. [MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API) and [Discogs tracklist guidelines](https://support.discogs.com/hc/en-us/articles/360005055373-Database-Guidelines-12-Tracklisting).
+
+`work_performances()` takes a MusicBrainz Work ID. The result has a work identity
+and entries with their own recording IDs, titles, artists, version details, and
+relationship attributes such as `cover` and `live`. A blank attribute list
+reflects the source relationship.
+
+Both methods return a `CatalogExpansion` with the looked-up `entity`, the ordered
+`items`, a `truncated` flag for the requested limit, and source `errors`.
+The limit defaults to 50 and accepts values from 1 through 100. If coverage is
+missing, inspect `errors` even when the release or work identity is present.

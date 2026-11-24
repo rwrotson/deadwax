@@ -8,6 +8,7 @@ from deadwax.core import (
     AdapterError,
     ArtistQuery,
     Capability,
+    CatalogExpansion,
     EntityKind,
     EntityType,
     ErrorKind,
@@ -24,6 +25,7 @@ from deadwax.core import (
     RecordCandidate,
     RecordKey,
     Relation,
+    ReleaseTrack,
     Scope,
     SourceError,
     SourceGroup,
@@ -31,6 +33,7 @@ from deadwax.core import (
     TrackQuery,
     VersionInfo,
     VersionKind,
+    WorkPerformance,
     parse_title,
     trace,
 )
@@ -140,6 +143,24 @@ class MusicBrainzAdapter(HttpAdapter):
             label=self.find_label,
             unresolved=self.find,
         )
+
+    async def release_tracklist(
+        self, release_id: str, limit: int
+    ) -> CatalogExpansion[ReleaseTrack]:
+        """Read the tracklist of the requested release edition."""
+        release = await self._get(
+            models.Release,
+            f"release/{release_id}",
+            inc="recordings+artist-credits+isrcs",
+        )
+        return p.release_tracklist(release, limit)
+
+    async def work_performances(
+        self, work_id: str, limit: int
+    ) -> CatalogExpansion[WorkPerformance]:
+        """Read the recording relationships of the requested work."""
+        work = await self._get(models.Work, f"work/{work_id}", inc="recording-rels+artist-credits")
+        return p.work_performances(work, limit)
 
     async def find_artist(self, query: ArtistQuery, context: LookupContext) -> Partial:
         """Find the artist and collect their tags, aliases, relations, releases, and links."""

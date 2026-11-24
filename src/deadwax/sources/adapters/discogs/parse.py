@@ -1,15 +1,19 @@
 import logging
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
+from itertools import islice
 from urllib.parse import urlsplit
 
 from deadwax.core import (
+    AdapterError,
     ArtistCandidate,
     CandidateLabel,
+    CatalogExpansion,
     Credit,
     Entity,
     EntityKind,
     EntityType,
+    ErrorKind,
     IdKind,
     LabelCandidate,
     Link,
@@ -20,6 +24,7 @@ from deadwax.core import (
     RecordKey,
     Relation,
     RelationKind,
+    ReleaseTrack,
     Scope,
     Tag,
     TagKind,
@@ -76,6 +81,57 @@ def credit_name(artists: Sequence[models.ArtistCredit]) -> str:
             join = artist.join.strip() or ","
             parts.append(f" {join} " if join != "," else ", ")
     return "".join(parts)
+
+
+def _track_entries(
+    tracks: Sequence[models.Track],
+    artists: Sequence[models.ArtistCredit],
+) -> Iterator[tuple[models.Track, Sequence[models.ArtistCredit]]]:
+    for track in tracks:
+        credited = track.artists or artists
+        if track.sub_tracks:
+            yield from _track_entries(track.sub_tracks, credited)
+        elif track.type_ == "track":
+            yield track, credited
+
+
+def release_tracklist(release: models.Release, limit: int) -> CatalogExpansion[ReleaseTrack]:
+    """Read playable track entries, including the parts of index tracks."""
+    url = page("release", release.id)
+    entity = Entity(
+        type=EntityType.RELEASE,
+        name=release.title,
+        url=url,
+        ids={IdKind.DISCOGS_RELEASE: str(release.id)},
+    )
+    items = []
+    entries = _track_entries(release.tracklist, release.artists)
+    for track, artists in islice(entries, limit + 1):
+        credit = credit_name(artists) or None
+        items.append(
+            ReleaseTrack(
+                title=track.title,
+                artist_credit=credit,
+                position=track.position or None,
+                recording=Entity(type=EntityType.RECORDING, name=track.title, artist=credit),
+                sources=[Provenance(source=SOURCE, url=url)],
+            )
+        )
+    errors = (
+        []
+        if items
+        else [
+            AdapterError(
+                source=SOURCE, kind=ErrorKind.NOT_FOUND, reason="no release tracklist", url=url
+            )
+        ]
+    )
+    return CatalogExpansion[ReleaseTrack](
+        entity=entity,
+        items=items[:limit],
+        truncated=len(items) > limit,
+        errors=errors,
+    )
 
 
 def tags(genres: Iterable[str], styles: Iterable[str], scope: Scope, url: str | None) -> list[Tag]:

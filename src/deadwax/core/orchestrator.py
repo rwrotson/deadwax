@@ -2,7 +2,7 @@ import asyncio
 import contextlib
 import logging
 import time
-from collections.abc import Callable, Collection, Sequence
+from collections.abc import Awaitable, Callable, Collection, Sequence
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -43,11 +43,6 @@ _ERROR_KINDS: tuple[tuple[type[SourceError], ErrorKind], ...] = (
 
 def _now() -> datetime:
     return datetime.now(UTC)
-
-
-def _failure(adapter: Adapter, kind: ErrorKind, reason: str, url: str | None = None) -> Partial:
-    error = AdapterError(source=adapter.name, kind=kind, reason=reason, url=url)
-    return Partial(source=adapter.name, errors=[error])
 
 
 def _milliseconds(start: float) -> int:
@@ -106,17 +101,33 @@ async def _timed(
     context: LookupContext,
     seconds: float,
 ) -> Partial:
+    result = await run_source(adapter.name, lambda: lookup(context), seconds)
+    if isinstance(result, AdapterError):
+        return Partial(source=adapter.name, errors=[result])
+    return result
+
+
+async def run_source[T](
+    source: str,
+    call: Callable[[], Awaitable[T]],
+    seconds: float,
+) -> T | AdapterError:
+    """Run one source operation within its deadline and capture source diagnostics."""
     try:
         async with adapter_deadline(seconds):
-            return await lookup(context)
+            return await call()
     except TimeoutError:
-        return _failure(adapter, ErrorKind.TIMEOUT, f"no answer within {seconds:g} s")
+        return AdapterError(
+            source=source, kind=ErrorKind.TIMEOUT, reason=f"no answer within {seconds:g} s"
+        )
     except SourceError as error:
         kind = next((k for cls, k in _ERROR_KINDS if isinstance(error, cls)), ErrorKind.FAILED)
-        return _failure(adapter, kind, str(error), error.url)
+        return AdapterError(source=source, kind=kind, reason=str(error), url=error.url)
     except Exception as error:
-        logger.warning("%s failed", adapter.name, exc_info=True)
-        return _failure(adapter, ErrorKind.FAILED, f"{type(error).__name__}: {error}")
+        logger.warning("%s failed", source, exc_info=True)
+        return AdapterError(
+            source=source, kind=ErrorKind.FAILED, reason=f"{type(error).__name__}: {error}"
+        )
 
 
 class LookupOptions(BaseModel):

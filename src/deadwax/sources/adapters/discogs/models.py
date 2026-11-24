@@ -49,6 +49,7 @@ class Track(ApiModel):
     title: str
     artists: list[ArtistCredit] = []
     extraartists: list[ArtistCredit] = []
+    sub_tracks: list[Track] = []
 
 
 class Master(ApiModel):

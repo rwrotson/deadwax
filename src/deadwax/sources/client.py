@@ -1,21 +1,41 @@
-from collections.abc import Collection
+from collections.abc import Awaitable, Callable, Collection
 from types import TracebackType
 from typing import Self
+from uuid import UUID
 
 import httpx
 
 from deadwax.core import (
+    AdapterError,
+    CatalogExpansion,
     Dossier,
     ErrorKind,
+    IdKind,
+    InvalidQueryError,
     LookupOptions,
     Query,
+    ReleaseTrack,
     Request,
+    WorkPerformance,
     run,
+    run_source,
     trim,
 )
+from deadwax.sources._adapter import HttpAdapter
 from deadwax.sources._http import HttpResources, ResponseCache, open_cache
+from deadwax.sources.adapters.discogs import DiscogsAdapter
+from deadwax.sources.adapters.musicbrainz import MusicBrainzAdapter
 from deadwax.sources.config import LookupConfig
 from deadwax.sources.registry import build_adapters
+
+_MAX_CATALOG_ITEMS = 100
+
+
+def _mbid(value: str) -> str:
+    try:
+        return str(UUID(value))
+    except ValueError as error:
+        raise InvalidQueryError("expected a MusicBrainz UUID") from error
 
 
 class Deadwax:
@@ -57,6 +77,79 @@ class Deadwax:
             await resources.sessions.aclose()
         if cache is not None:
             cache.close()
+
+    def _catalog_resources(self, limit: int) -> HttpResources:
+        if self._resources is None:
+            raise RuntimeError("the client is not open; use 'async with Deadwax(...)'")
+        if type(limit) is not int or not 1 <= limit <= _MAX_CATALOG_ITEMS:
+            raise InvalidQueryError(f"catalog limit must be between 1 and {_MAX_CATALOG_ITEMS}")
+        return self._resources
+
+    async def _expand_catalog[T](
+        self,
+        adapter: HttpAdapter,
+        result_type: type[CatalogExpansion[T]],
+        call: Callable[[], Awaitable[CatalogExpansion[T]]],
+    ) -> CatalogExpansion[T]:
+        status = adapter.status()
+        if not status.ready:
+            error = AdapterError(
+                source=adapter.name, kind=ErrorKind.SKIPPED, reason=status.detail or status.state
+            )
+            return result_type(errors=[error])
+        try:
+            result = await run_source(adapter.name, call, self._config.adapter_timeout)
+        finally:
+            await adapter.aclose()
+        if isinstance(result, AdapterError):
+            if result.kind is ErrorKind.BLOCKED:
+                result = result.model_copy(update={"access": adapter.access()})
+            return result_type(errors=[result])
+        return result
+
+    async def release_tracklist(
+        self,
+        kind: IdKind,
+        release_id: str,
+        *,
+        limit: int = 50,
+    ) -> CatalogExpansion[ReleaseTrack]:
+        """List up to 100 tracks from a specific MusicBrainz or Discogs release edition."""
+        resources = self._catalog_resources(limit)
+        if kind is IdKind.MUSICBRAINZ_RELEASE:
+            mbid = _mbid(release_id)
+            musicbrainz = MusicBrainzAdapter(self._config, resources)
+            return await self._expand_catalog(
+                musicbrainz,
+                CatalogExpansion[ReleaseTrack],
+                lambda: musicbrainz.release_tracklist(mbid, limit),
+            )
+        if kind is IdKind.DISCOGS_RELEASE:
+            if not release_id.isascii() or not release_id.isdecimal() or not release_id.strip("0"):
+                raise InvalidQueryError("expected a positive Discogs release ID")
+            discogs = DiscogsAdapter(self._config, resources)
+            return await self._expand_catalog(
+                discogs,
+                CatalogExpansion[ReleaseTrack],
+                lambda: discogs.release_tracklist(release_id, limit),
+            )
+        raise InvalidQueryError("expected a MusicBrainz release ID or Discogs release ID")
+
+    async def work_performances(
+        self,
+        work_id: str,
+        *,
+        limit: int = 50,
+    ) -> CatalogExpansion[WorkPerformance]:
+        """List up to 100 recording performances associated with a MusicBrainz Work ID."""
+        resources = self._catalog_resources(limit)
+        mbid = _mbid(work_id)
+        musicbrainz = MusicBrainzAdapter(self._config, resources)
+        return await self._expand_catalog(
+            musicbrainz,
+            CatalogExpansion[WorkPerformance],
+            lambda: musicbrainz.work_performances(mbid, limit),
+        )
 
     async def lookup(
         self,
