@@ -317,3 +317,13 @@ Explicit cover queries can now resolve unmarked performances at MusicBrainz and 
 Checks passed: `poe check` (1303 tests, 97.00% coverage), strict documentation build, and `git diff --check`. The adapter tests use mocked source responses. Live source lookups were skipped.
 
 **Suggested message:** `fix(sources): resolve covers from documented performance relations`.
+
+### 2026-11-25 — E-3 live qualification retry
+
+The standard `uv run --no-sync poe test-live` passed the six artist and label cases before failing in the track corpus. The repeat with `NO_PROXY=musicbrainz.org` passed those six cases and the first two track cases, Oren Ambarchi and Hainbach. It was stopped after three failures, with 18 cases outstanding. Discogs reviews for `deadbeat_blue_moon` reached the visible Patchright challenge on release 13543192 and later raised a Nodriver `AttributeError` because the tab had no browser attribute. MusicBrainz returned HTTP 503 for `open_yellow_circle` and `jason_gibbs_starlings`.
+
+The same three cover regression cases passed on `9424f37` and failed on v0.2.0 (`2cea710`). Live SecondHandSongs resolved Johnny Cash's *Hurt* and This Mortal Coil's *Song to the Siren* as covers only on the current revision. Both revisions rejected the Nine Inch Nails original as a cover. Current MusicBrainz resolved the This Mortal Coil cover in one run. HTTP 503 prevented a matched comparison across the MusicBrainz cases.
+
+`uv run --no-sync poe check` passed on `9424f37` with 1,303 tests and 97.00% branch coverage. The strict documentation build passed. E-3 still awaits a successful standard live suite. Release tracklists and work performances remain pending.
+
+**Suggested message:** `docs: record E-3 live qualification results`.
