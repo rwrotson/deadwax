@@ -47,6 +47,7 @@ The README lists deferred sources and those deadwax will not use.
 - **Pass:** identity.
 - **Finds the record by:** MusicBrainz IDs in the query; any URL through `ws/2/url`; the query's ISRC (`ws/2/isrc`, ranked through the matching gate); or a search. Track searches look at official album, EP and single releases first, then a plain search, then the base title. DJ-mix excerpts and videos are excluded.
 - **Contributes:** artist, title, version, date, ISRCs, labels and catalog numbers, barcode; credits (producer, engineer, instruments, vocals, remixer, writers from the work); tags and genres with vote weights; members and projects of the first credited artist, and its other artist relations (is person, collaboration, supporting musicians, subgroup, founder, rename, tribute, producer) as `associated` with the type in the note; covers, remixes, samples, mixes, appearances on releases and compilations; streaming and shop links; Discogs, Wikidata and Bandcamp IDs.
+- **Covers:** a track query ending in `(cover)` can match a base-title recording when its MusicBrainz performance relation marks it as a cover. Deadwax checks up to three base-title candidates. A sourced `cover_of` link comes from the recording response and survives a failed work-detail lookup.
 - **Artists and labels:** found by MusicBrainz IDs from the query or an earlier pass, a URL through `ws/2/url`, or a name search ranked through the matching gate. Contributes name, disambiguation, type, country, begin and end dates, Discogs and Wikidata IDs; tags and genres; aliases without search hints as `alias`; for an artist, members, projects and other artist relations, labels with a recording contract as `label`, and up to 25 official albums and EPs without secondary types as `release`; for a label, owners and imprints as `parent_label` and `sublabel`, and founders and signed artists as `associated`; streaming and shop links of the artist or label.
 - **Limits:** the public server answers "503 server busy" under load. Retries use `http.retry_base` and usually recover.
 
@@ -119,6 +120,7 @@ The README lists deferred sources and those deadwax will not use.
 - **Finds the record by:** a performance search by title and performer, through the matching gate. Songs only: it does not run for an album.
 - **Contributes:** the performance's first release date; writers of the work as `writer` credits; for an original, its covers as `covered_by`; for a cover, the work and the dated original as `cover_of`; for a later recording by the original artist, the first performance as `other_version` and that performance's covers; adaptations (translations, new lyrics) as `cover_of` or `covered_by` works with the note `adaptation`.
 - **Limits:** without a key the API allows about 10–20 requests a minute; the default rate is 0.25 per second. Covers carry no dates, which would take one request per cover.
+- **Covers:** a track query ending in `(cover)` searches the base title and checks up to three matching performances for a documented original by a different credited performer.
 
 ## KEXP
 

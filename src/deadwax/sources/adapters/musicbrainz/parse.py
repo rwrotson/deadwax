@@ -466,6 +466,29 @@ def artist_relations(artist: models.Artist) -> list[Relation]:
     return result
 
 
+def cover_relations(recording: models.Recording) -> list[Relation]:
+    """Read cover links directly from the recording's performance relationships."""
+    sources = [Provenance(source=SOURCE, url=page("recording", recording.id))]
+    return [
+        Relation(
+            kind=RelationKind.COVER_OF,
+            target=Entity(
+                type=EntityType.WORK,
+                name=work.title,
+                url=page("work", work.id),
+                ids={IdKind.MUSICBRAINZ_WORK: work.id},
+            ),
+            scope=Scope.WORK,
+            note="the song this recording performs",
+            sources=sources,
+        )
+        for relation in recording.relations
+        if relation.type == "performance"
+        and "cover" in relation.attributes
+        and (work := relation.work) is not None
+    ]
+
+
 def work_relations(
     work: models.Work,
     recording_id: str,

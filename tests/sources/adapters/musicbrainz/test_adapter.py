@@ -15,6 +15,7 @@ from deadwax.core import (
     Query,
     RecordCandidate,
     RecordIdentity,
+    RelationKind,
     Sourced,
     VersionKind,
 )
@@ -286,3 +287,55 @@ async def test_artist_relations_are_not_read_without_the_relations_facet() -> No
 
     assert partial.candidate is not None
     assert partial.relations == []
+
+
+COVER_WORK = {"id": MBID.format(8), "title": "Original Song"}
+COVER_RECORDING = {
+    **RECORDING,
+    "id": MBID.format(7),
+    "relations": [
+        {"type": "performance", "target-type": "work", "attributes": ["cover"], "work": COVER_WORK},
+    ],
+}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("title", ["Missing", "Missing (cover)"])
+async def test_cover_link_survives_missing_work_details(title: str) -> None:
+    query = parse_query(f"Everything but the Girl - {title}", EntityKind.TRACK)
+    routes = {
+        "recording": {"recordings": [COVER_RECORDING]},
+        f"recording/{COVER_RECORDING['id']}": COVER_RECORDING,
+        **artist_route(),
+    }
+
+    partial = await lookup(query, routes)
+
+    assert isinstance(partial.candidate, RecordCandidate)
+    assert partial.candidate.title == "Missing"
+    assert partial.candidate.version is not None
+    assert partial.candidate.version.kind is (
+        VersionKind.COVER if "(cover)" in title else VersionKind.ORIGINAL
+    )
+    (cover,) = [
+        relation for relation in partial.relations if relation.kind is RelationKind.COVER_OF
+    ]
+    assert cover.target.ids == {IdKind.MUSICBRAINZ_WORK: COVER_WORK["id"]}
+    assert cover.sources == [
+        Provenance(
+            source="musicbrainz", url=f"https://musicbrainz.org/recording/{COVER_RECORDING['id']}"
+        ),
+    ]
+    assert partial.errors[0].url == f"https://musicbrainz.org/work/{COVER_WORK['id']}"
+
+
+@pytest.mark.asyncio
+async def test_unmarked_original_does_not_answer_cover_query() -> None:
+    query = parse_query("Everything but the Girl - Missing (cover)", EntityKind.TRACK)
+    routes = {
+        "recording": {"recordings": [REMIX, RECORDING, COVER_RECORDING]},
+        f"recording/{RECORDING['id']}": RECORDING,
+    }
+
+    with pytest.raises(NotFoundError, match="no matching record"):
+        await lookup(query, routes)

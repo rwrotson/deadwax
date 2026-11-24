@@ -11,14 +11,17 @@ from deadwax.core import (
     Query,
     RecordKey,
     SourceGroup,
+    VersionKind,
+    parse_title,
 )
 from deadwax.sources._adapter import HttpAdapter
-from deadwax.sources._search import pick_hit, search_key
+from deadwax.sources._search import SearchHit, pick_hit, search_key
 from deadwax.sources.adapters.secondhandsongs import models
 from deadwax.sources.adapters.secondhandsongs import parse as p
 
 API = "https://api.secondhandsongs.com"
 COVERS = 50
+COVER_CANDIDATES = 3
 
 
 class SecondHandSongsAdapter(HttpAdapter):
@@ -47,7 +50,8 @@ class SecondHandSongsAdapter(HttpAdapter):
         if key is None:
             raise NotFoundError("neither the query nor earlier sources name the record")
 
-        performance = await self._get(models.Performance, await self._find(key))
+        cover = key.resolved_version.kind is VersionKind.COVER
+        performance = await self._cover_performance(key) if cover else await self._find(key)
         relations = (
             p.covers(performance, COVERS)
             if performance.is_original
@@ -60,7 +64,7 @@ class SecondHandSongsAdapter(HttpAdapter):
             relations += p.adaptations(work)
         return Partial(
             source=self.name,
-            candidate=p.candidate(performance),
+            candidate=p.candidate(performance, cover=cover),
             credits=writers,
             relations=relations,
         )
@@ -69,16 +73,39 @@ class SecondHandSongsAdapter(HttpAdapter):
         response = await self.client.get(url)
         return model.model_validate_json(response.content)
 
-    async def _find(self, key: RecordKey) -> str:
+    async def _search(self, key: RecordKey) -> list[SearchHit]:
         results = await self.client.get(
             f"{API}/search/performance",
             params={"title": key.title, "performer": key.artist},
         )
-        hits = p.search_hits(models.SearchResults.model_validate_json(results.content))
-        hit = pick_hit(key, hits)
+        return p.search_hits(models.SearchResults.model_validate_json(results.content))
+
+    async def _find(self, key: RecordKey) -> models.Performance:
+        hit = pick_hit(key, await self._search(key))
         if hit is None:
-            raise NotFoundError("no matching SecondHandSongs performance", url=results.url)
-        return hit.url
+            raise NotFoundError(
+                "no matching SecondHandSongs performance", url=f"{API}/search/performance"
+            )
+        return await self._get(models.Performance, hit.url)
+
+    async def _cover_performance(self, key: RecordKey) -> models.Performance:
+        base = RecordKey(key.artist, parse_title(key.title).base, key.kind)
+        hits = await self._search(base)
+        allowed = dict.fromkeys(
+            hit.url for hit in hits if p.cover_identity_matches(base, key, hit.key)
+        )
+        for url in list(allowed)[:COVER_CANDIDATES]:
+            try:
+                performance = await self._get(models.Performance, url)
+            except NotFoundError:
+                continue
+            found = p.candidate(performance)
+            candidate = RecordKey(found.artist, found.title, found.kind)
+            if p.cover_identity_matches(base, key, candidate) and p.has_original_artist(
+                performance
+            ):
+                return performance
+        raise NotFoundError("no confirmed SecondHandSongs cover", url=f"{API}/search/performance")
 
     async def _originals(self, performance: models.Performance) -> dict[str, models.Performance]:
         """Original performances of the works a non-original performance performs, by URI."""

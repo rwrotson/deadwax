@@ -2,11 +2,15 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from pydantic import ValidationError
+
 from deadwax.core import (
+    AdapterError,
     ArtistQuery,
     Capability,
     EntityKind,
     EntityType,
+    ErrorKind,
     IdKind,
     LabelQuery,
     LinkTarget,
@@ -21,8 +25,12 @@ from deadwax.core import (
     RecordKey,
     Relation,
     Scope,
+    SourceError,
     SourceGroup,
     TraceEvent,
+    TrackQuery,
+    VersionInfo,
+    VersionKind,
     parse_title,
     trace,
 )
@@ -47,6 +55,7 @@ _NAME_URL_INC = "artist-rels+label-rels"
 _NAME_SEARCH_LIMIT = "25"
 _BROWSE_LIMIT = "100"
 _SEARCH_LIMIT = "100"
+_COVER_CANDIDATES = 3
 _MAIN_RELEASES = "status:official AND primarytype:(album OR single OR ep)"
 
 # Identifiers that name a MusicBrainz entity, or a URL only MusicBrainz maps without a key.
@@ -92,7 +101,7 @@ class _TrackSources:
     release: models.Release | None
     group: models.ReleaseGroup | None
     work: models.Work | None
-    is_cover: bool
+    errors: list[AdapterError]
     artist_relations: list[Relation]
 
 
@@ -241,15 +250,28 @@ class MusicBrainzAdapter(HttpAdapter):
 
     async def find(self, query: Query, context: LookupContext) -> Partial:
         """Find the recording or release group and collect what MusicBrainz knows about it."""
+        cover = (
+            isinstance(query, TrackQuery)
+            and query.title is not None
+            and parse_title(query.title).version.kind is VersionKind.COVER
+        )
         target = await self._find_by_ids(query)
         if target is None:
             target = await self._find_by_text(query, context)
         if target is None:
+            reference = search_key(query, context)
+            if cover and reference is not None:
+                recording = await self._search_cover(reference)
+                if recording is not None:
+                    return self._track_partial(
+                        await self._track_sources(recording, context), cover=True
+                    )
             raise NotFoundError("no matching record in MusicBrainz")
 
         kind, mbid = target
         if kind is EntityKind.TRACK:
-            return self._track_partial(await self._track_sources(mbid, context))
+            recording = await self._get(models.Recording, f"recording/{mbid}", inc=_RECORDING_INC)
+            return self._track_partial(await self._track_sources(recording, context), cover=cover)
         return await self._album(mbid, context)
 
     async def _find_by_ids(self, query: Query) -> Target | None:
@@ -329,6 +351,23 @@ class MusicBrainzAdapter(HttpAdapter):
                     return EntityKind.TRACK, ranked[0].id
         return None
 
+    async def _search_cover(self, reference: RecordKey) -> models.Recording | None:
+        base = RecordKey(reference.artist, parse_title(reference.title).base, reference.kind)
+        query = f"recording:{p.phrase(base.title)} AND artist:{p.phrase(base.artist)}"
+        found = await self._search_recordings(query)
+        for match in p.rank_recordings(base, found.recordings)[:_COVER_CANDIDATES]:
+            try:
+                recording = await self._get(
+                    models.Recording,
+                    f"recording/{match.id}",
+                    inc=_RECORDING_INC,
+                )
+            except NotFoundError:
+                continue
+            if p.rank_recordings(base, [recording]) and p.cover_relations(recording):
+                return recording
+        return None
+
     async def _search_album(self, reference: RecordKey) -> Target | None:
         title, artist = p.phrase(reference.title), p.phrase(reference.artist)
         query = f"releasegroup:{title} AND artist:{artist}"
@@ -356,8 +395,11 @@ class MusicBrainzAdapter(HttpAdapter):
         )
         return p.artist_relations(artist)
 
-    async def _track_sources(self, mbid: str, context: LookupContext) -> _TrackSources:
-        recording = await self._get(models.Recording, f"recording/{mbid}", inc=_RECORDING_INC)
+    async def _track_sources(
+        self,
+        recording: models.Recording,
+        context: LookupContext,
+    ) -> _TrackSources:
         main = p.first_release(recording.releases)
         release = group = work = None
         if main is not None:
@@ -370,19 +412,33 @@ class MusicBrainzAdapter(HttpAdapter):
             (r for r in recording.relations if r.type == "performance" and r.work is not None),
             None,
         )
+        errors: list[AdapterError] = []
         if performance is not None and performance.work is not None:
-            work = await self._get(models.Work, f"work/{performance.work.id}", inc=_WORK_INC)
+            path = f"work/{performance.work.id}"
+            try:
+                work = await self._get(models.Work, path, inc=_WORK_INC)
+            except (SourceError, ValidationError) as error:
+                if not p.cover_relations(recording):
+                    raise
+                errors.append(
+                    AdapterError(
+                        source=self.name,
+                        kind=ErrorKind.FAILED,
+                        reason=str(error),
+                        url=p.page("work", performance.work.id),
+                    ),
+                )
 
         return _TrackSources(
             recording=recording,
             release=release,
             group=group,
             work=work,
-            is_cover=performance is not None and "cover" in performance.attributes,
+            errors=errors,
             artist_relations=await self._artist_relations(recording.artist_credit, context),
         )
 
-    def _track_partial(self, found: _TrackSources) -> Partial:
+    def _track_partial(self, found: _TrackSources, *, cover: bool) -> Partial:
         recording, release, group, work = found.recording, found.release, found.group, found.work
         url = p.page("recording", recording.id)
         people = p.artist_credits(recording.relations, Scope.RECORDING, url)
@@ -390,7 +446,9 @@ class MusicBrainzAdapter(HttpAdapter):
         links = p.links(recording.relations, LinkTarget.TRACK, url)
         review_links = p.review_links(recording.relations, url)
 
+        covers = p.cover_relations(recording)
         relations = [
+            *covers,
             *p.recording_relations(recording.relations, Scope.RECORDING, url),
             *p.appearances(recording.releases, None, url),
             *found.artist_relations,
@@ -401,7 +459,8 @@ class MusicBrainzAdapter(HttpAdapter):
         if work is not None:
             people += p.artist_credits(work.relations, Scope.WORK, p.page("work", work.id))
             version = p.recording_version(recording.title, recording.disambiguation)
-            relations += p.work_relations(work, recording.id, version, found.is_cover)
+            if not covers:
+                relations += p.work_relations(work, recording.id, version, is_cover=False)
         if group is not None:
             group_url = p.page("release-group", group.id)
             tags += p.tags(group.tags, group.genres, Scope.RELEASE_GROUP, group_url)
@@ -410,7 +469,8 @@ class MusicBrainzAdapter(HttpAdapter):
 
         return Partial(
             source=self.name,
-            candidate=_track_candidate(found),
+            candidate=_track_candidate(found, cover=cover and bool(covers)),
+            errors=found.errors,
             tags=tags,
             credits=people,
             relations=relations,
@@ -449,7 +509,7 @@ class MusicBrainzAdapter(HttpAdapter):
         )
 
 
-def _track_candidate(found: _TrackSources) -> RecordCandidate:
+def _track_candidate(found: _TrackSources, *, cover: bool) -> RecordCandidate:
     """Describe a recording; release IDs are its first release's, the Wikidata ID the song's."""
     recording = found.recording
     ids: dict[IdKind, str] = {IdKind.MUSICBRAINZ_RECORDING: recording.id}
@@ -465,11 +525,14 @@ def _track_candidate(found: _TrackSources) -> RecordCandidate:
         ids[IdKind.MUSICBRAINZ_WORK] = found.work.id
         ids.update(p.url_ids(found.work.relations))
 
+    version = p.recording_version(recording.title, recording.disambiguation)
+    if cover and version.kind is VersionKind.ORIGINAL:
+        version = VersionInfo(kind=VersionKind.COVER)
     return RecordCandidate(
         kind=EntityKind.TRACK,
         artist=p.credit_name(recording.artist_credit),
         title=recording.title,
-        version=p.recording_version(recording.title, recording.disambiguation),
+        version=version,
         date=recording.first_release_date,
         labels=p.labels(found.release) if found.release is not None else [],
         isrcs=recording.isrcs,

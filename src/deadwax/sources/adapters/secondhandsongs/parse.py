@@ -12,6 +12,8 @@ from deadwax.core import (
     RelationKind,
     Scope,
     Verdict,
+    VersionInfo,
+    VersionKind,
     compare,
 )
 from deadwax.sources._search import SearchHit
@@ -44,12 +46,13 @@ def search_hits(results: models.SearchResults) -> list[SearchHit]:
     ]
 
 
-def candidate(performance: models.Performance) -> RecordCandidate:
+def candidate(performance: models.Performance, *, cover: bool = False) -> RecordCandidate:
     """Describe a performance; its date is the first release's when known."""
     return RecordCandidate(
         kind=EntityKind.TRACK,
         artist=_performer(performance) or "",
         title=performance.title,
+        version=VersionInfo(kind=VersionKind.COVER) if cover else None,
         date=performance.first_release_date or performance.date,
         url=website(performance.uri),
     )
@@ -99,6 +102,25 @@ def same_artist(left: models.Performance, right: models.PerformanceRef) -> bool:
         RecordKey(artist=other, title=left.title),
     )
     return found.verdict is not Verdict.NO_MATCH
+
+
+def cover_identity_matches(base: RecordKey, cover: RecordKey, found: RecordKey) -> bool:
+    """Match a cover title or the same artist and title without a version marker."""
+    return any(compare(key, found).verdict is Verdict.MATCH for key in (base, cover))
+
+
+def has_original_artist(performance: models.Performance) -> bool:
+    """Require a sourced earlier performance by a different credited artist."""
+    return (
+        _performer(performance) is not None
+        and performance.is_original is not True
+        and any(
+            work.original is not None
+            and _performer(work.original) is not None
+            and not same_artist(performance, work.original)
+            for work in performance.originals
+        )
+    )
 
 
 def originals(

@@ -12,6 +12,7 @@ from deadwax.core import (
     RecordCandidate,
     RelationKind,
     Scope,
+    VersionKind,
     merge,
 )
 from deadwax.sources import LookupConfig, parse_query
@@ -208,3 +209,38 @@ async def test_other_version_is_not_merged() -> None:
 
 def test_website_keeps_foreign_urls() -> None:
     assert website("https://example.com/x") == "https://example.com/x"
+
+
+@pytest.mark.asyncio
+async def test_cover_query_uses_base_title_and_confirms_original_artist() -> None:
+    seen: list[httpx.Request] = []
+    adapter = make(search_for(3, "Song", "Singer"), seen=seen)
+    query = parse_query("Singer - Song (cover)", EntityKind.TRACK)
+    try:
+        partial = await adapter.lookup(query, LookupContext(query=query))
+    finally:
+        await adapter.aclose()
+
+    assert seen[0].url.params["title"] == "Song"
+    assert isinstance(partial.candidate, RecordCandidate)
+    assert partial.candidate.version is not None
+    assert partial.candidate.version.kind is VersionKind.COVER
+    assert merge(query, [partial], generated_at=datetime.now(UTC)).found
+    assert any(
+        relation.kind is RelationKind.COVER_OF
+        and relation.target.artist == "Band"
+        and relation.target.url == "https://secondhandsongs.com/performance/1"
+        for relation in partial.relations
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("number", [1, 4])
+async def test_cover_query_rejects_original_and_same_artist_versions(number: int) -> None:
+    adapter = make(search_for(number, "Song", "Band"))
+    query = parse_query("Band - Song (cover)", EntityKind.TRACK)
+    try:
+        with pytest.raises(NotFoundError, match="no confirmed SecondHandSongs cover"):
+            await adapter.lookup(query, LookupContext(query=query))
+    finally:
+        await adapter.aclose()

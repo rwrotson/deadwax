@@ -75,6 +75,7 @@ Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Sections of closed
 | E-1 | Done | Per-kind lookup slots (`Lookups`), dispatch by the kind known in each pass, `SourceInfo.kinds`. |
 | E-2 | Done | Typed queries per kind, a model for artists and labels, CLI `--artist` and `--label`. |
 | E-3 | In progress (standard live suite pending) | Artist and label lookups in MusicBrainz, Discogs, Last.fm, Wikipedia, and Bandcamp. Live invariants and documentation. |
+| Cover lookup | Done | MusicBrainz and SecondHandSongs confirm unmarked cover performances. |
 
 Common acceptance for source stages (9–19, and source work in E-3), in addition to each stage's own:
 
@@ -307,3 +308,12 @@ Moved the sources and tests guides into `docs/agents/`, added guides for core, C
 `uv run --group docs properdocs build --strict` and `git diff --check` passed. Checked the guide links and anchors, verified the two moves preserved their contents, and confirmed the generated site, sitemap, and search index exclude the agent guides. The Python suite and live lookups were skipped because the change affects only documentation and its site configuration.
 
 **Suggested message:** `docs: organize agent guides by project structure`.
+
+
+### 2026-11-24 — Cover lookup follow-up
+
+Explicit cover queries can now resolve unmarked performances at MusicBrainz and SecondHandSongs when the source documents the cover relationship. MusicBrainz retains the sourced relationship and work identifier when work details fail. The shared matching gate still controls other versions.
+
+Checks passed: `poe check` (1303 tests, 97.00% coverage), strict documentation build, and `git diff --check`. The adapter tests use mocked source responses. Live source lookups were skipped.
+
+**Suggested message:** `fix(sources): resolve covers from documented performance relations`.
