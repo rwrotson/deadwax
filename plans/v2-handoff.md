@@ -1,14 +1,12 @@
-# deadwax v2: implementation plan and handoff journal
+# deadwax v2 implementation plan and handoff journal (archived)
 
-## Status and handoff
+> Archived on 2026-11-25 after E-3 qualification and the Mixhound discovery stage 3 catalog transitions. The [v1 archive](v1.md) records stages 0–7. The [v2 archive](v2.md) records the v2 source stages, refactoring, early Mixhound work, and the decision log.
 
-This is the active specification and multi-session handoff for deadwax. deadwax collects, for one track or album, what open sources know about that exact recording, with four goals: (1) texts describing its sound, (2) relations for further searches, (3) confirmation of the exact recording and version with visible discrepancies, (4) streaming links. v1 (eight sources) is complete; its plan, stage evidence, and full decision log are archived in [`plans/v1.md`](plans/v1.md). The v2 source scope, closed v2 stages (8–17, 19, 20, R-1–R-6, M-1–M-3), their evidence, the Stage 18 access attempts, and the v2 decision log are archived in [`plans/v2.md`](plans/v2.md).
+## Final status
 
-- **Status:** v1 and v2 complete; v0.1.0 is the first tagged release (2026-11-20, GitHub only, no PyPI). Stage 18 (Rate Your Music) deferred until RYM is accessible; Boomkat and Norman Records remain access-limited. Stages E-1 and E-2 are done. E-3 and the catalog transitions for Mixhound discovery stage 3 are done. Release and integration belong to Mixhound stage 4.
-- **Branch:** `main`. Agents never create commits on the user's behalf.
-- **Working rule:** complete one stage, run its acceptance checks, append dated evidence, update the status table, report an English Conventional Commit suggestion, and stop. Resume the next stage only when the user asks.
-- Before code changes, read [`AGENTS.md`](AGENTS.md), the applicable guides in its [Read when table](AGENTS.md#read-when), `docs/architecture.md` (import rules R1–R9), and `CONTRIBUTING.md`. After code changes run `uv run poe check`. After docs or public docstring changes also run `uv run --group docs properdocs build --strict`.
-- Before changing a v1 adapter, read its rows in the decision log of `plans/v1.md`; before changing a v2 adapter, its stage and evidence in `plans/v2.md`.
+The deadwax workstream is closed. v0.1.0 was the first tagged release on 2026-11-20, and v0.2.0 followed on 2026-11-23. Record-kind stages E-1–E-3, cover lookup, and the catalog transitions for Mixhound discovery stage 3 were completed. Rate Your Music was deferred at closure with live verification outstanding. Boomkat and Norman Records retained access limitations. Release and integration for those catalog transitions belong to Mixhound stage 4.
+
+See [AGENTS.md](../AGENTS.md) for the current workflow and the [architecture](../docs/architecture.md) and [source documentation](../docs/sources.md) for current behavior. The decisions and checks below describe this workstream.
 
 ### Accepted decisions
 
@@ -32,12 +30,12 @@ Never used: Juno Download (shut down), Every Noise at Once, direct Metacritic sc
 ## v1 baseline
 
 - Sources: MusicBrainz, iTunes, Deezer (identity pass); Discogs, Bandcamp, Last.fm, Wikipedia/Wikidata (enrichment pass); Odesli (links pass).
-- Layers, import rules R1–R9 and contracts: `docs/architecture.md`, `pyproject.toml`. Sources, lookup flow, escalation and cache: `docs/sources.md`. Dossier model: `docs/output.md` and `src/deadwax/core/models.py`. Original design notes (package layout, data model, per-adapter coverage, HTTP stack, CLI): `plans/v1.md`.
+- Layers, import rules R1–R9 and contracts are described in the [architecture](../docs/architecture.md) and [project configuration](../pyproject.toml). See the [source documentation](../docs/sources.md) for lookup flow, escalation, and caching, the [output reference](../docs/output.md) for the dossier model, and the [v1 archive](v1.md) for the original design notes.
 - Tests: network off (pytest-socket); adapters get an injected client and replay recorded fixtures from `tests/fixtures/<source>/` (`scripts/record_fixtures.py`); opt-in live invariants in `tests/integration` (`poe test-live`); 95% branch coverage.
 
 ### Standing decisions
 
-Carried from the v1 decision log, where each has its date and reason. They apply to v2 sources unless a new decision supersedes one.
+These decisions were carried forward from the v1 decision log, which records their dates and reasoning.
 
 - Fact URLs are plain strings, not `HttpUrl`.
 - Relation kinds are directional (`cover_of`/`covered_by`, `remix_of`/`remixed_by`, `samples`/`sampled_by`).
@@ -63,12 +61,12 @@ Carried from the v1 decision log, where each has its date and reason. They apply
 
 ## Implementation stages and acceptance criteria
 
-Numbering continues after v1 (stages 0–7 in `plans/v1.md`). Sections of closed stages are in `plans/v2.md`. Order: shared infrastructure first; clean APIs next, to prove it; each model addition lands in the first stage whose source needs it; sources behind bot protection or with open terms-of-service questions last, so those decisions can be made meanwhile.
+Numbering continued after [v1 stages 0–7](v1.md). See the [v2 archive](v2.md) for details of the earlier stages. Shared infrastructure came first, followed by API sources. Model additions landed with the first source that needed them. Sources with access or terms-of-service questions came later.
 
 | Stage | Status | Deliverable |
 | --- | --- | --- |
-| 8–17, 19 | Done | v2 sources (details and caveats in `plans/v2.md`). |
-| 18 | Deferred (RYM access blocked) | Provisional Rate Your Music adapter and browser-first fetching; parser and live results unverified. |
+| 8–17, 19 | Done | v2 sources ([details and caveats](v2.md#closed-stages)). |
+| 18 | Deferred at closure (RYM access blocked) | Provisional Rate Your Music adapter and browser-first fetching. Live verification remained outstanding. |
 | R-1–R-6 | Done | Structural refactoring: adapter packages, shared helpers, service catalogue, configuration, core, cleanup. |
 | M-1–M-3 | Done | Requests by facets and the `Deadwax` client, leads, Bandcamp previews and ISRC. |
 | 20 | Done (RYM blocked, Forced Exposure HTTP 403, Norman disabled by the local allowlist) | Qualification; release v0.1.0. |
@@ -91,13 +89,7 @@ Common acceptance for source stages (9–19, and source work in E-3), in additio
 
 ### Stage 18: Rate Your Music
 
-- [x] The user confirmed express permission for automated RYM access.
-- [x] Browser-first fetching for a source that never answers plain httpx.
-- [ ] Verify primary and secondary genres, descriptor tags, rating with vote count, chart positions, and user reviews against real RYM pages. The provisional parser is covered only by synthetic HTML.
-
-**Deferred until:** RYM search and record pages can be captured and live lookups run. Do not mark this stage done from synthetic fixtures. The 2026-11-16 access attempts are in `plans/v2.md`.
-
-**Suggested message:** `feat(sources): add Rate Your Music adapter`.
+The user confirmed express permission for automated RYM access. The provisional adapter used browser-first fetching and was tested with synthetic HTML. Primary and secondary genres, descriptor tags, ratings and vote counts, chart positions, and user reviews still needed verification against real pages. The [v2 archive](v2.md#2026-11-16--stage-18-deferred-at-user-request) records why live verification was deferred.
 
 ### Stages E-1–E-3: record kinds
 
@@ -112,16 +104,14 @@ Agreed with the user on 2026-11-21. deadwax will look up artists and labels, and
 
 **Suggested messages:** `refactor!: dispatch adapter lookups by record kind`; `feat!: add typed queries and a model for artists and labels`; E-3 at its end.
 
-### Later, unscheduled: automation masking for Cloudflare-protected sources
+### Unscheduled proposal for Cloudflare-protected sources
 
-- [ ] Masking browser automation (stealth plugins, undetected-chromedriver, nodriver, Camoufox, fingerprint spoofing) so that Beatport and similar sources pass Cloudflare challenges that defeat httpx, curl_cffi, and plain Playwright.
-
-Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. Cons: an arms race with Cloudflare's detection, breaks with its updates, heavy and fragile code, against Beatport's terms and its explicit refusal of automated clients. Coding agents do not implement this item: Claude Code declines it, and its safety classifier refused even running the existing ladder against Beatport. It is not part of any stage and is not taken as the next action.
+On 2026-11-13, the user recorded a proposal for browser automation masking to avoid manual intervention for Beatport and similar sources. The proposal stayed outside the implementation stages. The discussion noted ongoing maintenance, fragility, and Beatport's refusal of automated clients.
 
 ## Verification
 
 - `uv sync --all-groups --locked`, `uv run poe check`, `uv run --group docs properdocs build --strict`, `uv build` with wheel smoke, `uv run poe audit`.
-- Manual: `deadwax sources`; the five v1 check records (`plans/v1.md`, "Five manual-check records") plus records chosen for each new source, in `--format pretty`, first with `--no-cache`; `poe test-live`. Reports separate mock-tested from live-verified behaviour.
+- Manual checks used `deadwax sources`, the [five v1 check records](v1.md#five-manual-check-records-confirmed-at-stage-7), and records chosen for each new source. Lookups ran in `--format pretty`, first with `--no-cache`, alongside `poe test-live`. Reports separate mock-tested from live-verified behaviour.
 
 ## Risks
 
@@ -135,7 +125,7 @@ Recorded at the user's request on 2026-11-13. Pros: no manual step per lookup. C
 
 ## Progress evidence and decision log
 
-Update the stage table only after its acceptance gate passes. Append dated evidence under the newest entry: what changed, exact commands and outcomes, what remains. Do not replace old evidence. Keep decisions distinct from observations.
+Entries record the state and verification results at the time of each handoff. The final status above reflects the completed workstream.
 
 ### 2026-11-21 — E-3 progress, step 1 (groundwork and MusicBrainz)
 
@@ -374,3 +364,9 @@ Uncached live checks with `NO_PROXY=musicbrainz.org` passed on MusicBrainz relea
 The Deadwax release and Mixhound dependency update remain for stage 4.
 
 **Suggested message:** `feat(sources): enumerate release tracks and work performances`.
+
+### 2026-11-25 — Workstream archived
+
+Moved the completed plan to `plans/v2-handoff.md`, updated references and workflow instructions, and preserved the dated evidence. Rate Your Music is recorded as deferred at closure, with live verification outstanding.
+
+The strict documentation build, archive link checks, and whitespace checks passed. The Python suite and live lookups were skipped because the changes were limited to documentation.

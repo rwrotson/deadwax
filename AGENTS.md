@@ -6,7 +6,7 @@ The base install depends on Pydantic, httpx, and selectolax. Extras: `logs` (str
 
 ## Workflow
 
-- Implementation is staged. Read `DEADWAX_PLAN.md` (specification and handoff journal) before work, implement only the first incomplete stage, append dated evidence, and stop at the stage boundary.
+- When working from an active staged plan, read it before work, implement only the first incomplete stage, append dated evidence, and stop at the stage boundary.
 - Inspect `git status` before editing. Preserve existing uncommitted changes and limit edits to the requested task.
 - Run `uv run poe check` after code changes; after docs, `properdocs.yml`, or public docstring changes also run the strict docs build.
 - Report which checks ran, which were skipped, and why. `poe test-fast` is not the full CI suite.
@@ -73,4 +73,4 @@ Before editing, read the guide for each affected layer and the test guide if the
 | Working in `tests/` | [Test guide](docs/agents/tests.md) |
 | Dependencies, settings, credentials, public API, docstrings and comments | `CONTRIBUTING.md` |
 | CI, releases, publishing | README "CI/CD", `docs/notes.md` |
-| History, or changing a v1/v2 adapter | `plans/v1.md`, `plans/v2.md` (archived stages and decision logs) |
+| History, or changing a v1/v2 adapter | [v1 archive](plans/v1.md), [v2 archive](plans/v2.md), and [v2 closing handoff](plans/v2-handoff.md) |

@@ -91,7 +91,7 @@ errors | events | deadline
 
 `events` holds `TraceEvent`, `trace()`, and `trace_scope()`, which every other core module may use. An event name is a `TraceEvent` member; a new event is added to the enum and to the table in `docs/runs.md`. `deadline` holds the adapter time budget that the orchestrator sets and adapters read or pause. `request` defines what an application asks for; `select` trims a merged dossier to it.
 
-A change to this order is recorded in the progress evidence of `DEADWAX_PLAN.md`.
+Document changes to this order here and record the rationale in the handoff for the change.
 
 ### R6. Third-party packages (contract)
 

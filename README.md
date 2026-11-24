@@ -11,7 +11,7 @@ Artist and label dossiers can include profiles, aliases, catalogues, and relatio
 
 Every fact carries the source and URL where it was found. Nothing is invented: missing data leaves a field empty. The result is equally usable in a terminal and as JSON for other programs.
 
-> The specification, stages, and progress log are in [`DEADWAX_PLAN.md`](https://github.com/rwrotson/deadwax/blob/main/DEADWAX_PLAN.md).
+> The [archived plans](https://github.com/rwrotson/deadwax/tree/main/plans) contain the implementation stages, decisions, and progress logs.
 
 ## Usage
 
