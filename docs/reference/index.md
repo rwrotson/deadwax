@@ -34,7 +34,7 @@ The pages below are generated from public objects in `src/deadwax/`. Names expor
 | `deadwax.sources.adapters.odesli.adapter` | Read links on all platforms from the song.link page of a streaming link |
 | `deadwax.sources.adapters.odesli.parse` | Turn song.link responses into identity and facts |
 | `deadwax.sources.adapters.odesli.models` | Model song.link responses |
-| `deadwax.sources.adapters.discogs.adapter` | Read masters, releases, versions, artists, labels, and reviews from Discogs |
+| `deadwax.sources.adapters.discogs.adapter` | Read masters, releases, versions, artists, and labels through the Discogs API |
 | `deadwax.sources.adapters.discogs.parse` | Turn Discogs responses into identity and facts |
 | `deadwax.sources.adapters.discogs.models` | Model Discogs API responses |
 | `deadwax.sources.adapters.bandcamp.adapter` | Find and read Bandcamp album and track pages |

@@ -117,12 +117,7 @@ async def test_mainstream_track(replay: Replay, config: LookupConfig) -> None:
         link.service for link in dossier.links
     }
     assert "alternative rock" in tags_from(dossier, "discogs")
-    assert errors(dossier) == {
-        "discogs": ErrorKind.BLOCKED,
-        "genius": ErrorKind.SKIPPED,
-    }
-    reviews = next(e for e in dossier.errors if e.source == "discogs")
-    assert reviews.reason.startswith("reviews:")
+    assert errors(dossier) == {"genius": ErrorKind.SKIPPED}
     assert {"pandora", "yandex"} <= {
         link.service for link in dossier.links if link.sources[0].source == "odesli"
     }
@@ -485,7 +480,9 @@ def test_describe_sources_reports_configured_access() -> None:
     assert sources["bandcamp"].api
     assert sources["bandcamp"].html_transports == ["patchright", "httpx"]
     assert sources["bandcamp"].browser_headless is False
-    for name in ("discogs", "genius", "hardwax"):
+    assert sources["discogs"].api
+    assert sources["discogs"].html_transports == []
+    for name in ("genius", "hardwax"):
         assert sources[name].api
         assert sources[name].html_transports
 

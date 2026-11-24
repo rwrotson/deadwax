@@ -256,29 +256,3 @@ def test_links_and_appearance(huerco: tuple[models.Master, models.Release]) -> N
     ]
     assert on_master.target.ids[IdKind.DISCOGS_MASTER] == "1016511"
     assert IdKind.DISCOGS_MASTER not in on_release.target.ids
-
-
-def test_reviews_from_json_ld() -> None:
-    page = b"""
-    <script type="application/ld+json">{"@type": "MusicRelease", "review": [
-      {"reviewBody": " Great ", "author": {"name": "fan"}, "datePublished": "2020-01-02T10:00",
-       "reviewRating": {"ratingValue": "4", "bestRating": 5}},
-      {"reviewBody": "Fine", "author": "plain", "reviewRating": {"ratingValue": "n/a"}},
-      {"description": ""}, "junk"]}</script>
-    <script type="application/ld+json">{"@type": "Product", "review": {"reviewBody": "One",
-      "reviewRating": {"ratingValue": 3}}}</script>
-    """
-
-    reviews = p.reviews(page, "https://www.discogs.com/release/1")
-
-    assert [(r.body, r.author, r.date) for r in reviews] == [
-        ("Great", "fan", "2020-01-02"),
-        ("Fine", "plain", None),
-        ("One", None, None),
-    ]
-    assert reviews[0].rating is not None
-    assert (reviews[0].rating.value, reviews[0].rating.scale) == (4.0, 5.0)
-    assert reviews[1].rating is None
-    assert reviews[2].rating is not None
-    assert reviews[2].rating.scale == 5.0
-    assert p.reviews(b"<html></html>", "https://www.discogs.com/release/1") == []

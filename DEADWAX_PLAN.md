@@ -337,3 +337,13 @@ Nodriver navigates the existing tab through CDP. When a challenge was observed a
 The full `uv run --no-sync poe test-live` run with that route completed all 29 scenarios in 15 minutes. It passed 26, including all six artist and label cases and the Genius case. The Discogs review page in `deadbeat_blue_moon` reported `blocked` and the API facts were retained. MusicBrainz returned HTTP 503 after retries for `jason_gibbs_starlings`, `albert_hammond`, and `basinski_and_blue_again`. E-3 remains open pending a successful standard live run.
 
 **Suggested message:** `fix(sources): preserve catalog facts on blocked review pages`.
+
+### 2026-11-25 — Discogs API-only lookups and E-3 retry
+
+Discogs now uses API v2 for all requests. Release-page reviews and the browser transport were removed from the adapter. Discogs URL queries resolve to API IDs. The legacy Discogs browser settings are still accepted by configuration. The transport fixes remain in the separate commit `38fbbc2`.
+
+Live Discogs-only checks passed for a release, an artist, and a label by ID without a token, and an album search with a token. The API response for release 4950798 also exposed track durations, company roles, series, format details, additional identifiers, linked videos, images, community ratings and have/want counts. The community rating and marketplace statistics endpoints both answered. These additional fields were inspected separately from the adapter change.
+
+`uv run --no-sync poe check` passed with 1,300 tests and 96.99% branch coverage. The strict documentation build passed. The full `uv run --no-sync poe test-live` with `NO_PROXY=musicbrainz.org` ran all 29 scenarios in 5 minutes 22 seconds. All six name lookups, the Genius case and the three previous MusicBrainz failures passed. The run passed 26 and failed three because MusicBrainz returned HTTP 503 for `codeine_promise_of_love`, `spiritualized_shine_a_light`, and `jeff_buckley_sky_blue_skin`. E-3 remains open pending a successful standard live run.
+
+**Suggested message:** `refactor(sources): use only the Discogs API`.

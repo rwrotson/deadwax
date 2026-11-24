@@ -6,9 +6,7 @@ import httpx
 from deadwax.core import (
     AdapterError,
     ArtistQuery,
-    BlockedError,
     Capability,
-    ConfigurationError,
     EntityKind,
     ErrorKind,
     IdKind,
@@ -24,17 +22,14 @@ from deadwax.core import (
     Relation,
     Requirement,
     Scope,
-    SourceError,
     SourceGroup,
     SourceStatus,
-    Text,
 )
 from deadwax.sources._adapter import HttpAdapter
-from deadwax.sources._http import ClientSpec, HttpClient, HttpResources, Profile
+from deadwax.sources._http import HttpClient, Profile
 from deadwax.sources._search import name_key, search_key
 from deadwax.sources.adapters.discogs import models
 from deadwax.sources.adapters.discogs import parse as p
-from deadwax.sources.config import LookupConfig
 
 logger = logging.getLogger(__name__)
 
@@ -52,13 +47,12 @@ _NAME_IDS = {EntityKind.ARTIST: IdKind.DISCOGS_ARTIST, EntityKind.LABEL: IdKind.
 
 
 class DiscogsAdapter(HttpAdapter):
-    """Genres, styles, credits, notes, versions, labels, members, and reviews from Discogs."""
+    """Genres, styles, credits, notes, versions, labels, and members from Discogs."""
 
     name = "discogs"
     pass_ = Pass.ENRICH
     group = SourceGroup.CORE
     service = "discogs"
-    additional_profiles = (Profile.BROWSER,)
     capabilities = frozenset(
         {
             Capability.IDENTITY,
@@ -71,10 +65,6 @@ class DiscogsAdapter(HttpAdapter):
     )
     requires = (Requirement(setting="sources.discogs.token", purpose="search and compilations"),)
     default_user_agent = DEFAULT_USER_AGENT
-
-    def __init__(self, config: LookupConfig, resources: HttpResources) -> None:
-        super().__init__(config, resources)
-        self._page_client: HttpClient | None = None
 
     @property
     def token(self) -> str | None:
@@ -109,23 +99,6 @@ class DiscogsAdapter(HttpAdapter):
                 settings = settings.model_copy(update={"rate": ANONYMOUS_RATE})
             self._client = HttpClient(self.client_spec(Profile.API), settings, self.resources)
         return self._client
-
-    @property
-    def page_client(self) -> HttpClient:
-        """Client for release pages, with browser headers and the escalation ladder."""
-        if self._page_client is None:
-            user_agent = self.settings.user_agent
-            headers = {"user-agent": user_agent} if user_agent else {}
-            spec = ClientSpec(self.name, Profile.BROWSER, headers)
-            self._page_client = HttpClient(spec, self.client_settings, self.resources)
-        return self._page_client
-
-    async def aclose(self) -> None:
-        """Close both clients."""
-        await super().aclose()
-        if self._page_client is not None:
-            await self._page_client.aclose()
-            self._page_client = None
 
     async def _get[M: models.ApiModel](self, model: type[M], path: str, **params: str) -> M:
         response = await self.client.get(f"{API}{path}", params=params or None)
@@ -328,16 +301,14 @@ class DiscogsAdapter(HttpAdapter):
         relations += await self._artist(release)
         relations += await self._label_releases(release, candidate.title)
 
-        reviews, errors = await self._reviews(release)
         return Partial(
             source=self.name,
             candidate=candidate,
             tags=tags,
             credits=people,
-            texts=texts + reviews,
+            texts=texts,
             relations=relations,
             links=p.links(release, master),
-            errors=errors,
         )
 
     async def _versions(
@@ -394,24 +365,3 @@ class DiscogsAdapter(HttpAdapter):
 
         exclude = {release.id, *([master.id] if master is not None else [])}
         return p.compilation_relations(found.results, exclude)
-
-    async def _reviews(self, release: models.Release) -> tuple[list[Text], list[AdapterError]]:
-        """Read reviews from the release page; a refused page costs only the reviews."""
-        url = p.page("release", release.id)
-        try:
-            response = await self.page_client.get(url)
-        except BlockedError as error:
-            reason = f"reviews: {error}"
-            return [], [
-                AdapterError(source=self.name, kind=ErrorKind.BLOCKED, reason=reason, url=url),
-            ]
-        except NotFoundError:
-            return [], []
-        # An explicitly chosen escalation step that cannot run raises ConfigurationError;
-        # it costs only the reviews.
-        except (SourceError, ConfigurationError) as error:
-            reason = f"reviews: {error}"
-            return [], [
-                AdapterError(source=self.name, kind=ErrorKind.FAILED, reason=reason, url=url),
-            ]
-        return p.reviews(response.content, response.url), []

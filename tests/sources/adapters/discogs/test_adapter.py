@@ -8,7 +8,6 @@ from pydantic import SecretStr
 from deadwax.core import (
     ArtistCandidate,
     Capability,
-    ConfigurationError,
     EntityKind,
     ErrorKind,
     ExternalId,
@@ -28,13 +27,11 @@ from deadwax.core import (
     UnresolvedQuery,
 )
 from deadwax.sources import LookupConfig, parse_query
-from deadwax.sources._http import Fetcher, HttpResources
+from deadwax.sources._http import HttpResources
 from deadwax.sources.adapters.discogs import DiscogsAdapter
 from deadwax.sources.adapters.discogs.adapter import ANONYMOUS_RATE, DEFAULT_USER_AGENT
-from deadwax.sources.config import Escalation, HttpSettings
 
 API = "https://api.discogs.com"
-PAGE = "https://www.discogs.com/release/10"
 TRACKS = [{"position": "A1", "title": "Song"}, {"position": "A2", "title": "Other"}]
 ARTISTS = [{"id": 3, "name": "Band"}]
 MASTER = {"id": 1, "title": "Record", "main_release": 10, "artists": ARTISTS,
@@ -42,11 +39,6 @@ MASTER = {"id": 1, "title": "Record", "main_release": 10, "artists": ARTISTS,
 RELEASE = {"id": 10, "title": "Record", "master_id": 1, "released": "2020-02-03",
            "artists": ARTISTS, "labels": [{"id": 5, "name": "Label", "catno": "L1"}],
            "tracklist": TRACKS, "notes": "Release note"}  # fmt: skip
-REVIEWS = (
-    b'<script type="application/ld+json">{"@type": "MusicRelease", "review": '
-    b'[{"reviewBody": "Good", "author": {"name": "fan"}}]}</script>'
-)
-
 type Route = tuple[int, object]
 
 
@@ -57,7 +49,6 @@ def routes(**changes: Route) -> dict[str, Route]:
         f"{API}/masters/1/versions": (200, {"versions": [{"id": 11, "title": "Record"}]}),
         f"{API}/artists/3": (200, {"id": 3, "name": "Band", "members": [{"id": 4, "name": "M"}]}),
         f"{API}/labels/5/releases": (200, {"releases": [{"id": 12, "title": "Next"}]}),
-        PAGE: (200, REVIEWS),
     }
     return base | {key.replace("__", "/"): value for key, value in changes.items()}
 
@@ -68,9 +59,9 @@ def make(
     token: str | None = None,
     seen: list[httpx.Request] | None = None,
     search: Callable[[httpx.Request], Route] | None = None,
-    **http: object,
 ) -> DiscogsAdapter:
     def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.host == "api.discogs.com"
         if seen is not None:
             seen.append(request)
         url = str(request.url.copy_with(query=None))
@@ -84,7 +75,7 @@ def make(
     config = LookupConfig.model_validate(
         {
             "sources": {"discogs": {"rate": 1000, "token": token}},
-            "http": {"retries": 0, "escalation": [], **http},
+            "http": {"retries": 0, "escalation": []},
         },
     )
     return DiscogsAdapter(config, HttpResources(transport=httpx.MockTransport(handler)))
@@ -289,15 +280,11 @@ async def test_album_by_master_id_from_an_earlier_pass() -> None:
 
     assert partial.candidate is not None
     assert partial.candidate.ids[IdKind.DISCOGS_RELEASE] == "10"
-    assert [t.title for t in partial.texts if t.title] == ["Master notes", "Release notes"]
-    assert [t.author for t in partial.texts if t.author] == ["fan"]
+    assert [t.title for t in partial.texts] == ["Master notes", "Release notes"]
     kinds = {r.kind for r in partial.relations}
     assert {RelationKind.OTHER_VERSION, RelationKind.MEMBER, RelationKind.LABEL_RELEASE} <= kinds
-    api = [r for r in seen if r.url.host == "api.discogs.com"]
-    assert {r.headers["user-agent"] for r in api} == {DEFAULT_USER_AGENT}
+    assert {r.headers["user-agent"] for r in seen} == {DEFAULT_USER_AGENT}
     assert all("authorization" not in r.headers for r in seen)
-    page = next(r for r in seen if r.url.host == "www.discogs.com")
-    assert page.headers["user-agent"].startswith("Mozilla/5.0")
     await adapter.aclose()
 
 
@@ -438,46 +425,18 @@ async def test_release_without_artist_or_label() -> None:
     assert RelationKind.LABEL_RELEASE not in kinds
 
 
-@pytest.mark.parametrize(
-    ("route", "expected"),
-    [
-        ((403, b"<title>Just a moment...</title>"), [ErrorKind.BLOCKED]),
-        ((404, b"gone"), []),
-        ((500, b"oops"), [ErrorKind.FAILED]),
-    ],
-)
-@pytest.mark.asyncio
-async def test_review_page_failures_keep_the_api_facts(
-    route: Route,
-    expected: list[ErrorKind],
-) -> None:
-    adapter = make(routes(**{PAGE: route}))
+def test_api_access_with_no_permitted_html_transports() -> None:
+    config = LookupConfig.model_validate(
+        {"http": {"escalation": []}, "sources": {"discogs": {"html_transports": ["browser"]}}},
+    )
+    adapter = DiscogsAdapter(config, HttpResources())
 
-    partial = await adapter.lookup(ALBUM, with_ids(ALBUM, discogs_master="1"))
-
-    assert partial.candidate is not None
-    assert [e.kind for e in partial.errors] == expected
-    assert all(e.reason.startswith("reviews:") for e in partial.errors)
-
-
-@pytest.mark.asyncio
-async def test_missing_escalation_browser_costs_only_the_reviews() -> None:
-    def unavailable(_: HttpSettings, __: str | None) -> Fetcher:
-        raise ConfigurationError("Chromium for Playwright is not installed")
-
-    table = routes(**{PAGE: (403, b"<title>Just a moment...</title>")})
-    adapter = make(table, escalation=["browser"])
-    adapter.resources.escalations = {
-        Escalation.IMPERSONATE: unavailable,
-        Escalation.BROWSER: unavailable,
-    }
-    adapter.resources.installed = lambda _: True
-
-    partial = await adapter.lookup(ALBUM, with_ids(ALBUM, discogs_master="1"))
-
-    assert partial.candidate is not None
-    assert [e.kind for e in partial.errors] == [ErrorKind.BLOCKED]
-    assert "Chromium" in partial.errors[0].reason
+    assert adapter.status().ready
+    access = adapter.access()
+    assert access.api
+    assert access.html_transports == []
+    assert access.browser_headless is None
+    assert not access.headed_fallback
 
 
 @pytest.mark.parametrize(
@@ -493,11 +452,10 @@ def test_rate_without_a_token(discogs: dict[str, object], rate: float) -> None:
     assert adapter.client.settings.rate == rate
 
 
-def test_user_agent_setting_applies_to_both_clients() -> None:
+def test_user_agent_setting_applies_to_the_api_client() -> None:
     config = LookupConfig.model_validate(
         {"sources": {"discogs": {"user_agent": "Mine/1.0", "token": SecretStr("t")}}},
     )
     adapter = DiscogsAdapter(config, HttpResources())
 
     assert adapter.client.spec.headers["user-agent"] == "Mine/1.0"
-    assert adapter.page_client.spec.headers == {"user-agent": "Mine/1.0"}

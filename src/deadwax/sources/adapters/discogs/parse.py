@@ -16,7 +16,6 @@ from deadwax.core import (
     LinkTarget,
     NameKey,
     Provenance,
-    Rating,
     RecordCandidate,
     RecordKey,
     Relation,
@@ -32,7 +31,6 @@ from deadwax.core import (
     normalize_barcode,
     normalize_text,
 )
-from deadwax.sources._html import JsonObject, json_ld, parse_html
 from deadwax.sources.adapters.discogs import models
 from deadwax.sources.services import link_target, service_of
 
@@ -656,51 +654,3 @@ def profile_links(urls: Iterable[str], target: LinkTarget, profile_url: str) -> 
             ),
         )
     return result
-
-
-def _number(value: object) -> float | None:
-    try:
-        return float(value) if isinstance(value, (int, float, str)) and str(value) else None
-    except ValueError:
-        return None
-
-
-def _review(item: JsonObject, url: str) -> Text | None:
-    body = item.get("reviewBody") or item.get("description")
-    if not isinstance(body, str) or not body.strip():
-        return None
-
-    author = item.get("author")
-    author_name = author.get("name") if isinstance(author, dict) else author
-
-    rating = item.get("reviewRating")
-    score = None
-    if isinstance(rating, dict):
-        value, scale = _number(rating.get("ratingValue")), _number(rating.get("bestRating"))
-        if value is not None:
-            score = Rating(value=value, scale=scale or 5.0)
-    date = item.get("datePublished")
-    return Text(
-        kind=TextKind.USER,
-        body=body.strip(),
-        author=author_name if isinstance(author_name, str) else None,
-        publication="Discogs",
-        date=date[:10] if isinstance(date, str) else None,
-        rating=score,
-        scope=Scope.RELEASE,
-        sources=[Provenance(source=SOURCE, url=url)],
-    )
-
-
-def _review_items(release: JsonObject) -> list[JsonObject]:
-    items = release.get("review")
-    if isinstance(items, dict):
-        return [items]
-    return [item for item in items if isinstance(item, dict)] if isinstance(items, list) else []
-
-
-def reviews(content: bytes, url: str) -> list[Text]:
-    """Read user reviews from the JSON-LD of a release page."""
-    releases = json_ld(parse_html(content), "MusicRelease", "MusicAlbum", "Product")
-    found = (_review(item, url) for release in releases for item in _review_items(release))
-    return [text for text in found if text is not None]
