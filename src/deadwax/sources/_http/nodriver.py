@@ -36,7 +36,6 @@ class _ResponseEvent(Protocol):
 class _Tab(Protocol):
     url: str
 
-    async def get(self, url: str) -> object: ...
     async def send(self, command: object) -> object: ...
     async def evaluate(self, expression: str, *, return_by_value: bool) -> object: ...
     async def sleep(self, seconds: float) -> object: ...
@@ -215,11 +214,13 @@ class NodriverFetcher:
             if received.type_.value == "Document":
                 responses.append(received.response)
 
-        network = vars(vars(module)["cdp"])["network"]
-        tab.add_handler(vars(network)["ResponseReceived"], record)
+        cdp = vars(vars(module)["cdp"])
+        network = vars(cdp["network"])
+        navigate = vars(cdp["page"])["navigate"]
+        tab.add_handler(network["ResponseReceived"], record)
         try:
-            await asyncio.wait_for(tab.send(vars(network)["enable"]()), timeout=self._timeout)
-            await asyncio.wait_for(tab.get(request.full_url), timeout=self._timeout)
+            await asyncio.wait_for(tab.send(network["enable"]()), timeout=self._timeout)
+            await asyncio.wait_for(tab.send(navigate(request.full_url)), timeout=self._timeout)
             response = await self._ready_response(tab, request, responses)
         except (TimeoutError, OSError, RuntimeError) as error:
             raise TransportError(f"{type(error).__name__}: {error}") from error

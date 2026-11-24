@@ -433,7 +433,7 @@ class HttpClient:
         safe_url = redact(request.full_url, self.spec.secret_params)
         reason = ""
         tried: list[str] = []
-        challenged = False
+        challenge_reason: str | None = None
         level = self._level
         while level < len(self._steps):
             step = self._steps[level]
@@ -441,7 +441,7 @@ class HttpClient:
                 response = await self._attempt(step, request, safe_url, exchange)
             except TransportError as error:
                 error.url = error.url or safe_url
-                if level == len(self._steps) - 1:
+                if level == len(self._steps) - 1 and challenge_reason is None:
                     raise
                 self._unavailable.append(f"{self._label(step)} failed: {error}")
                 trace(logger, TraceEvent.HTTP_STEP_FAILED, step=step, reason=str(error))
@@ -459,15 +459,16 @@ class HttpClient:
                 self._level = level
                 return response
             reason, challenge = problem
-            challenged = challenged or challenge
+            challenge_reason = reason if challenge else challenge_reason
             if challenge and self._falls_back(step, reason):
                 self._headed = True
                 trace(logger, TraceEvent.HTTP_HEADED_FALLBACK, url=safe_url, fetcher=label)
                 continue
             level += 1
         unavailable = f"; {'; '.join(self._unavailable)}" if self._unavailable else ""
-        failure_type = BlockedError if challenged else SourceError
-        raise failure_type(f"{reason} (tried {', '.join(tried)}{unavailable})", url=safe_url)
+        failure_type = BlockedError if challenge_reason is not None else SourceError
+        detail = challenge_reason or reason
+        raise failure_type(f"{detail} (tried {', '.join(tried)}{unavailable})", url=safe_url)
 
     def _problem(self, response: Response, safe_url: str, label: str) -> tuple[str, bool] | None:
         """Return why a page is unusable and whether it is a challenge, or None when usable."""

@@ -440,6 +440,23 @@ async def test_blocked_when_every_transport_meets_a_challenge() -> None:
 
 
 @pytest.mark.asyncio
+async def test_last_transport_failure_preserves_the_observed_challenge() -> None:
+    setup = Setup(Server([httpx.Response(403, content=CHALLENGE)]), retries=0)
+    setup.fetchers = {
+        Escalation.IMPERSONATE: FakeFetcher("impersonate", [TransportError("no document")]),
+    }
+
+    async with setup.client(Profile.BROWSER, escalation=Escalation.IMPERSONATE) as client:
+        with pytest.raises(
+            BlockedError,
+            match=r"Cloudflare challenge .*impersonate failed: no document",
+        ) as raised:
+            await client.get(URL)
+
+    assert raised.value.url == URL
+
+
+@pytest.mark.asyncio
 async def test_escalated_transport_errors_carry_the_url() -> None:
     setup = Setup(Server([httpx.Response(403, content=CHALLENGE)]), retries=0)
     setup.fetchers = {Escalation.IMPERSONATE: FakeFetcher("impersonate", [SourceError("boom")])}

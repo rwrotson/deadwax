@@ -29,22 +29,21 @@ class FakeTab:
     def add_handler(self, event: object, callback: Callable[[object], None]) -> None:
         self.callback = callback
 
-    async def get(self, url: str) -> None:
-        self.url = url
+    async def send(self, command: object) -> None:
+        if not isinstance(command, str):
+            return
+        self.url = command
         if self.status is not None and self.callback is not None:
             self.callback(
                 SimpleNamespace(
                     type_=SimpleNamespace(value="Document"),
                     response=SimpleNamespace(
-                        url=url,
+                        url=command,
                         status=self.status,
                         headers={"Content-Type": "text/html"},
                     ),
                 ),
             )
-
-    async def send(self, command: object) -> None:
-        pass
 
     async def bring_to_front(self) -> None:
         self.fronts += 1
@@ -120,18 +119,20 @@ def scenario(monkeypatch: pytest.MonkeyPatch) -> Scenario:
 
     network = SimpleNamespace(ResponseReceived=object)
     network.enable = object
-    module = SimpleNamespace(start=start, cdp=SimpleNamespace(network=network))
+    page = SimpleNamespace(navigate=str)
+    module = SimpleNamespace(start=start, cdp=SimpleNamespace(network=network, page=page))
     monkeypatch.setattr(nodriver_module, "_module", lambda: module)
     return state
 
 
 @pytest.mark.asyncio
-async def test_fetch_returns_final_document(scenario: Scenario) -> None:
+async def test_fetch_navigates_tab_without_browser_reference(scenario: Scenario) -> None:
     fetcher = NodriverFetcher(timeout=5, max_bytes=100, proxy="http://proxy.test:8080")
 
     response = await fetcher.fetch(Request("GET", "https://example.test/page"))
     await fetcher.aclose()
 
+    assert response.url == "https://example.test/page"
     assert response.status == 200
     assert response.headers == {"content-type": "text/html"}
     assert response.text == "<html>ready</html>"

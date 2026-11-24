@@ -327,3 +327,13 @@ The same three cover regression cases passed on `9424f37` and failed on v0.2.0 (
 `uv run --no-sync poe check` passed on `9424f37` with 1,303 tests and 97.00% branch coverage. The strict documentation build passed. E-3 still awaits a successful standard live suite. Release tracklists and work performances remain pending.
 
 **Suggested message:** `docs: record E-3 live qualification results`.
+
+### 2026-11-25 — E-3 transport fixes and full live run
+
+Nodriver navigates the existing tab through CDP. When a challenge was observed and the final HTML transport fails, the HTTP client reports the challenge as blocked and includes the transport failure in the diagnostic. Discogs keeps the release facts obtained from its API.
+
+`uv run --no-sync poe check` passed with 1,304 tests and 97.00% branch coverage. The strict documentation build and a local headless Nodriver smoke check passed. The three cases from the prior live attempt passed with `NO_PROXY=musicbrainz.org`.
+
+The full `uv run --no-sync poe test-live` run with that route completed all 29 scenarios in 15 minutes. It passed 26, including all six artist and label cases and the Genius case. The Discogs review page in `deadbeat_blue_moon` reported `blocked` and the API facts were retained. MusicBrainz returned HTTP 503 after retries for `jason_gibbs_starlings`, `albert_hammond`, and `basinski_and_blue_again`. E-3 remains open pending a successful standard live run.
+
+**Suggested message:** `fix(sources): preserve catalog facts on blocked review pages`.
