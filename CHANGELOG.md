@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.3.0 (2026-11-25)
+
+### Feat
+
+- **sources**: enumerate release tracks and work performances
+
+### Fix
+
+- **sources**: preserve catalog facts on blocked review pages
+- **sources**: resolve covers from documented performance relations
+
+### Refactor
+
+- **sources**: use only the Discogs API
+
 ## v0.2.0 (2026-11-23)
 
 ### Feat
